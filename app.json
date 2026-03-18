@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "Bandaro",
+    "slug": "bandaro",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/tres-bandas-logo.png",
+    "scheme": "bandaro",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/images/tres-bandas-logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.bandaro.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/images/tres-bandas-logo.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/tres-bandas-logo.png"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "c9251e2d-eb95-4cec-8772-1f006831b07a"
+      }
+    },
+    "owner": "camilopaez117"
+  }
+}
