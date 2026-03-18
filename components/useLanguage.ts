@@ -15,7 +15,7 @@ interface LanguageContextValue {
     setPreference: (value: LanguagePreference) => void;
 }
 
-const STORAGE_KEY = '@billar/language-preference';
+const STORAGE_KEY = '@bandaro/language-preference';
 const LanguageContext = createContext<LanguageContextValue | null>(null);
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
