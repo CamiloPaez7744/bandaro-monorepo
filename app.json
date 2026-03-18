@@ -4,11 +4,11 @@
     "slug": "bandaro",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/tres-bandas-logo.png",
+    "icon": "./assets/images/Bandaro.PNG",
     "scheme": "bandaro",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/images/tres-bandas-logo.png",
+      "image": "./assets/images/Bandaro.PNG",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -19,14 +19,14 @@
       "package": "com.bandaro.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/tres-bandas-logo.png"
+        "foregroundImage": "./assets/images/Bandaro.PNG"
       },
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/tres-bandas-logo.png"
+      "favicon": "./assets/images/Bandaro.PNG"
     },
     "plugins": [
       "expo-router"
