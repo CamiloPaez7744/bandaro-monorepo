@@ -6,10 +6,19 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      run_eas_build:
+        description: 'Run EAS mobile builds (consumes Expo quota)'
+        required: true
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
 
 env:
-  NODE_VERSION: '20'
-  PNPM_VERSION: '10'
+  NODE_VERSION: "20"
+  PNPM_VERSION: "10"
 
 jobs:
   validate:
@@ -78,7 +87,7 @@ jobs:
     name: Build Mobile (EAS)
     needs: validate
     runs-on: ubuntu-latest
-    if: github.event_name != 'pull_request' && secrets.EXPO_TOKEN != ''
+    if: github.event_name == 'workflow_dispatch' && inputs.run_eas_build == 'true' && secrets.EXPO_TOKEN != ''
     steps:
       - name: Checkout
         uses: actions/checkout@v4
