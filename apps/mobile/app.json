@@ -4,11 +4,11 @@
     "slug": "bandaro",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/Bandaro.PNG",
+    "icon": "./assets/images/bandaro.png",
     "scheme": "bandaro",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/images/Bandaro.PNG",
+      "image": "./assets/images/bandaro.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -19,14 +19,14 @@
       "package": "com.bandaro.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/Bandaro.PNG"
+        "foregroundImage": "./assets/images/bandaro.png"
       },
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/Bandaro.PNG"
+      "favicon": "./assets/images/bandaro.png"
     },
     "plugins": [
       "expo-router"

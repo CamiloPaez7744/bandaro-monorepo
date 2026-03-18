@@ -1,0 +1,13 @@
+{
+  "name": "@bandaro/backend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "echo \"Backend pending implementation\"",
+    "build": "echo \"Backend build pending\"",
+    "lint": "echo \"Backend lint pending\"",
+    "type-check": "echo \"Backend type-check pending\"",
+    "test": "echo \"Backend tests pending\"",
+    "clean": "echo \"Backend clean pending\""
+  }
+}

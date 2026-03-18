@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "incremental": true,
+    "noEmit": true,
+    "allowSyntheticDefaultImports": true,
+    "baseUrl": ".",
+    "paths": {
+      "@bandaro/core": ["./packages/core/src"],
+      "@bandaro/ui": ["./packages/ui/src"],
+      "@bandaro/config": ["./packages/config"],
+      "@/*": ["./apps/mobile/*"]
+    }
+  },
+  "exclude": ["node_modules", "dist", "build", ".expo", "web-build"]
+}
