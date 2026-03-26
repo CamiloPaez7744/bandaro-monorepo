@@ -33,14 +33,21 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="historial"
+        name="history"
         options={{
           title: t('tabs.history'),
           tabBarIcon: ({ color, size }) => <Ionicons name="time" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="perfil"
+        name="training"
+        options={{
+          title: t('tabs.training'),
+          tabBarIcon: ({ color, size }) => <Ionicons name="barbell" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
         options={{
           title: t('tabs.profile'),
           tabBarIcon: ({ color, size }) => <Ionicons name="person" size={size} color={color} />,

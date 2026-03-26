@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import type { Sesion } from '@/src/domain/entities/Sesion';
-import type { Usuario } from '@/src/domain/entities/Usuario';
+import type { Session } from '@/src/domain/entities/Session';
+import type { User } from '@/src/domain/entities/User';
 import type { IAuthRepository } from '@/src/domain/repositories/IAuthRepository';
 import { createJwt } from '@/src/infrastructure/auth/jwt';
 
@@ -38,7 +38,7 @@ function normalizeCountryCode(code?: string): string {
 }
 
 export class FileSystemAuthRepository implements IAuthRepository {
-    async registrar(input: Omit<Usuario, 'id' | 'createdAt' | 'passwordHash'> & { password: string }): Promise<Usuario> {
+    async registrar(input: Omit<User, 'id' | 'createdAt' | 'passwordHash'> & { password: string }): Promise<User> {
         const users = await this.readUsers();
         const email = normalizeEmail(input.email);
 
@@ -46,7 +46,7 @@ export class FileSystemAuthRepository implements IAuthRepository {
             throw new Error('Ya existe un usuario con este correo.');
         }
 
-        const user: Usuario = {
+        const user: User = {
             id: `${Date.now()}-${Math.floor(Math.random() * 100000)}`,
             nombre: input.nombre.trim(),
             alias: input.alias.trim(),
@@ -63,7 +63,7 @@ export class FileSystemAuthRepository implements IAuthRepository {
         return user;
     }
 
-    async login(emailRaw: string, password: string): Promise<Sesion> {
+    async login(emailRaw: string, password: string): Promise<Session> {
         const users = await this.readUsers();
         const email = normalizeEmail(emailRaw);
         const user = users.find((item) => normalizeEmail(item.email) === email);
@@ -81,17 +81,17 @@ export class FileSystemAuthRepository implements IAuthRepository {
         await AsyncStorage.removeItem(SESSION_STORAGE_KEY);
     }
 
-    async obtenerSesionActual(): Promise<Sesion | null> {
+    async obtenerSessionActual(): Promise<Session | null> {
         const raw = await AsyncStorage.getItem(SESSION_STORAGE_KEY);
         if (!raw) {
             return null;
         }
 
-        return JSON.parse(raw) as Sesion;
+        return JSON.parse(raw) as Session;
     }
 
-    async refrescarSesion(refreshToken: string): Promise<Sesion> {
-        const session = await this.obtenerSesionActual();
+    async refrescarSession(refreshToken: string): Promise<Session> {
+        const session = await this.obtenerSessionActual();
         if (!session) {
             throw new Error('No hay sesion activa.');
         }
@@ -110,7 +110,7 @@ export class FileSystemAuthRepository implements IAuthRepository {
         return next;
     }
 
-    async obtenerUsuarioPorId(userId: string): Promise<Usuario | null> {
+    async obtenerUserPorId(userId: string): Promise<User | null> {
         const users = await this.readUsers();
         return users.find((user) => user.id === userId) ?? null;
     }
@@ -118,16 +118,16 @@ export class FileSystemAuthRepository implements IAuthRepository {
     async actualizarPerfil(
         userId: string,
         input: { nombre?: string; alias?: string; nacionalidad?: string; countryCode?: string; avatar?: string }
-    ): Promise<Usuario> {
+    ): Promise<User> {
         const users = await this.readUsers();
         const index = users.findIndex((user) => user.id === userId);
 
         if (index === -1) {
-            throw new Error('Usuario no encontrado.');
+            throw new Error('User no encontrado.');
         }
 
         const current = users[index];
-        const updated: Usuario = {
+        const updated: User = {
             ...current,
             nombre: input.nombre?.trim() || current.nombre,
             alias: input.alias?.trim() || current.alias,
@@ -141,7 +141,7 @@ export class FileSystemAuthRepository implements IAuthRepository {
         return updated;
     }
 
-    private buildSession(userId: string): Sesion {
+    private buildSession(userId: string): Session {
         const access = createJwt({ sub: userId, type: 'access' }, 60 * 15);
         const refresh = createJwt({ sub: userId, type: 'refresh' }, 60 * 60 * 24 * 7);
 
@@ -154,7 +154,7 @@ export class FileSystemAuthRepository implements IAuthRepository {
         };
     }
 
-    private async readUsers(): Promise<Usuario[]> {
+    private async readUsers(): Promise<User[]> {
         const raw = await AsyncStorage.getItem(USERS_STORAGE_KEY);
         if (!raw) {
             return [];

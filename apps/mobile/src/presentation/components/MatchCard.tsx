@@ -1,12 +1,12 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import type { Partida } from '@/src/domain/entities/Partida';
+import type { Match } from '@/src/domain/entities/Match';
 import { getPalette, theme } from '@/constants/theme';
 import { useColorScheme } from '@/components/useColorScheme';
 import { useI18n } from '@/components/useLanguage';
 
 interface MatchCardProps {
-  partida: Partida;
+  partida: Match;
   onPress?: () => void;
 }
 

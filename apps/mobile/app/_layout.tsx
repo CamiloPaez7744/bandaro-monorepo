@@ -65,9 +65,11 @@ function RootLayoutNav() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="auth/login" options={{ title: t('stack.login') }} />
         <Stack.Screen name="auth/register" options={{ title: t('stack.register') }} />
-        <Stack.Screen name="partida/nueva" options={{ title: t('stack.newMatch') }} />
-        <Stack.Screen name="partida/en-vivo" options={{ title: t('stack.liveMatch') }} />
-        <Stack.Screen name="partida/resumen" options={{ title: t('stack.summary') }} />
+        <Stack.Screen name="training/index" options={{ title: t('stack.training') }} />
+        <Stack.Screen name="training/[systemId]" options={{ title: t('stack.trainingSystem') }} />
+        <Stack.Screen name="match/new" options={{ title: t('stack.newMatch') }} />
+        <Stack.Screen name="match/live" options={{ title: t('stack.liveMatch') }} />
+        <Stack.Screen name="match/summary" options={{ title: t('stack.summary') }} />
       </Stack>
     </ThemeProvider>
   );

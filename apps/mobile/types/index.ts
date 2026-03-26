@@ -1,12 +1,12 @@
-export type EstadoPartida = 'EN_VIVO' | 'FINALIZADA';
+export type EstadoMatch = 'EN_VIVO' | 'FINALIZADA';
 
-export type TurnoJugador = 'A' | 'B';
+export type TurnoPlayer = 'A' | 'B';
 
-export interface ResumenPartida {
+export interface SummaryMatch {
     promedioGeneral: number;
-    promedioJugadorA: number;
-    promedioJugadorB: number;
+    promedioPlayerA: number;
+    promedioPlayerB: number;
     serieMayorA: number;
     serieMayorB: number;
-    ganador: TurnoJugador | 'EMPATE';
+    ganador: TurnoPlayer | 'EMPATE';
 }

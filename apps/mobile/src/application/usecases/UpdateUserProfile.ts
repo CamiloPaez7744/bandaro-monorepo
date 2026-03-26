@@ -6,7 +6,7 @@ export class UpdateUserProfile {
 
     async execute(userId: string, dto: UpdateProfileDTO) {
         if (!userId) {
-            throw new Error('Usuario invalido.');
+            throw new Error('User invalido.');
         }
 
         return this.repository.actualizarPerfil(userId, dto);

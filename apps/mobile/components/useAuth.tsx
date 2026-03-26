@@ -2,8 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { PropsWithChildren } from 'react';
 import { AppState, Platform } from 'react-native';
 
-import type { Sesion } from '@/src/domain/entities/Sesion';
-import type { Usuario } from '@/src/domain/entities/Usuario';
+import type { Session } from '@/src/domain/entities/Session';
+import type { User } from '@/src/domain/entities/User';
 import { container } from '@/src/presentation/container';
 
 interface RegisterInput {
@@ -30,8 +30,8 @@ interface LoginInput {
 }
 
 interface AuthContextValue {
-  user: Usuario | null;
-  session: Sesion | null;
+  user: User | null;
+  session: Session | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (input: LoginInput) => Promise<void>;
@@ -59,8 +59,8 @@ export const DEFAULT_AVATARS = [
 ];
 
 export function AuthProvider({ children }: PropsWithChildren) {
-  const [session, setSession] = useState<Sesion | null>(null);
-  const [user, setUser] = useState<Usuario | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAppActive, setIsAppActive] = useState(true);
 

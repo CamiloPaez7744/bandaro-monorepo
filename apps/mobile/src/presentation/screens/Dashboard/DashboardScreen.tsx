@@ -9,11 +9,11 @@ import { useAuth } from '@/components/useAuth';
 import { useColorScheme } from '@/components/useColorScheme';
 import { useI18n } from '@/components/useLanguage';
 import { getPalette, theme } from '@/constants/theme';
-import type { Partida } from '@/src/domain/entities/Partida';
+import type { Match } from '@/src/domain/entities/Match';
 import { MatchCard } from '@/src/presentation/components/MatchCard';
 import { StatChip } from '@/src/presentation/components/StatChip';
 import { container } from '@/src/presentation/container';
-import { useEstadisticas } from '@/src/presentation/hooks/useEstadisticas';
+import { useStatistics } from '@/src/presentation/hooks/useStatistics';
 
 const CHART_WIDTH = 320;
 const CHART_HEIGHT = 160;
@@ -40,59 +40,59 @@ export function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const palette = getPalette(useColorScheme());
   const styles = getStyles(palette);
-  const { estadisticas } = useEstadisticas();
-  const [partidas, setPartidas] = useState<Partida[]>([]);
+  const { estadisticas } = useStatistics();
+  const [partidas, setMatchs] = useState<Match[]>([]);
 
   const alias = user?.alias?.trim().toLowerCase() ?? '';
   const nombre = user?.nombre?.trim().toLowerCase() ?? '';
 
-  const coincideUsuario = useCallback(
-    (nombreJugador: string) => {
-      const normalizado = nombreJugador.trim().toLowerCase();
+  const coincideUser = useCallback(
+    (nombrePlayer: string) => {
+      const normalizado = nombrePlayer.trim().toLowerCase();
       return normalizado === alias || normalizado === nombre;
     },
     [alias, nombre]
   );
 
-  const partidasDelUsuario = useMemo(() => {
+  const partidasDelUser = useMemo(() => {
     if (!isAuthenticated || !user) {
-      return [] as Partida[];
+      return [] as Match[];
     }
 
     return partidas.filter((partida) => {
-      return coincideUsuario(partida.jugadorA.nombre) || coincideUsuario(partida.jugadorB.nombre);
+      return coincideUser(partida.jugadorA.nombre) || coincideUser(partida.jugadorB.nombre);
     });
-  }, [coincideUsuario, isAuthenticated, partidas, user]);
+  }, [coincideUser, isAuthenticated, partidas, user]);
 
-  const estadisticasUsuario = useMemo(() => {
-    if (partidasDelUsuario.length === 0) {
+  const estadisticasUser = useMemo(() => {
+    if (partidasDelUser.length === 0) {
       return { promedio: 0, serieMayor: 0 };
     }
 
-    let totalEntradasUsuario = 0;
-    let totalCarambolasUsuario = 0;
+    let totalEntrysUser = 0;
+    let totalCarambolasUser = 0;
     let serieMayor = 0;
 
-    partidasDelUsuario.forEach((partida) => {
-      const juegaComoA = coincideUsuario(partida.jugadorA.nombre);
-      const entradasUsuario = partida.entradas.filter((entrada) => entrada.jugador === (juegaComoA ? 'A' : 'B'));
+    partidasDelUser.forEach((partida) => {
+      const juegaComoA = coincideUser(partida.jugadorA.nombre);
+      const entradasUser = partida.entradas.filter((entrada) => entrada.jugador === (juegaComoA ? 'A' : 'B'));
 
-      totalEntradasUsuario += entradasUsuario.length;
-      totalCarambolasUsuario += entradasUsuario.reduce((acc, entrada) => acc + entrada.carambolas, 0);
-      const mayorPartida = entradasUsuario.reduce((acc, entrada) => Math.max(acc, entrada.carambolas), 0);
-      serieMayor = Math.max(serieMayor, mayorPartida);
+      totalEntrysUser += entradasUser.length;
+      totalCarambolasUser += entradasUser.reduce((acc, entrada) => acc + entrada.carambolas, 0);
+      const mayorMatch = entradasUser.reduce((acc, entrada) => Math.max(acc, entrada.carambolas), 0);
+      serieMayor = Math.max(serieMayor, mayorMatch);
     });
 
     return {
-      promedio: totalEntradasUsuario > 0 ? totalCarambolasUsuario / totalEntradasUsuario : 0,
+      promedio: totalEntrysUser > 0 ? totalCarambolasUser / totalEntrysUser : 0,
       serieMayor,
     };
-  }, [coincideUsuario, partidasDelUsuario]);
+  }, [coincideUser, partidasDelUser]);
 
-  const ultimasPartidas = useMemo(() => partidas.slice(0, 3), [partidas]);
+  const ultimasMatchs = useMemo(() => partidas.slice(0, 3), [partidas]);
 
-  const dataPromedio = useMemo(() => {
-    const source = isAuthenticated && user ? partidasDelUsuario : partidas;
+  const dataAverage = useMemo(() => {
+    const source = isAuthenticated && user ? partidasDelUser : partidas;
     const finalizadas = source.filter((p) => p.estado === 'FINALIZADA');
     const ordenadas = [...finalizadas].sort((a, b) => new Date(a.fechaInicio).getTime() - new Date(b.fechaInicio).getTime());
     const ultimasSiete = ordenadas.slice(-7);
@@ -101,10 +101,10 @@ export function DashboardScreen() {
       let promedio = 0;
 
       if (isAuthenticated && user) {
-        const juegaComoA = coincideUsuario(partida.jugadorA.nombre);
-        const entradasUsuario = partida.entradas.filter((entrada) => entrada.jugador === (juegaComoA ? 'A' : 'B'));
-        const carambolasUsuario = entradasUsuario.reduce((acc, entrada) => acc + entrada.carambolas, 0);
-        promedio = entradasUsuario.length > 0 ? carambolasUsuario / entradasUsuario.length : 0;
+        const juegaComoA = coincideUser(partida.jugadorA.nombre);
+        const entradasUser = partida.entradas.filter((entrada) => entrada.jugador === (juegaComoA ? 'A' : 'B'));
+        const carambolasUser = entradasUser.reduce((acc, entrada) => acc + entrada.carambolas, 0);
+        promedio = entradasUser.length > 0 ? carambolasUser / entradasUser.length : 0;
       } else {
         const entradas = partida.entradas.length;
         const carambolas = partida.marcadorA + partida.marcadorB;
@@ -116,24 +116,24 @@ export function DashboardScreen() {
         value: promedio,
       };
     });
-  }, [coincideUsuario, isAuthenticated, partidas, partidasDelUsuario, t, user]);
+  }, [coincideUser, isAuthenticated, partidas, partidasDelUser, t, user]);
 
   const chartModel = useMemo(() => {
-    if (dataPromedio.length === 0) {
+    if (dataAverage.length === 0) {
       return { linePath: '', areaPath: '', points: [] as Array<{ x: number; y: number }> };
     }
 
     const usableWidth = CHART_WIDTH - CHART_PADDING * 2;
     const usableHeight = CHART_HEIGHT - CHART_PADDING * 2;
-    const min = Math.min(...dataPromedio.map((d) => d.value));
-    const max = Math.max(...dataPromedio.map((d) => d.value));
+    const min = Math.min(...dataAverage.map((d) => d.value));
+    const max = Math.max(...dataAverage.map((d) => d.value));
     const range = max - min;
 
-    const points = dataPromedio.map((item, index) => {
+    const points = dataAverage.map((item, index) => {
       const x =
-        dataPromedio.length === 1
+        dataAverage.length === 1
           ? CHART_PADDING + usableWidth / 2
-          : CHART_PADDING + (index / (dataPromedio.length - 1)) * usableWidth;
+          : CHART_PADDING + (index / (dataAverage.length - 1)) * usableWidth;
       const normalized = range === 0 ? 0.5 : (item.value - min) / range;
       const y = CHART_HEIGHT - CHART_PADDING - normalized * usableHeight;
       return { x, y };
@@ -146,16 +146,16 @@ export function DashboardScreen() {
     const areaPath = `${linePath} L ${last.x} ${baselineY} L ${first.x} ${baselineY} Z`;
 
     return { linePath, areaPath, points };
-  }, [dataPromedio]);
+  }, [dataAverage]);
 
-  const promedioActual = dataPromedio.length > 0 ? dataPromedio[dataPromedio.length - 1].value : 0;
-  const promedioAnterior = dataPromedio.length > 1 ? dataPromedio[dataPromedio.length - 2].value : 0;
+  const promedioActual = dataAverage.length > 0 ? dataAverage[dataAverage.length - 1].value : 0;
+  const promedioAnterior = dataAverage.length > 1 ? dataAverage[dataAverage.length - 2].value : 0;
   const variacion =
     promedioAnterior > 0 ? ((promedioActual - promedioAnterior) / promedioAnterior) * 100 : promedioActual > 0 ? 100 : 0;
 
   useFocusEffect(
     useCallback(() => {
-      container.obtenerHistorial.execute().then((items) => setPartidas(items));
+      container.obtenerHistory.execute().then((items) => setMatchs(items));
     }, [])
   );
 
@@ -173,18 +173,23 @@ export function DashboardScreen() {
         {isAuthenticated && user ? t('dashboard.subtitle.personal', { alias: user.alias }) : t('dashboard.subtitle.global')}
       </Text>
 
-      <TouchableOpacity style={styles.cta} onPress={() => router.push('/partida/nueva')}>
-        <Text style={styles.ctaText}>{t('dashboard.newMatch')}</Text>
-      </TouchableOpacity>
+      <View style={styles.ctaRow}>
+        <TouchableOpacity style={styles.cta} onPress={() => router.push('/match/new')}>
+          <Text style={styles.ctaText}>{t('dashboard.newMatch')}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.ctaSecondary} onPress={() => router.push('/training/index')}>
+          <Text style={styles.ctaSecondaryText}>{t('dashboard.training')}</Text>
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.statsRow}>
         <StatChip
           label={isAuthenticated && user ? t('dashboard.stat.personalAvg') : t('dashboard.stat.generalAvg')}
-          value={(isAuthenticated && user ? estadisticasUsuario.promedio : estadisticas.promedioGeneral).toFixed(3)}
+          value={(isAuthenticated && user ? estadisticasUser.promedio : estadisticas.promedioGeneral).toFixed(3)}
         />
         <StatChip
           label={t('dashboard.stat.bestRun')}
-          value={String(isAuthenticated && user ? estadisticasUsuario.serieMayor : estadisticas.serieMayor)}
+          value={String(isAuthenticated && user ? estadisticasUser.serieMayor : estadisticas.serieMayor)}
         />
       </View>
 
@@ -206,7 +211,7 @@ export function DashboardScreen() {
         </View>
 
         <View style={styles.chartWrap}>
-          {dataPromedio.length === 0 ? (
+          {dataAverage.length === 0 ? (
             <Text style={styles.empty}>
               {isAuthenticated && user
                 ? t('dashboard.chart.empty.personal')
@@ -229,7 +234,7 @@ export function DashboardScreen() {
                 ))}
               </Svg>
               <View style={styles.chartLabels}>
-                {dataPromedio.map((item, index) => (
+                {dataAverage.map((item, index) => (
                   <Text key={`lb-${index}`} style={styles.chartLabelText}>
                     {item.label}
                   </Text>
@@ -242,10 +247,10 @@ export function DashboardScreen() {
 
       <Text style={styles.sectionTitle}>{t('dashboard.section.recentMatches')}</Text>
       <View style={styles.list}>
-        {ultimasPartidas.length === 0 ? (
+        {ultimasMatchs.length === 0 ? (
           <Text style={styles.empty}>{t('dashboard.empty.matches')}</Text>
         ) : (
-          ultimasPartidas.map((p) => <MatchCard key={p.id} partida={p} />)
+          ultimasMatchs.map((p) => <MatchCard key={p.id} partida={p} />)
         )}
       </View>
     </ScrollView>
@@ -269,14 +274,33 @@ const getStyles = (palette: ReturnType<typeof getPalette>) =>
       color: palette.muted,
     },
     cta: {
+      flex: 1,
       backgroundColor: palette.primary,
       borderRadius: theme.radius.lg,
       paddingVertical: 14,
       alignItems: 'center',
     },
+    ctaRow: {
+      flexDirection: 'row',
+      gap: theme.spacing.sm,
+    },
     ctaText: {
       color: 'white',
       fontWeight: '700',
+      fontSize: 16,
+    },
+    ctaSecondary: {
+      flex: 1,
+      borderRadius: theme.radius.lg,
+      borderWidth: 1,
+      borderColor: palette.primary,
+      paddingVertical: 14,
+      alignItems: 'center',
+      backgroundColor: `${palette.primary}14`,
+    },
+    ctaSecondaryText: {
+      color: palette.primary,
+      fontWeight: '800',
       fontSize: 16,
     },
     statsRow: {

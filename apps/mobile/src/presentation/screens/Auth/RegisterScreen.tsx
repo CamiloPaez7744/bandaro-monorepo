@@ -40,7 +40,7 @@ export function RegisterScreen() {
         email,
         password,
       });
-      router.replace('/(tabs)/perfil');
+      router.replace('/(tabs)/profile');
     } catch (error) {
       Alert.alert(t('common.error'), error instanceof Error ? error.message : t('auth.register.error'));
     } finally {

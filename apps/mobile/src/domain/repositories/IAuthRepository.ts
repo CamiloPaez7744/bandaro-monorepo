@@ -1,5 +1,5 @@
-import type { Sesion } from '@/src/domain/entities/Sesion';
-import type { Usuario } from '@/src/domain/entities/Usuario';
+import type { Session } from '@/src/domain/entities/Session';
+import type { User } from '@/src/domain/entities/User';
 
 export interface ActualizarPerfilInput {
     nombre?: string;
@@ -10,11 +10,11 @@ export interface ActualizarPerfilInput {
 }
 
 export interface IAuthRepository {
-    registrar(input: Omit<Usuario, 'id' | 'createdAt' | 'passwordHash'> & { password: string }): Promise<Usuario>;
-    login(email: string, password: string): Promise<Sesion>;
+    registrar(input: Omit<User, 'id' | 'createdAt' | 'passwordHash'> & { password: string }): Promise<User>;
+    login(email: string, password: string): Promise<Session>;
     logout(): Promise<void>;
-    obtenerSesionActual(): Promise<Sesion | null>;
-    refrescarSesion(refreshToken: string): Promise<Sesion>;
-    obtenerUsuarioPorId(userId: string): Promise<Usuario | null>;
-    actualizarPerfil(userId: string, input: ActualizarPerfilInput): Promise<Usuario>;
+    obtenerSessionActual(): Promise<Session | null>;
+    refrescarSession(refreshToken: string): Promise<Session>;
+    obtenerUserPorId(userId: string): Promise<User | null>;
+    actualizarPerfil(userId: string, input: ActualizarPerfilInput): Promise<User>;
 }

@@ -8,6 +8,6 @@ export class RefreshSession {
             throw new Error('Refresh token requerido.');
         }
 
-        return this.repository.refrescarSesion(refreshToken);
+        return this.repository.refrescarSession(refreshToken);
     }
 }
