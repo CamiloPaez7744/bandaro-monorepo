@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Cue Ball Effect - Emerald Velocity</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=Roboto:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-primary-container": "#b1f0d5",
+                        "error": "#ffb4ab",
+                        "on-tertiary-fixed-variant": "#6e3730",
+                        "secondary": "#b3ccc0",
+                        "tertiary": "#ffb4a9",
+                        "primary-fixed-dim": "#96d3ba",
+                        "on-tertiary-fixed": "#370d09",
+                        "surface-tint": "#10b981",
+                        "surface-container-highest": "#243a34",
+                        "inverse-on-surface": "#2e312f",
+                        "inverse-primary": "#064c39",
+                        "outline": "#384e44",
+                        "surface-variant": "#162521",
+                        "surface-container-high": "#1c2e29",
+                        "on-primary": "#003829",
+                        "secondary-fixed-dim": "#b3ccc0",
+                        "surface-container": "#162521",
+                        "tertiary-container": "#69332c",
+                        "surface-bright": "#162521",
+                        "on-surface": "#f1f3f1",
+                        "on-secondary-fixed": "#091f18",
+                        "primary-container": "#064c39",
+                        "on-error-container": "#ffdad6",
+                        "outline-variant": "#10b981",
+                        "on-secondary-fixed-variant": "#354b42",
+                        "surface-container-low": "#0d1412",
+                        "on-secondary": "#1f352c",
+                        "tertiary-fixed-dim": "#ffb4a9",
+                        "primary": "#10b981",
+                        "on-surface-variant": "#bfc9c3",
+                        "on-primary-fixed-variant": "#0e503d",
+                        "background": "#0a0f0d",
+                        "surface-container-lowest": "#050807",
+                        "tertiary-fixed": "#ffdad5",
+                        "on-secondary-container": "#a6beb2",
+                        "secondary-container": "#384e44",
+                        "on-primary-fixed": "#002116",
+                        "error-container": "#93000a",
+                        "primary-fixed": "#b1f0d5",
+                        "secondary-fixed": "#cfe8db",
+                        "surface": "#0a0f0d",
+                        "on-error": "#690005",
+                        "inverse-surface": "#e1e3e0",
+                        "surface-dim": "#0a0f0d",
+                        "on-background": "#f1f3f1",
+                        "on-tertiary-container": "#e89c92",
+                        "on-tertiary": "#52211b"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "1rem",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Inter"],
+                        "display": ["Inter"],
+                        "body": ["Inter"],
+                        "label": ["Inter"],
+                        "stats": ["Roboto"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+            text-transform: none;
+            letter-spacing: normal;
+            word-wrap: normal;
+            white-space: nowrap;
+            direction: ltr;
+        }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #384e44; border-radius: 10px; }
+        .active-glow { filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.4)); }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body selection:bg-primary selection:text-on-primary overflow-hidden">
+<!-- TopAppBar -->
+<header class="bg-surface dark:bg-surface flex justify-between items-center w-full px-4 h-16 docked full-width top-0 z-50">
+<div class="flex items-center gap-3">
+<button class="flex items-center justify-center size-10 hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors rounded-full active:scale-95">
+<span class="material-symbols-outlined text-primary dark:text-primary">arrow_back</span>
+</button>
+<h1 class="text-headline-sm font-headline font-semibold text-on-surface dark:text-on-surface">Cue Ball Effect</h1>
+</div>
+<button class="bg-primary text-on-primary px-6 py-2 rounded-full text-label-sm font-bold tracking-widest active:scale-95 transition-all">
+            CONFIRM
+        </button>
+</header>
+<main class="h-[calc(100vh-64px)] overflow-y-auto custom-scrollbar flex flex-col items-center px-4 pb-32 pt-6">
+<!-- Main Diagram Container -->
+<div class="relative w-full max-w-lg aspect-square flex items-center justify-center mb-8">
+<!-- Tonal Stacking Background -->
+<div class="absolute inset-0 bg-surface-container rounded-full opacity-30 blur-3xl scale-110"></div>
+<div class="relative w-full h-full flex items-center justify-center p-4">
+<!-- High Fidelity Technical Diagram -->
+<div class="relative w-full h-full group cursor-crosshair">
+<img alt="Cue Ball Technical Grid" class="w-full h-full object-contain rounded-full shadow-2xl transition-transform duration-500 group-hover:scale-[1.02]" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBejhB-2ICylk47pes_ouot5aLQb_BD-jdJkhBHFXTq4atOIdwwZof62rvkQeWy8nL12BH2FuAuT0ooi-v74aJASrcIzxU_luzMC3NPWF4agwl7G_8bvm2xRj7hbfJXeHK3K0vhRQd0lpFEI0eKkMTzL6SymsDO_IUSLzZ9FY716RqTYhID7ndUwWCPemDMM9sHmA8-OuiWmkZegn9DV5r6kvpVSZHExVfjuB6bvchtYLxwzSociMxnzFBlupXQXuCiqJE1mKLeP1g"/>
+<!-- Dynamic Contact Point Indicator (Interaction Simulation) -->
+<div class="absolute top-1/2 left-1/2 size-6 bg-primary rounded-full border-2 border-on-primary -translate-x-1/2 -translate-y-1/2 shadow-[0_0_15px_#10b981] z-10 transition-all duration-200 pointer-events-none" id="contact-point"></div>
+<!-- Interactive Overlay -->
+<div class="absolute inset-0 rounded-full" id="interaction-layer"></div>
+</div>
+</div>
+</div>
+<!-- Bento Layout Info Grid -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3 w-full max-w-lg">
+<!-- X Coordinate -->
+<div class="col-span-1 bg-surface-container p-4 rounded-xl border-l-4 border-primary shadow-sm">
+<p class="text-on-surface-variant text-[10px] font-bold uppercase tracking-tighter mb-1">X-Axis Offset</p>
+<div class="flex items-baseline gap-1">
+<span class="text-display font-stats font-bold text-primary leading-none" id="coord-x">0.00</span>
+<span class="text-label-sm text-on-surface-variant font-medium">mm</span>
+</div>
+</div>
+<!-- Y Coordinate -->
+<div class="col-span-1 bg-surface-container p-4 rounded-xl border-l-4 border-primary shadow-sm">
+<p class="text-on-surface-variant text-[10px] font-bold uppercase tracking-tighter mb-1">Y-Axis Offset</p>
+<div class="flex items-baseline gap-1">
+<span class="text-display font-stats font-bold text-primary leading-none" id="coord-y">0.00</span>
+<span class="text-label-sm text-on-surface-variant font-medium">mm</span>
+</div>
+</div>
+<!-- Impact Level -->
+<div class="col-span-2 bg-surface-container p-4 rounded-xl shadow-sm overflow-hidden relative">
+<div class="absolute right-0 top-0 p-2 opacity-10">
+<span class="material-symbols-outlined text-6xl">bolt</span>
+</div>
+<p class="text-on-surface-variant text-[10px] font-bold uppercase tracking-tighter mb-1">Impact Level</p>
+<div class="flex items-center gap-3">
+<span class="text-display font-stats font-bold text-on-surface leading-none" id="impact-val">Neutral</span>
+</div>
+<div class="mt-3 h-1.5 w-full bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-primary w-0 transition-all duration-300" id="impact-bar"></div>
+</div>
+</div>
+<!-- Presets Section -->
+<div class="col-span-2 md:col-span-4 bg-surface-container p-4 rounded-xl shadow-sm">
+<p class="text-on-surface-variant text-[10px] font-bold uppercase tracking-tighter mb-3">Quick Presets</p>
+<div class="flex flex-wrap gap-2">
+<button class="preset-btn px-4 py-2 rounded-lg bg-surface-container-high border border-primary/10 text-on-surface text-label-sm font-bold hover:bg-primary hover:text-on-primary transition-all" onclick="setPreset(0, 45, 'Follow', 80)">Follow</button>
+<button class="preset-btn px-4 py-2 rounded-lg bg-surface-container-high border border-primary/10 text-on-surface text-label-sm font-bold hover:bg-primary hover:text-on-primary transition-all" onclick="setPreset(0, -45, 'Draw', 85)">Draw</button>
+<button class="preset-btn px-4 py-2 rounded-lg bg-surface-container-high border border-primary/10 text-on-surface text-label-sm font-bold hover:bg-primary hover:text-on-primary transition-all" onclick="setPreset(45, 0, 'English R', 60)">English R</button>
+<button class="preset-btn px-4 py-2 rounded-lg bg-surface-container-high border border-primary/10 text-on-surface text-label-sm font-bold hover:bg-primary hover:text-on-primary transition-all" onclick="setPreset(-45, 0, 'English L', 60)">English L</button>
+<button class="preset-btn px-4 py-2 rounded-lg bg-primary text-on-primary text-label-sm font-bold transition-all" onclick="setPreset(0, 0, 'Neutral', 0)">Reset</button>
+</div>
+</div>
+<!-- Contextual Tip -->
+<div class="col-span-2 md:col-span-4 bg-primary-container p-4 rounded-xl border border-primary/20 flex gap-3 items-start">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">info</span>
+<div>
+<p class="text-on-primary-container text-label-sm font-bold uppercase mb-1">Coach Tip</p>
+<p class="text-on-primary-container/80 text-body">Maintain a level cue for consistent reaction on high 'Follow' shots. Avoid 'Masse' unintentional curves by checking your bridge height.</p>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 py-3 pb-safe bg-surface/80 dark:bg-surface/80 shadow-lg backdrop-blur-md">
+<div class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant hover:text-primary-fixed-dim transition-colors group">
+<span class="material-symbols-outlined">sports_score</span>
+<span class="text-label-sm font-label font-bold uppercase tracking-wider">Training</span>
+</div>
+<div class="flex flex-col items-center justify-center text-primary dark:text-primary active:scale-90 transition-transform">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">ads_click</span>
+<span class="text-label-sm font-label font-bold uppercase tracking-wider">Technique</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant hover:text-primary-fixed-dim transition-colors group">
+<span class="material-symbols-outlined">history</span>
+<span class="text-label-sm font-label font-bold uppercase tracking-wider">History</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant hover:text-primary-fixed-dim transition-colors group">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-label-sm font-label font-bold uppercase tracking-wider">Settings</span>
+</div>
+</nav>
+<script>
+        const layer = document.getElementById('interaction-layer');
+        const pointer = document.getElementById('contact-point');
+        const coordX = document.getElementById('coord-x');
+        const coordY = document.getElementById('coord-y');
+        const impactVal = document.getElementById('impact-val');
+        const impactBar = document.getElementById('impact-bar');
+
+        layer.addEventListener('mousemove', (e) => {
+            updatePosition(e.offsetX, e.offsetY);
+        });
+
+        layer.addEventListener('click', (e) => {
+            updatePosition(e.offsetX, e.offsetY);
+        });
+
+        function updatePosition(x, y) {
+            const rect = layer.getBoundingClientRect();
+            const centerX = rect.width / 2;
+            const centerY = rect.height / 2;
+            
+            // Percentage based offset
+            const pctX = ((x - centerX) / centerX) * 100;
+            const pctY = ((centerY - y) / centerY) * 100;
+            
+            pointer.style.left = `${x}px`;
+            pointer.style.top = `${y}px`;
+            
+            const mmX = (pctX * 0.285).toFixed(2);
+            const mmY = (pctY * 0.285).toFixed(2);
+            
+            coordX.innerText = mmX;
+            coordY.innerText = mmY;
+            
+            const distance = Math.sqrt(pctX**2 + pctY**2);
+            updateImpact(distance, pctX, pctY);
+        }
+
+        function updateImpact(dist, px, py) {
+            impactBar.style.width = `${Math.min(dist, 100)}%`;
+            
+            if (dist < 10) {
+                impactVal.innerText = "Neutral";
+                impactBar.className = "h-full bg-primary transition-all duration-300";
+            } else if (dist < 40) {
+                impactVal.innerText = "Low";
+                impactBar.className = "h-full bg-primary transition-all duration-300";
+            } else if (dist < 75) {
+                impactVal.innerText = "Medium";
+                impactBar.className = "h-full bg-primary transition-all duration-300";
+            } else {
+                impactVal.innerText = "Extreme";
+                impactBar.className = "h-full bg-error transition-all duration-300 shadow-[0_0_8px_#ffb4ab]";
+            }
+        }
+
+        function setPreset(px, py, label, barWidth) {
+            const rect = layer.getBoundingClientRect();
+            const centerX = rect.width / 2;
+            const centerY = rect.height / 2;
+            
+            // Reverse mapping for display
+            const visualX = centerX + (px * centerX / 100);
+            const visualY = centerY - (py * centerY / 100);
+            
+            pointer.style.left = `${visualX}px`;
+            pointer.style.top = `${visualY}px`;
+            
+            coordX.innerText = (px * 0.285).toFixed(2);
+            coordY.innerText = (py * 0.285).toFixed(2);
+            
+            impactVal.innerText = label;
+            impactBar.style.width = `${barWidth}%`;
+            impactBar.className = barWidth > 80 ? "h-full bg-error transition-all duration-300" : "h-full bg-primary transition-all duration-300";
+
+            // Update button styles
+            document.querySelectorAll('.preset-btn').forEach(btn => {
+                btn.classList.remove('bg-primary', 'text-on-primary');
+                btn.classList.add('bg-surface-container-high', 'text-on-surface');
+            });
+            event.currentTarget.classList.add('bg-primary', 'text-on-primary');
+            event.currentTarget.classList.remove('bg-surface-container-high', 'text-on-surface');
+        }
+    </script>
+</body></html>

@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>CueMaster Pro - Training Flashcard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&amp;family=Roboto:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary": "#ffb4a9",
+                        "inverse-on-surface": "#2e312f",
+                        "outline-variant": "#10b981",
+                        "surface-container-lowest": "#050807",
+                        "error-container": "#93000a",
+                        "surface-container-high": "#1c2e29",
+                        "on-secondary-fixed": "#091f18",
+                        "surface-bright": "#162521",
+                        "primary": "#10b981",
+                        "on-primary-fixed-variant": "#0e503d",
+                        "on-error-container": "#ffdad6",
+                        "on-surface-variant": "#bfc9c3",
+                        "secondary-container": "#384e44",
+                        "on-tertiary": "#52211b",
+                        "primary-container": "#064c39",
+                        "outline": "#384e44",
+                        "on-secondary": "#1f352c",
+                        "tertiary-fixed": "#ffdad5",
+                        "primary-fixed-dim": "#96d3ba",
+                        "on-tertiary-fixed": "#370d09",
+                        "surface-tint": "#10b981",
+                        "on-error": "#690005",
+                        "inverse-surface": "#e1e3e0",
+                        "secondary": "#b3ccc0",
+                        "surface-container-low": "#0d1412",
+                        "on-surface": "#f1f3f1",
+                        "background": "#0a0f0d",
+                        "surface-container-highest": "#243a34",
+                        "surface": "#0a0f0d",
+                        "on-primary-container": "#b1f0d5",
+                        "surface-dim": "#0a0f0d",
+                        "on-tertiary-fixed-variant": "#6e3730",
+                        "error": "#ffb4ab",
+                        "secondary-fixed": "#cfe8db",
+                        "on-background": "#f1f3f1",
+                        "secondary-fixed-dim": "#b3ccc0",
+                        "tertiary-fixed-dim": "#ffb4a9",
+                        "on-tertiary-container": "#e89c92",
+                        "tertiary-container": "#69332c",
+                        "surface-container": "#162521",
+                        "inverse-primary": "#064c39",
+                        "on-primary-fixed": "#002116",
+                        "on-primary": "#003829",
+                        "primary-fixed": "#b1f0d5",
+                        "surface-variant": "#162521",
+                        "on-secondary-fixed-variant": "#354b42",
+                        "on-secondary-container": "#a6be32"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Inter", "sans-serif"],
+                        "display": ["Inter", "sans-serif"],
+                        "body": ["Inter", "sans-serif"],
+                        "label": ["Inter", "sans-serif"],
+                        "data": ["Roboto", "sans-serif"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #0a0f0d; color: #f1f3f1; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .active-pill { font-variation-settings: 'FILL' 1; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="overflow-hidden">
+<!-- Sidebar Integration (JSON: SideNavBar) -->
+<aside class="h-screen w-64 fixed left-0 top-0 bg-surface flex flex-col py-6 z-50">
+<div class="px-6 mb-8">
+<h1 class="text-headline font-display font-bold text-primary">CueMaster Pro</h1>
+<p class="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold">Precision Training</p>
+</div>
+<nav class="flex-1 space-y-1">
+<!-- Training Library: Active State -->
+<a class="flex items-center space-x-3 bg-surface-container-high text-primary border-l-4 border-primary px-4 py-3 transition-all duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">menu_book</span>
+<span class="font-body text-body leading-tight font-medium">Training Library</span>
+</a>
+<a class="flex items-center space-x-3 text-on-surface-variant px-4 py-3 opacity-70 hover:bg-surface-container-high hover:text-on-surface transition-all duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined">biotech</span>
+<span class="font-body text-body leading-tight font-medium">Live Analysis</span>
+</a>
+<a class="flex items-center space-x-3 text-on-surface-variant px-4 py-3 opacity-70 hover:bg-surface-container-high hover:text-on-surface transition-all duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined">analytics</span>
+<span class="font-body text-body leading-tight font-medium">Performance History</span>
+</a>
+<a class="flex items-center space-x-3 text-on-surface-variant px-4 py-3 opacity-70 hover:bg-surface-container-high hover:text-on-surface transition-all duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-body text-body leading-tight font-medium">Global Settings</span>
+</a>
+</nav>
+<div class="px-4 mt-auto">
+<button class="w-full py-3 bg-primary text-on-primary rounded-full font-bold text-sm tracking-wide shadow-lg shadow-primary/20 hover:scale-[1.02] transition-transform active:scale-95">
+                Start Practice
+            </button>
+<div class="mt-6 flex items-center space-x-3 px-2">
+<div class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center overflow-hidden border border-primary/20">
+<img alt="Professional Coach Avatar" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDE5GNtOR2WhRikjycfKtO3BjnwYayxNLFGCH1Y4eottWyrRoiERrWXmHoRJj4GI-a4xossWFzFmPuFe78rXJ2prBnFu8848XHvoOHasXl-NS-SoLPILgNyA_tOOO3DwdJgJKWxWv_XNxvJcv4m2TMiTyHhRPs8gWOpCKRj-YVL_CsHAl_ouC_pxqIlloHYc4ZnIh6hZVrvGNHTsJ093WVfQ9nikOQ-wqX0KXNe0FH42SCnaqezp-sZVglF6E8DE6X3ApYlK_KHtII"/>
+</div>
+<div>
+<p class="text-xs font-bold">Coach Marcus</p>
+<p class="text-[10px] text-primary">Master Tier</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="ml-64 min-h-screen flex flex-col relative">
+<!-- Top Bar Integration (JSON: TopNavBar) -->
+<header class="fixed top-0 right-0 w-[calc(100%-16rem)] h-16 bg-surface/80 backdrop-blur-md flex justify-between items-center px-8 z-40">
+<div class="flex items-center space-x-6">
+<div class="flex items-center space-x-2 bg-surface-container px-3 py-1.5 rounded-full border border-primary/10">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+<span class="text-[10px] font-bold uppercase tracking-tighter">Active Session: Diamond Systems</span>
+</div>
+</div>
+<div class="flex items-center space-x-6">
+<div class="flex items-center space-x-4">
+<span class="material-symbols-outlined text-on-surface-variant hover:text-primary cursor-pointer transition-colors">notifications</span>
+<span class="material-symbols-outlined text-on-surface-variant hover:text-primary cursor-pointer transition-colors">help_outline</span>
+</div>
+<div class="h-8 w-[1px] bg-outline/20"></div>
+<div class="flex items-center space-x-3">
+<span class="text-xs font-medium text-on-surface-variant">Session Progress</span>
+<div class="w-32 h-1.5 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-primary w-[26%] transition-all duration-500"></div>
+</div>
+<span class="text-[10px] font-data font-bold text-primary">4/15</span>
+</div>
+</div>
+</header>
+<!-- Training Dashboard Content -->
+<div class="mt-16 p-8 flex-1 flex flex-col gap-6">
+<!-- Hero Tactical Section -->
+<div class="grid grid-cols-12 gap-6 flex-1">
+<!-- Table Canvas Area -->
+<div class="col-span-12 lg:col-span-8 flex flex-col gap-4">
+<div class="relative bg-surface-container rounded-xl overflow-hidden border border-primary/10 flex-1 flex items-center justify-center p-8 group">
+<!-- Table Texture and Visuals -->
+<div class="relative w-full aspect-[2/1] rounded-sm bg-[#064c39] border-[16px] border-[#2c1810] shadow-2xl">
+<!-- Inset Table shadow -->
+<div class="absolute inset-0 shadow-[inset_0_0_60px_rgba(0,0,0,0.5)]"></div>
+<!-- The Carom Billiard Table Image -->
+<img alt="Carom Table Texture" class="absolute inset-0 w-full h-full object-cover mix-blend-overlay opacity-80" src="https://lh3.googleusercontent.com/aida/ADBb0uiBEOBZBjYqJXaM8Es9Jy9fxEsgyT7oimc0FrWR9_2cYB6lWKqXj9LiqEI8Js8NCJG88lw50a0xo7tDGQ04glO-zEPHfIfNCu1DKjn9zlnr3pJnwx_H-Y4l8UfaGqqXykWkSFV0RIiyJJw8zAZBWJbKGBns5JlnnBDtIBQ_hJPU8xpX-XS7DFrnSxHiNgK6v3Y0oFznH_bK61s8vUKHDUln3FCMW9h1NmH-HQo8TpioPQenMfFXVQ9oTBE"/>
+<!-- Visual Markers (Carom has no pockets) -->
+<!-- Diamonds on Rail -->
+<div class="absolute -top-4 left-0 right-0 flex justify-around px-12">
+<div class="w-1.5 h-1.5 bg-on-surface/30 rounded-full"></div>
+<div class="w-1.5 h-1.5 bg-on-surface/30 rounded-full"></div>
+<div class="w-1.5 h-1.5 bg-on-surface/30 rounded-full"></div>
+<div class="w-1.5 h-1.5 bg-primary/80 ring-4 ring-primary/20 rounded-full"></div>
+<div class="w-1.5 h-1.5 bg-on-surface/30 rounded-full"></div>
+</div>
+<!-- Balls Representation -->
+<!-- White Ball -->
+<div class="absolute top-1/2 left-[20%] w-6 h-6 bg-white rounded-full shadow-lg border border-gray-200">
+<div class="absolute top-1 left-1 w-1.5 h-1.5 bg-white/50 rounded-full"></div>
+</div>
+<!-- Red Ball -->
+<div class="absolute top-[60%] right-[30%] w-6 h-6 bg-red-600 rounded-full shadow-lg border border-red-800">
+<div class="absolute top-1 left-1 w-1.5 h-1.5 bg-white/30 rounded-full"></div>
+</div>
+<!-- Yellow Ball -->
+<div class="absolute top-[40%] right-[25%] w-6 h-6 bg-yellow-400 rounded-full shadow-lg border border-yellow-600">
+<div class="absolute top-1 left-1 w-1.5 h-1.5 bg-white/40 rounded-full"></div>
+</div>
+<!-- Floating Instructions Overlay -->
+<div class="absolute bottom-6 left-6 right-6 flex justify-between items-end">
+<div class="bg-surface-dim/80 backdrop-blur-sm p-4 rounded-lg border border-primary/20 max-w-xs">
+<h3 class="text-primary text-xs font-bold uppercase mb-1 flex items-center">
+<span class="material-symbols-outlined text-sm mr-1">info</span> Coach Hint
+                                    </h3>
+<p class="text-sm leading-snug">Aim for the long rail diamond 3. Ensure a smooth stroke with no side-spin for consistent rebound.</p>
+</div>
+<div class="flex gap-2">
+<button class="flex items-center space-x-2 px-4 py-2 bg-surface-container-highest hover:bg-primary/20 transition-colors rounded-lg text-sm font-medium border border-outline/20">
+<span class="material-symbols-outlined text-sm">visibility</span>
+<span>Show Solution</span>
+</button>
+<button class="flex items-center space-x-2 px-4 py-2 bg-surface-container-highest hover:bg-primary/20 transition-colors rounded-lg text-sm font-medium border border-outline/20">
+<span class="material-symbols-outlined text-sm">replay</span>
+<span>Reset Position</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Control & Stat Panel -->
+<div class="col-span-12 lg:col-span-4 flex flex-col gap-6">
+<!-- Metadata Card -->
+<section class="bg-surface-container rounded-xl p-6 border border-primary/10">
+<div class="mb-4">
+<span class="text-[10px] font-bold text-primary uppercase tracking-widest">Training Module</span>
+<h2 class="text-display font-bold leading-tight mt-1">Diamond System - Base 50</h2>
+<p class="text-on-surface-variant font-medium text-sm">3-Cushion Position Analysis</p>
+</div>
+<div class="flex items-center justify-between p-4 bg-surface-container-low rounded-lg border border-outline/10">
+<div class="flex items-center space-x-3">
+<div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">psychology</span>
+</div>
+<div>
+<p class="text-xs font-bold">Concept Focus</p>
+<p class="text-[10px] text-on-surface-variant">Reflection Angle Calculation</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant">chevron_right</span>
+</div>
+</section>
+<!-- Tracking Section -->
+<section class="bg-surface-container rounded-xl p-6 border border-primary/10 flex-1 flex flex-col gap-6">
+<div>
+<h3 class="text-on-surface font-bold text-sm mb-4">Record Hits</h3>
+<div class="flex items-center justify-between bg-surface-container-low p-4 rounded-xl border border-outline/10">
+<button class="w-10 h-10 rounded-full bg-surface-container-high border border-outline/20 flex items-center justify-center hover:bg-primary/20 transition-colors">
+<span class="material-symbols-outlined">remove</span>
+</button>
+<div class="text-center">
+<span class="text-3xl font-data font-bold text-primary">4</span>
+<span class="text-on-surface-variant mx-1 font-bold">/</span>
+<span class="text-lg font-data font-medium text-on-surface-variant">10</span>
+<p class="text-[10px] uppercase font-bold text-on-surface-variant/60 tracking-wider">Successful Attempts</p>
+</div>
+<button class="w-10 h-10 rounded-full bg-surface-container-high border border-outline/20 flex items-center justify-center hover:bg-primary/20 transition-colors">
+<span class="material-symbols-outlined">add</span>
+</button>
+</div>
+</div>
+<div>
+<div class="flex items-center justify-between mb-3">
+<h3 class="text-on-surface font-bold text-sm">Difficulty Rating</h3>
+<span class="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded uppercase font-bold">Self Assessment</span>
+</div>
+<div class="flex justify-between items-center bg-surface-container-low p-4 rounded-xl border border-outline/10">
+<div class="flex space-x-1">
+<span class="material-symbols-outlined text-primary active-pill">star</span>
+<span class="material-symbols-outlined text-primary active-pill">star</span>
+<span class="material-symbols-outlined text-primary active-pill">star</span>
+<span class="material-symbols-outlined text-on-surface-variant/30">star</span>
+<span class="material-symbols-outlined text-on-surface-variant/30">star</span>
+</div>
+<span class="text-xs font-bold text-on-surface-variant">Moderate</span>
+</div>
+</div>
+<div class="mt-auto pt-6 border-t border-outline/10">
+<button class="w-full py-4 bg-primary text-on-primary rounded-xl font-bold flex items-center justify-center space-x-3 shadow-lg shadow-primary/20 hover:bg-primary-fixed-dim transition-all group">
+<span>Complete &amp; Next Position</span>
+<span class="material-symbols-outlined group-hover:translate-x-1 transition-transform">arrow_forward</span>
+</button>
+</div>
+</section>
+</div>
+</div>
+<!-- Bottom Context Cards (Bento Style) -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 h-40">
+<div class="bg-surface-container rounded-xl p-4 border border-primary/10 flex flex-col justify-between">
+<span class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Avg Precision</span>
+<div class="flex items-baseline space-x-2">
+<span class="text-3xl font-data font-bold">82%</span>
+<span class="text-primary text-xs font-bold flex items-center">
+<span class="material-symbols-outlined text-sm">trending_up</span> +4.1%
+                        </span>
+</div>
+<div class="w-full h-1 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-primary w-[82%]"></div>
+</div>
+</div>
+<div class="bg-surface-container rounded-xl p-4 border border-primary/10 flex flex-col justify-between">
+<span class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Time Spent</span>
+<div class="flex items-baseline space-x-2">
+<span class="text-3xl font-data font-bold">12:45</span>
+<span class="text-on-surface-variant text-xs font-medium">min</span>
+</div>
+<div class="flex items-center space-x-2 text-[10px] text-on-surface-variant">
+<span class="w-2 h-2 rounded-full bg-yellow-400"></span>
+<span>Estimated: 15:00</span>
+</div>
+</div>
+<div class="bg-primary-container/30 rounded-xl p-4 border border-primary/20 flex flex-col justify-between relative overflow-hidden">
+<div class="relative z-10">
+<span class="text-[10px] font-bold text-primary uppercase tracking-widest">Daily Goal</span>
+<p class="text-sm font-bold mt-1">2 more positions to unlock daily achievement.</p>
+</div>
+<span class="material-symbols-outlined absolute -right-4 -bottom-4 text-7xl opacity-10 text-primary rotate-12">military_tech</span>
+</div>
+</div>
+</div>
+</main>
+<!-- Background Atmospheric Effect -->
+<div class="fixed inset-0 -z-10 pointer-events-none opacity-20">
+<div class="absolute top-1/4 right-1/4 w-96 h-96 bg-primary rounded-full blur-[120px]"></div>
+<div class="absolute bottom-1/4 left-1/4 w-96 h-96 bg-primary-container rounded-full blur-[120px]"></div>
+</div>
+</body></html>

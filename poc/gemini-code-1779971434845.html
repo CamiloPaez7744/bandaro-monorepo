@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+    <title>CueMaster Pro - Interactive Training</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@300;400;600" rel="stylesheet"/>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#064c39",
+                        "billiard-blue": "#2b5c8f",
+                        "background-light": "#f6f8f7",
+                        "background-dark": "#0a1210",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"],
+                        "mono": ["Roboto", "monospace"]
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        body {
+            min-height: 100dvh;
+            touch-action: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        /* Lock canvas aspect ratio cleanly */
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1 / 2; /* Portrait Table Mode for Mobile first */
+            background-color: #1e3a5f;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 antialiased overflow-hidden">
+<div class="relative flex h-screen w-full max-w-md mx-auto flex-col bg-background-light dark:bg-background-dark overflow-hidden border-x border-primary/20">
+    
+    <header class="flex flex-col gap-1 p-3 bg-background-light dark:bg-background-dark/50 border-b border-primary/10 shrink-0">
+        <div class="flex items-center justify-between">
+            <button class="text-slate-900 dark:text-slate-100 hover:bg-primary/10 p-1 rounded-full transition-colors">
+                <span class="material-symbols-outlined">arrow_back</span>
+            </button>
+            <h1 class="text-base font-bold tracking-tight">3-Cushion Training System</h1>
+            <div class="flex items-center gap-1">
+                <span id="mode-badge" class="text-xs px-2 py-0.5 font-semibold uppercase tracking-wider bg-amber-500/20 text-amber-500 rounded border border-amber-500/30">Edit Mode</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 flex flex-col p-2 justify-center items-center relative overflow-hidden bg-slate-950">
+        
+        <div class="w-full text-center mb-1 z-10">
+            <p class="text-xs text-slate-400">Drag balls to set position. Use panel controls to spin and aim.</p>
+        </div>
+
+        <div class="canvas-container rounded-lg shadow-2xl border-[10px] border-[#1e120c] ring-4 ring-slate-800 overflow-hidden">
+            <canvas id="billiardsCanvas" class="absolute top-0 left-0 w-full h-full"></canvas>
+        </div>
+
+    </main>
+
+    <section class="p-3 bg-slate-900 border-t border-slate-800 rounded-t-xl shadow-[0_-10px_30px_rgba(0,0,0,0.5)] z-20 select-none">
+        <div class="flex flex-col gap-3">
+            
+            <div class="flex items-center justify-between text-xs font-mono text-slate-400 border-b border-slate-800 pb-2">
+                <div>Aim: <span id="aim-deg" class="text-white font-bold">0.0°</span></div>
+                <div>Spin (Tips): <span id="spin-val" class="text-cyan-400 font-bold">Center</span></div>
+                <div>Power: <span id="power-val" class="text-yellow-400 font-bold">3 / 5</span></div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 items-center">
+                
+                <div class="flex flex-col items-center justify-center bg-slate-950 p-2 rounded-lg border border-slate-800">
+                    <span class="text-[10px] text-slate-500 uppercase tracking-widest mb-1">Cue Ball Tip / Spin</span>
+                    <div class="relative w-16 h-16 rounded-full bg-white border border-slate-400 flex items-center justify-center cursor-crosshair" id="spin-pad">
+                        <div class="absolute w-full h-px bg-slate-300"></div>
+                        <div class="absolute h-full w-px bg-slate-300"></div>
+                        <div class="absolute w-10 h-10 rounded-full border border-dashed border-slate-300"></div>
+                        <div id="spin-marker" class="absolute w-3 h-3 bg-red-600 rounded-full shadow-md -translate-x-1/2 -translate-y-1/2" style="left: 50%; top: 50%;"></div>
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-1 justify-center bg-slate-950 p-2 rounded-lg border border-slate-800 h-full">
+                    <span class="text-[10px] text-slate-500 uppercase tracking-widest text-center">Shot Power (Speed)</span>
+                    <div class="flex items-center justify-between px-1 mt-1">
+                        <button onclick="adjustPower(-1)" class="w-6 h-6 flex items-center justify-center bg-slate-800 rounded text-slate-300 hover:bg-slate-700">-</button>
+                        <div class="flex gap-1" id="power-bars">
+                            <div class="w-3 h-5 bg-yellow-500 rounded-sm"></div>
+                            <div class="w-3 h-5 bg-yellow-500 rounded-sm"></div>
+                            <div class="w-3 h-5 bg-yellow-500 rounded-sm"></div>
+                            <div class="w-3 h-5 bg-slate-700 rounded-sm"></div>
+                            <div class="w-3 h-5 bg-slate-700 rounded-sm"></div>
+                        </div>
+                        <button onclick="adjustPower(1)" class="w-6 h-6 flex items-center justify-center bg-slate-800 rounded text-slate-300 hover:bg-slate-700">+</button>
+                    </div>
+                    
+                    <div class="mt-2 pt-1 border-t border-slate-800/60 flex items-center justify-between">
+                        <span class="text-[10px] text-slate-400 font-medium">Guides:</span>
+                        <label class="relative inline-flex items-center cursor-pointer scale-75 origin-right">
+                            <input type="checkbox" id="toggle-solution" class="sr-only peer" checked>
+                            <div class="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                        </label>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="grid grid-cols-3 gap-2">
+                <button id="btn-mode" onclick="toggleMode()" class="flex items-center justify-center gap-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition-colors">
+                    <span class="material-symbols-outlined text-sm">edit</span>
+                    <span id="txt-mode">Aim / Drag</span>
+                </button>
+                <button onclick="resetScenario()" class="flex items-center justify-center gap-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition-colors">
+                    <span class="material-symbols-outlined text-sm">refresh</span>
+                    <span>Reset Ball</span>
+                </button>
+                <button id="btn-fire" onclick="fireShot()" class="flex items-center justify-center gap-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-all shadow-md active:scale-95">
+                    <span class="material-symbols-outlined text-sm">play_arrow</span>
+                    <span>Execute</span>
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <nav class="flex border-t border-slate-800 bg-slate-950 px-4 pb-4 pt-2 shrink-0">
+        <a class="flex flex-1 flex-col items-center justify-center gap-1 text-emerald-500" href="#">
+            <span class="material-symbols-outlined text-xl">play_circle</span>
+            <p class="text-[9px] font-medium leading-none">Training</p>
+        </a>
+        <a class="flex flex-1 flex-col items-center justify-center gap-1 text-slate-500" href="#">
+            <span class="material-symbols-outlined text-xl">menu_book</span>
+            <p class="text-[9px] font-medium leading-none">Systems</p>
+        </a>
+        <a class="flex flex-1 flex-col items-center justify-center gap-1 text-slate-500" href="#">
+            <span class="material-symbols-outlined text-xl">bar_chart</span>
+            <p class="text-[9px] font-medium leading-none">Analysis</p>
+        </a>
+    </nav>
+</div>
+
+<script>
+    /**
+     * Billiards Physics Engine Sim and Renderer Configuration
+     * Scaled viewport support for portrait configurations
+     */
+    const canvas = document.getElementById('billiardsCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Virtual table coordinate matrix setup (Internal standard units 400x800 match standard 1:2 Carom layout)
+    const V_WIDTH = 400;
+    const V_HEIGHT = 800;
+    
+    // Physics constants
+    const BALL_RADIUS = 12;
+    const FRICTION = 0.992;
+    const CUSHION_RESTITUTION = 0.90; 
+
+    // Simulation states
+    let appMode = 'EDIT'; // EDIT or ANIMATING
+    let powerLevel = 3;   // 1 to 5
+    let spinOffsetX = 0;  // -1 to +1 range 
+    let spinOffsetY = 0;  // -1 to +1 range
+    let aimAngle = 4.71;   // Radians pointing up initially
+
+    // Interactive target reference structures
+    let balls = [
+        { id: 'white',  x: 100, y: 650, vx: 0, vy: 0, color: '#ffffff', border: '#cbd5e1', label: 'Cue' },
+        { id: 'yellow', x: 130, y: 300, vx: 0, vy: 0, color: '#facc15', border: '#ca8a04', label: 'Obj1' },
+        { id: 'red',    x: 320, y: 150, vx: 0, vy: 0, color: '#dc2626', border: '#991b1b', label: 'Obj2' }
+    ];
+
+    // State tracks
+    let draggedBall = null;
+    let isAimingWithPointer = false;
+
+    // Reset coordinates copy backup
+    const initialPositions = JSON.parse(JSON.stringify(balls));
+
+    function initCanvas() {
+        // Adjust Canvas bounding metrics to fill parent screen footprint
+        const rect = canvas.parentElement.getBoundingClientRect();
+        canvas.width = rect.width;
+        canvas.height = rect.height;
+        draw();
+    }
+
+    // Convert internal virtual coordinate vectors to real DOM UI client dimensions
+    function toRealCoords(vx, vy) {
+        return {
+            x: (vx / V_WIDTH) * canvas.width,
+            y: (vy / V_HEIGHT) * canvas.height
+        };
+    }
+
+    function toVirtualCoords(rx, ry) {
+        return {
+            x: (rx / canvas.width) * V_WIDTH,
+            y: (ry / canvas.height) * V_HEIGHT
+        };
+    }
+
+    function drawTableSkeletal() {
+        // Clear viewport canvas environment background
+        ctx.fillStyle = '#224870'; // Professional premium Carom blue speed felt
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Render diamond tracking system markers
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+        
+        // Vertical Rails Diamonds
+        for (let y = 0; y <= V_HEIGHT; y += V_HEIGHT / 8) {
+            let pLeft = toRealCoords(0, y);
+            let pRight = toRealCoords(V_WIDTH, y);
+            ctx.beginPath(); ctx.arc(pLeft.x + 3, pLeft.y, 2.5, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(pRight.x - 3, pRight.y, 2.5, 0, Math.PI * 2); ctx.fill();
+        }
+        // Horizontal rails diamonds
+        for (let x = 0; x <= V_WIDTH; x += V_WIDTH / 4) {
+            let pTop = toRealCoords(x, 0);
+            let pBottom = toRealCoords(x, V_HEIGHT);
+            ctx.beginPath(); ctx.arc(pTop.x, pTop.y + 3, 2.5, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(pBottom.x, pBottom.y - 3, 2.5, 0, Math.PI * 2); ctx.fill();
+        }
+
+        // Draw Subtle Center Grid Lines mapping
+        ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for(let i = 1; i < 4; i++){
+            let px = toRealCoords((V_WIDTH/4)*i, 0);
+            ctx.moveTo(px.x, 0); ctx.lineTo(px.x, canvas.height);
+        }
+        for(let j = 1; j < 8; j++){
+            let py = toRealCoords(0, (V_HEIGHT/8)*j);
+            ctx.moveTo(0, py.y); ctx.lineTo(canvas.width, py.y);
+        }
+        ctx.stroke();
+    }
+
+    /**
+     * Compute predictive raycasting matrices dynamically using virtual environment variables 
+     * Handles reflections, structural paths, and multi-ball interaction projection
+     */
+    function computeAndDrawTrajectories() {
+        if (appMode !== 'EDIT') return;
+
+        // Clone tracking context safely to prevent side-channel mutative errors
+        let simBalls = JSON.parse(JSON.stringify(balls));
+        let white = simBalls.find(b => b.id === 'white');
+
+        // Translate selected configuration into real launch vector speeds
+        const launchMagnitude = powerLevel * 4.5;
+        white.vx = Math.cos(aimAngle) * launchMagnitude;
+        white.vy = Math.sin(aimAngle) * launchMagnitude;
+
+        // Trace vectors structures arrays
+        let paths = { white: [{x: white.x, y: white.y}], yellow: [], red: [] };
+        
+        // Step through simulation inside limited sandbox steps to generate line guides preview
+        let steps = 280;
+        let collisionOccurred = false;
+
+        for (let step = 0; step < steps; step++) {
+            // Check changes for each object
+            simBalls.forEach(b => {
+                if (Math.abs(b.vx) < 0.05 && Math.abs(b.vy) < 0.05) {
+                    b.vx = 0; b.vy = 0;
+                }
+                b.x += b.vx;
+                b.y += b.vy;
+                b.vx *= FRICTION;
+                b.vy *= FRICTION;
+
+                // Wall / Cushion collision mechanics
+                if (b.x < BALL_RADIUS) { b.x = BALL_RADIUS; b.vx = -b.vx * CUSHION_RESTITUTION; applySpinEffect(b, 'left'); }
+                if (b.x > V_WIDTH - BALL_RADIUS) { b.x = V_WIDTH - BALL_RADIUS; b.vx = -b.vx * CUSHION_RESTITUTION; applySpinEffect(b, 'right'); }
+                if (b.y < BALL_RADIUS) { b.y = BALL_RADIUS; b.vy = -b.vy * CUSHION_RESTITUTION; applySpinEffect(b, 'top'); }
+                if (b.y > V_HEIGHT - BALL_RADIUS) { b.y = V_HEIGHT - BALL_RADIUS; b.vy = -b.vy * CUSHION_RESTITUTION; applySpinEffect(b, 'bottom'); }
+            });
+
+            // Ball to ball collision tracking handling
+            for (let i = 0; i < simBalls.length; i++) {
+                for (let j = i + 1; j < simBalls.length; j++) {
+                    let b1 = simBalls[i];
+                    let b2 = simBalls[j];
+                    let dx = b2.x - b1.x;
+                    let dy = b2.y - b1.y;
+                    let dist = Math.hypot(dx, dy);
+
+                    if (dist < BALL_RADIUS * 2) {
+                        // Resolve structural overlap positions
+                        let overlap = (BALL_RADIUS * 2) - dist;
+                        let nx = dx / dist;
+                        let ny = dy / dist;
+                        
+                        b1.x -= nx * overlap * 0.5;
+                        b1.y -= ny * overlap * 0.5;
+                        b2.x += nx * overlap * 0.5;
+                        b2.y += ny * overlap * 0.5;
+
+                        // Elastic momentum transfer calculation
+                        let kx = b1.vx - b2.vx;
+                        let ky = b1.vy - b2.vy;
+                        let p = nx * kx + ny * ky;
+
+                        if (p > 0) {
+                            b1.vx -= nx * p;
+                            b1.vy -= ny * p;
+                            b2.vx += nx * p;
+                            b2.vy += ny * p;
+                            
+                            // Initialize trace paths tracking if object impacted
+                            if(paths[b1.id].length === 0 || step === 0) paths[b1.id].push({x: b1.x, y: b1.y});
+                            if(paths[b2.id].length === 0) paths[b2.id].push({x: b2.x, y: b2.y});
+                        }
+                    }
+                }
+            }
+
+            // Append vector path trackers snapshots
+            simBalls.forEach(b => {
+                let lastP = paths[b.id][paths[b.id].length - 1];
+                if (!lastP || Math.hypot(b.x - lastP.x, b.y - lastP.y) > 8) {
+                    paths[b.id].push({x: b.x, y: b.y});
+                }
+            });
+        }
+
+        // Display Generated paths to viewport
+        if(document.getElementById('toggle-solution').checked) {
+            renderGuidePath(paths.white, '#ffffff', false);
+            renderGuidePath(paths.yellow, '#facc15', true);
+            renderGuidePath(paths.red, '#dc2626', true);
+        }
+    }
+
+    // Modulate velocity vectors parsing structural Carom english dynamic rotations
+    function applySpinEffect(ball, cushion) {
+        if (ball.id !== 'white') return; 
+        // Simple procedural conversion of english input offsets to deflected cushion reflection angles
+        const spinForce = spinOffsetX * 1.8;
+        if (cushion === 'top' || cushion === 'bottom') {
+            ball.vx += spinForce;
+        } else {
+            ball.vy -= spinForce;
+        }
+    }
+
+    function renderGuidePath(points, color, isObjectBall) {
+        if (!points || points.length < 2) return;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = isObjectBall ? 1.5 : 2.5;
+        ctx.setLineDash(isObjectBall ? [4, 4] : [6, 4]);
+        ctx.shadowBlur = 4;
+        ctx.shadowColor = color;
+
+        ctx.beginPath();
+        let start = toRealCoords(points[0].x, points[0].y);
+        ctx.moveTo(start.x, start.y);
+        for (let i = 1; i < points.length; i++) {
+            let pt = toRealCoords(points[i].x, points[i].y);
+            ctx.lineTo(pt.x, pt.y);
+        }
+        ctx.stroke();
+        
+        // Reset system shadow configurations
+        ctx.setLineDash([]);
+        ctx.shadowBlur = 0;
+    }
+
+    function drawBalls() {
+        balls.forEach(b => {
+            let real = toRealCoords(b.x, b.y);
+            let rRadius = (BALL_RADIUS / V_WIDTH) * canvas.width;
+
+            // Simple realistic spherical gradient fills
+            let gradient = ctx.createRadialGradient(
+                real.x - rRadius*0.3, real.y - rRadius*0.3, rRadius * 0.1,
+                real.x, real.y, rRadius
+            );
+            gradient.addColorStop(0, '#ffffff');
+            gradient.addColorStop(0.2, b.color);
+            gradient.addColorStop(1, b.border);
+
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(real.x, real.y, rRadius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Ball outline profiles
+            ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        });
+    }
+
+    function drawAimLine() {
+        if (appMode !== 'EDIT') return;
+        let white = balls.find(b => b.id === 'white');
+        let realWhite = toRealCoords(white.x, white.y);
+        
+        // Target endpoint helper calculation
+        let targetX = white.x + Math.cos(aimAngle) * 70;
+        let targetY = white.y + Math.sin(aimAngle) * 70;
+        let realTarget = toRealCoords(targetX, targetY);
+
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.8)'; // Red active aim pointer sight line
+        ctx.lineWidth = 2;
+        ctx.setLineDash([2, 2]);
+        ctx.beginPath();
+        ctx.moveTo(realWhite.x, realWhite.y);
+        ctx.lineTo(realTarget.x, realTarget.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Interactive direction target wheel marker
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.arc(realTarget.x, realTarget.y, 4, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    function draw() {
+        drawTableSkeletal();
+        computeAndDrawTrajectories();
+        drawAimLine();
+        drawBalls();
+    }
+
+    /**
+     * Simulation Execution Pipeline
+     * Uses High performance loops running runtime mechanics
+     */
+    function updatePhysicsTick() {
+        let activeMotion = false;
+
+        balls.forEach(b => {
+            if (Math.abs(b.vx) < 0.01 && Math.abs(b.vy) < 0.01) {
+                b.vx = 0; b.vy = 0;
+            } else {
+                activeMotion = true;
+            }
+
+            b.x += b.vx;
+            b.y += b.vy;
+            b.vx *= FRICTION;
+            b.vy *= FRICTION;
+
+            // Bounce check boundaries handling
+            if (b.x < BALL_RADIUS) { b.x = BALL_RADIUS; b.vx = -b.vx * CUSHION_RESTITUTION; applySpinEffect(b, 'left'); }
+            if (b.x > V_WIDTH - BALL_RADIUS) { b.x = V_WIDTH - BALL_RADIUS; b.vx = -b.vx * CUSHION_RESTITUTION; applySpinEffect(b, 'right'); }
+            if (b.y < BALL_RADIUS) { b.y = BALL_RADIUS; b.vy = -b.vy * CUSHION_RESTITUTION; applySpinEffect(b, 'top'); }
+            if (b.y > V_HEIGHT - BALL_RADIUS) { b.y = V_HEIGHT - BALL_RADIUS; b.vy = -b.vy * CUSHION_RESTITUTION; applySpinEffect(b, 'bottom'); }
+        });
+
+        // Resolve Dynamic Interaction Intersect Collisions
+        for (let i = 0; i < balls.length; i++) {
+            for (let j = i + 1; j < balls.length; j++) {
+                let b1 = balls[i]; let b2 = balls[j];
+                let dx = b2.x - b1.x; let dy = b2.y - b1.y;
+                let dist = Math.hypot(dx, dy);
+
+                if (dist < BALL_RADIUS * 2) {
+                    let overlap = (BALL_RADIUS * 2) - dist;
+                    let nx = dx / dist; let ny = dy / dist;
+                    b1.x -= nx * overlap * 0.5; b1.y -= ny * overlap * 0.5;
+                    b2.x += nx * overlap * 0.5; b2.y += ny * overlap * 0.5;
+
+                    let kx = b1.vx - b2.vx; let ky = b1.vy - b2.vy;
+                    let p = nx * kx + ny * ky;
+                    if (p > 0) {
+                        b1.vx -= nx * p; b1.vy -= ny * p;
+                        b2.vx += nx * p; b2.vy += ny * p;
+                    }
+                }
+            }
+        }
+
+        return activeMotion;
+    }
+
+    function runAnimationLoop() {
+        if (appMode !== 'ANIMATING') return;
+        let isMoving = updatePhysicsTick();
+        draw();
+
+        if (isMoving) {
+            requestAnimationFrame(runAnimationLoop);
+        } else {
+            // Loop execution finalized, transition environment properties
+            appMode = 'EDIT';
+            updateUIState();
+            draw();
+        }
+    }
+
+    /**
+     * Touch Gestures & Pointer Interaction Management
+     */
+    canvas.addEventListener('pointerdown', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const pointerV = toVirtualCoords(e.clientX - rect.left, e.clientY - rect.top);
+
+        // Check if cursor selected an interactive target object node
+        let found = null;
+        balls.forEach(b => {
+            if (Math.hypot(b.x - pointerV.x, b.y - pointerV.y) < BALL_RADIUS * 1.8) {
+                found = b;
+            }
+        });
+
+        if (found) {
+            draggedBall = found;
+        } else {
+            // Screen tracking coordinates pointer to calculate direction angle
+            isAimingWithPointer = true;
+            adjustAimAngle(pointerV);
+        }
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const pointerV = toVirtualCoords(e.clientX - rect.left, e.clientY - rect.top);
+
+        if (draggedBall && appMode === 'EDIT') {
+            // Restrict ball placement inside legal layout bounds
+            draggedBall.x = Math.max(BALL_RADIUS, Math.min(V_WIDTH - BALL_RADIUS, pointerV.x));
+            draggedBall.y = Math.max(BALL_RADIUS, Math.min(V_HEIGHT - BALL_RADIUS, pointerV.y));
+            draw();
+        } else if (isAimingWithPointer && appMode === 'EDIT') {
+            adjustAimAngle(pointerV);
+        }
+    });
+
+    canvas.addEventListener('pointerup', () => {
+        draggedBall = null;
+        isAimingWithPointer = false;
+    });
+
+    function adjustAimAngle(pointerV) {
+        let white = balls.find(b => b.id === 'white');
+        aimAngle = Math.atan2(pointerV.y - white.y, pointerV.x - white.x);
+        
+        // Normalize readout visualization updates
+        let degrees = (aimAngle * (180 / Math.PI));
+        if (degrees < 0) degrees += 360;
+        document.getElementById('aim-deg').innerText = degrees.toFixed(1) + '°';
+        draw();
+    }
+
+    /**
+     * Interface State Mutators
+     */
+    function adjustPower(delta) {
+        powerLevel = Math.max(1, Math.min(5, powerLevel + delta));
+        
+        // Update force panel layout nodes status mapping
+        const barsContainer = document.getElementById('power-bars');
+        barsContainer.innerHTML = '';
+        for (let i = 1; i <= 5; i++) {
+            let bar = document.createElement('div');
+            bar.className = `w-3 h-5 rounded-sm ${i <= powerLevel ? 'bg-yellow-500' : 'bg-slate-700'}`;
+            barsContainer.appendChild(bar);
+        }
+        document.getElementById('power-val').innerText = `${powerLevel} / 5`;
+        draw();
+    }
+
+    // Setup procedural pointer engine tracking pad for spin adjustments
+    const spinPad = document.getElementById('spin-pad');
+    const spinMarker = document.getElementById('spin-marker');
+
+    spinPad.addEventListener('click', (e) => {
+        const rect = spinPad.getBoundingClientRect();
+        let px = (e.clientX - rect.left);
+        let py = (e.clientY - rect.top);
+        
+        // Convert configurations range markers
+        let pctX = (px / rect.width) * 2 - 1;
+        let pctY = (py / rect.height) * 2 - 1;
+
+        // Constraint magnitude to prevent selecting coordinates outside circle bounds
+        let dist = Math.hypot(pctX, pctY);
+        if(dist > 1) {
+            pctX /= dist;
+            pctY /= dist;
+        }
+
+        spinOffsetX = pctX;
+        spinOffsetY = pctY;
+
+        // Reposition selector graphic element
+        spinMarker.style.left = `${((spinOffsetX + 1) / 2) * 100}%`;
+        spinMarker.style.top = `${((spinOffsetY + 1) / 2) * 100}%`;
+
+        // Update indicators
+        let desc = "Center";
+        if (Math.abs(spinOffsetX) > 0.2) desc = spinOffsetX > 0 ? "Right Spin" : "Left Spin";
+        document.getElementById('spin-val').innerText = desc;
+        draw();
+    });
+
+    function toggleMode() {
+        if(appMode === 'ANIMATING') return;
+        // In this implementation mode toggle serves to clear scenarios or reset vector overlays
+        draw();
+    }
+
+    function resetScenario() {
+        balls = JSON.parse(JSON.stringify(initialPositions));
+        appMode = 'EDIT';
+        updateUIState();
+        draw();
+    }
+
+    function fireShot() {
+        if (appMode !== 'EDIT') return;
+        
+        appMode = 'ANIMATING';
+        updateUIState();
+
+        // Translate configured user force metrics into launch properties
+        let white = balls.find(b => b.id === 'white');
+        const launchMagnitude = powerLevel * 4.5;
+        white.vx = Math.cos(aimAngle) * launchMagnitude;
+        white.vy = Math.sin(aimAngle) * launchMagnitude;
+
+        // Kickoff simulation cycles execution loop
+        requestAnimationFrame(runAnimationLoop);
+    }
+
+    function updateUIState() {
+        const badge = document.getElementById('mode-badge');
+        const btnFire = document.getElementById('btn-fire');
+        
+        if (appMode === 'ANIMATING') {
+            badge.innerText = "Simulating";
+            badge.className = "text-xs px-2 py-0.5 font-semibold uppercase tracking-wider bg-red-500/20 text-red-400 rounded border border-red-500/30";
+            btnFire.disabled = true;
+            btnFire.className = "flex items-center justify-center gap-1 py-2 bg-slate-800 text-slate-500 rounded-lg text-xs font-bold transition-all cursor-not-allowed";
+        } else {
+            badge.innerText = "Edit Mode";
+            badge.className = "text-xs px-2 py-0.5 font-semibold uppercase tracking-wider bg-amber-500/20 text-amber-500 rounded border border-amber-500/30";
+            btnFire.disabled = false;
+            btnFire.className = "flex items-center justify-center gap-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-all shadow-md active:scale-95";
+        }
+    }
+
+    // Toggle listener change tracking for overlay lines updates
+    document.getElementById('toggle-solution').addEventListener('change', () => draw());
+
+    // Monitor resize viewports adjustments handling loops
+    window.addEventListener('resize', initCanvas);
+    window.addEventListener('DOMContentLoaded', initCanvas);
+</script>
+</body>
+</html>

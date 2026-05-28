@@ -1,6 +1,6 @@
-import { memo } from 'react';
+import { memo, useId } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import Svg, { Circle, Defs, G, Line, LinearGradient, Polyline, Rect, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, G, Line, LinearGradient, Polyline, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 import type { Point2D } from '@/src/presentation/screens/Training/trainingData';
 
@@ -46,8 +46,8 @@ const TABLE_H = 142;
 const longRailRatios = Array.from({ length: 7 }, (_, index) => (index + 1) / 8);
 const shortRailRatios = Array.from({ length: 3 }, (_, index) => (index + 1) / 4);
 const outerMargin = 0;
-const railThickness = 10.5;
-const cushionThickness = 6;
+const railThickness = 8.27;
+const cushionThickness = 4.73;
 const longGridLines = 7;
 const shortGridLines = 3;
 
@@ -172,6 +172,7 @@ function linePoints(points: Point2D[], orientation: Orientation, layout: ReturnT
 function BilliardsTableThumbnailBase(props: Readonly<BilliardsTableThumbnailProps>) {
     const { orientation = 'horizontal', style, balls = [], path = [], paths = [], aim, showPath = true, showZones = true } = props;
     const layout = getLayout(orientation);
+    const uid = useId();
     let derivedPaths: TrajectoryPath[] = paths;
     if (derivedPaths.length === 0 && path.length > 1) {
         derivedPaths = [{ id: 'solution', points: path, color: '#f8fafc', width: 2.25, dash: [8, 8], opacity: 1 }];
@@ -181,29 +182,47 @@ function BilliardsTableThumbnailBase(props: Readonly<BilliardsTableThumbnailProp
         <View style={[styles.container, { aspectRatio: layout.viewBox.width / layout.viewBox.height }, style]}>
             <Svg width="100%" height="100%" viewBox={`0 0 ${layout.viewBox.width} ${layout.viewBox.height}`}>
                 <Defs>
-                    <LinearGradient id="frameGradient" x1="0" y1="0" x2="1" y2="1">
-                        <Stop offset="0%" stopColor="#264538" />
-                        <Stop offset="100%" stopColor="#1a3028" />
+                    <LinearGradient id={`${uid}-frameGradient`} x1="0" y1="0" x2="1" y2="1">
+                        <Stop offset="0%" stopColor="#8b5a2b" />
+                        <Stop offset="25%" stopColor="#a0692f" />
+                        <Stop offset="50%" stopColor="#6d4423" />
+                        <Stop offset="75%" stopColor="#8b5a2b" />
+                        <Stop offset="100%" stopColor="#5d3a1f" />
                     </LinearGradient>
-                    <LinearGradient id="cushionGradient" x1="0" y1="0" x2="1" y2="1">
+                    <LinearGradient id={`${uid}-cushionGradient`} x1="0" y1="0" x2="1" y2="1">
                         <Stop offset="0%" stopColor="#2f5647" />
                         <Stop offset="100%" stopColor="#1f382f" />
                     </LinearGradient>
-                    <LinearGradient id="feltGradient" x1="0" y1="0" x2="0" y2="1">
+                    <LinearGradient id={`${uid}-feltGradient`} x1="0" y1="0" x2="0" y2="1">
                         <Stop offset="0%" stopColor="#2c8f68" />
                         <Stop offset="100%" stopColor="#226e51" />
                     </LinearGradient>
-                    <LinearGradient id="shadowGradient" x1="0" y1="0" x2="0" y2="1">
+                    <LinearGradient id={`${uid}-shadowGradient`} x1="0" y1="0" x2="0" y2="1">
                         <Stop offset="0%" stopColor="rgba(31, 20, 13, 0.24)" />
                         <Stop offset="100%" stopColor="rgba(31, 20, 13, 0.04)" />
                     </LinearGradient>
+                    <RadialGradient id={`${uid}-ballWhite`} cx="35%" cy="35%" r="65%">
+                        <Stop offset="0%" stopColor="#ffffff" />
+                        <Stop offset="70%" stopColor="#e8e8e8" />
+                        <Stop offset="100%" stopColor="#c8c8c8" />
+                    </RadialGradient>
+                    <RadialGradient id={`${uid}-ballYellow`} cx="35%" cy="35%" r="65%">
+                        <Stop offset="0%" stopColor="#ffe066" />
+                        <Stop offset="70%" stopColor="#facc15" />
+                        <Stop offset="100%" stopColor="#ca8a04" />
+                    </RadialGradient>
+                    <RadialGradient id={`${uid}-ballRed`} cx="35%" cy="35%" r="65%">
+                        <Stop offset="0%" stopColor="#f87171" />
+                        <Stop offset="70%" stopColor="#dc2626" />
+                        <Stop offset="100%" stopColor="#991b1b" />
+                    </RadialGradient>
                 </Defs>
 
-                <Rect x={layout.railX} y={layout.railY} width={layout.railW} height={layout.railH} rx={12} fill="url(#frameGradient)" />
-                <Rect x={layout.cushionX} y={layout.cushionY} width={layout.cushionW} height={layout.cushionH} rx={6} fill="url(#cushionGradient)" />
-                <Rect x={layout.playX} y={layout.playY} width={layout.playW} height={layout.playH} rx={4} fill="url(#feltGradient)" />
-                <Rect x={layout.playX} y={layout.playY} width={layout.playW} height={layout.playH} rx={4} fill="url(#shadowGradient)" opacity={0.28} />
-                <Rect x={layout.playX + 1} y={layout.playY + 1} width={layout.playW - 2} height={layout.playH - 2} rx={3} fill="none" stroke="rgba(255,255,255,0.10)" strokeWidth={0.75} opacity={0.6} />
+                <Rect x={layout.railX} y={layout.railY} width={layout.railW} height={layout.railH} rx={10} fill={`url(#${uid}-frameGradient)`} />
+                <Rect x={layout.cushionX} y={layout.cushionY} width={layout.cushionW} height={layout.cushionH} rx={5} fill={`url(#${uid}-cushionGradient)`} />
+                <Rect x={layout.playX} y={layout.playY} width={layout.playW} height={layout.playH} rx={3} fill={`url(#${uid}-feltGradient)`} />
+                <Rect x={layout.playX} y={layout.playY} width={layout.playW} height={layout.playH} rx={3} fill={`url(#${uid}-shadowGradient)`} opacity={0.28} />
+                <Rect x={layout.playX + 1} y={layout.playY + 1} width={layout.playW - 2} height={layout.playH - 2} rx={2} fill="none" stroke="rgba(255,255,255,0.10)" strokeWidth={0.5} opacity={0.6} />
 
                 {showZones ? (
                     <>
@@ -243,13 +262,13 @@ function BilliardsTableThumbnailBase(props: Readonly<BilliardsTableThumbnailProp
                     return (
                         <>
                             {diamonds.longSide.map((point) => (
-                                <Circle key={`long-diamond-${point.x}-${point.y}`} cx={point.x} cy={point.y} r={1.5} fill="#f8fafc" opacity={0.94} />
+                                <Circle key={`long-diamond-${point.x}-${point.y}`} cx={point.x} cy={point.y} r={1.0} fill="#f8fafc" opacity={0.94} />
                             ))}
                             {diamonds.shortSide.map((point) => (
-                                <Circle key={`short-diamond-${point.x}-${point.y}`} cx={point.x} cy={point.y} r={1.5} fill="#f8fafc" opacity={0.94} />
+                                <Circle key={`short-diamond-${point.x}-${point.y}`} cx={point.x} cy={point.y} r={1.0} fill="#f8fafc" opacity={0.94} />
                             ))}
                             {diamonds.corners.map((point) => (
-                                <Circle key={`corner-diamond-${point.x}-${point.y}`} cx={point.x} cy={point.y} r={1.5} fill="#f8fafc" opacity={0.94} />
+                                <Circle key={`corner-diamond-${point.x}-${point.y}`} cx={point.x} cy={point.y} r={1.0} fill="#f8fafc" opacity={0.94} />
                             ))}
                         </>
                     );
@@ -269,7 +288,7 @@ function BilliardsTableThumbnailBase(props: Readonly<BilliardsTableThumbnailProp
                                         x2={to.x}
                                         y2={to.y}
                                         stroke="rgba(255,255,255,0.16)"
-                                        strokeWidth={6}
+                                        strokeWidth={3}
                                         strokeLinecap="round"
                                     />
                                     <Line
@@ -278,11 +297,11 @@ function BilliardsTableThumbnailBase(props: Readonly<BilliardsTableThumbnailProp
                                         x2={to.x}
                                         y2={to.y}
                                         stroke={aimColor}
-                                        strokeWidth={2.2}
+                                        strokeWidth={1.2}
                                         strokeLinecap="round"
                                         strokeDasharray="3 6"
                                     />
-                                    <Circle cx={to.x} cy={to.y} r={4.2} fill={aimColor} />
+                                    <Circle cx={to.x} cy={to.y} r={2.0} fill={aimColor} />
                                 </>
                             );
                         })()}
@@ -302,7 +321,7 @@ function BilliardsTableThumbnailBase(props: Readonly<BilliardsTableThumbnailProp
                                       points={linePoints(trajectory.points, orientation, layout)}
                                       fill="none"
                                       stroke="rgba(255,255,255,0.14)"
-                                      strokeWidth={pathWidth + 4.5}
+                                      strokeWidth={pathWidth + 2.0}
                                       strokeLinecap="round"
                                       strokeLinejoin="round"
                                   />
@@ -317,7 +336,7 @@ function BilliardsTableThumbnailBase(props: Readonly<BilliardsTableThumbnailProp
                                   />
                                   {trajectory.points.slice(1, -1).map((point, index) => {
                                       const mapped = mapPoint(point, orientation, layout);
-                                      return <Circle key={`${trajectory.id}-bounce-${index}-${mapped.x}-${mapped.y}`} cx={mapped.x} cy={mapped.y} r={3.2} fill={pathStroke} opacity={0.9} />;
+                                      return <Circle key={`${trajectory.id}-bounce-${index}-${mapped.x}-${mapped.y}`} cx={mapped.x} cy={mapped.y} r={1.5} fill={pathStroke} opacity={0.9} />;
                                   })}
                               </G>
                           );
@@ -326,10 +345,13 @@ function BilliardsTableThumbnailBase(props: Readonly<BilliardsTableThumbnailProp
 
                 {balls.map((ball) => {
                     const mapped = mapPoint({ x: ball.x, y: ball.y }, orientation, layout);
+                    const gradientId = ball.id === 'white' ? `${uid}-ballWhite` : ball.id === 'yellow' ? `${uid}-ballYellow` : `${uid}-ballRed`;
                     return (
                         <G key={ball.id}>
-                            <Circle cx={mapped.x} cy={mapped.y} r={6.8} fill={ball.color} stroke={ball.border} strokeWidth={1.2} />
-                            <Circle cx={mapped.x - 2} cy={mapped.y - 2} r={2.1} fill="rgba(255,255,255,0.92)" />
+                            <Circle cx={mapped.x + 0.4} cy={mapped.y + 0.4} r={3.075} fill="rgba(0,0,0,0.25)" />
+                            <Circle cx={mapped.x} cy={mapped.y} r={3.075} fill={`url(#${gradientId})`} stroke={ball.border} strokeWidth={0.4} />
+                            <Circle cx={mapped.x - 1} cy={mapped.y - 1} r={1.2} fill="rgba(255,255,255,0.85)" />
+                            <Circle cx={mapped.x - 0.8} cy={mapped.y - 0.8} r={0.7} fill="rgba(255,255,255,0.95)" />
                         </G>
                     );
                 })}

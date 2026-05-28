@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Emerald Velocity - Training Systems</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .active-icon {
+            font-variation-settings: 'FILL' 1;
+        }
+        body {
+            background-color: #0a0f0d;
+            font-family: 'Inter', sans-serif;
+            color: #f1f3f1;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .glass-card {
+            background: linear-gradient(145deg, rgba(22, 37, 33, 0.9) 0%, rgba(10, 15, 13, 1) 100%);
+        }
+        .emerald-glow:hover {
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
+        }
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0a0f0d;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #10b981;
+            border-radius: 10px;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "tertiary-fixed-dim": "#ffb4a9",
+                      "tertiary-container": "#69332c",
+                      "on-tertiary": "#52211b",
+                      "surface-variant": "#162521",
+                      "primary": "#10b981",
+                      "inverse-surface": "#e1e3e0",
+                      "surface-bright": "#162521",
+                      "outline": "#384e44",
+                      "outline-variant": "#10b981",
+                      "surface-container-highest": "#243a34",
+                      "on-secondary": "#1f352c",
+                      "on-error": "#690005",
+                      "inverse-on-surface": "#2e312f",
+                      "on-primary-fixed-variant": "#0e503d",
+                      "primary-fixed": "#b1f0d5",
+                      "on-surface-variant": "#bfc9c3",
+                      "error": "#ffb4ab",
+                      "surface-container-high": "#1c2e29",
+                      "secondary-container": "#384e44",
+                      "surface-container-lowest": "#050807",
+                      "secondary-fixed": "#cfe8db",
+                      "on-secondary-fixed-variant": "#354b42",
+                      "primary-container": "#064c39",
+                      "on-primary-fixed": "#002116",
+                      "on-tertiary-container": "#e89c92",
+                      "on-tertiary-fixed": "#370d09",
+                      "on-surface": "#f1f3f1",
+                      "surface-dim": "#0a0f0d",
+                      "on-background": "#f1f3f1",
+                      "tertiary-fixed": "#ffdad5",
+                      "surface-tint": "#10b981",
+                      "primary-fixed-dim": "#96d3ba",
+                      "secondary-fixed-dim": "#b3ccc0",
+                      "on-secondary-fixed": "#091f18",
+                      "on-primary-container": "#b1f0d5",
+                      "on-error-container": "#ffdad6",
+                      "surface-container": "#162521",
+                      "background": "#0a0f0d",
+                      "error-container": "#93000a",
+                      "tertiary": "#ffb4a9",
+                      "surface-container-low": "#0d1412",
+                      "on-primary": "#003829",
+                      "surface": "#0a0f0d",
+                      "on-secondary-container": "#a6beb2",
+                      "on-tertiary-fixed-variant": "#6e3730",
+                      "secondary": "#b3ccc0",
+                      "inverse-primary": "#064c39"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "fontFamily": {
+                      "headline": ["Inter"],
+                      "display": ["Inter"],
+                      "body": ["Inter"],
+                      "label": ["Inter"]
+              }
+            },
+          },
+        }
+    </script>
+</head>
+<body class="bg-surface text-on-surface">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-surface h-16 shadow-none">
+<div class="flex justify-between items-center px-4 h-full w-full max-w-7xl mx-auto">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary text-2xl" style="font-variation-settings: 'FILL' 1;">sports_score</span>
+<h1 class="font-headline text-headline-sm font-semibold tracking-tight text-primary">Training Systems</h1>
+</div>
+<div class="w-10 h-10 rounded-full overflow-hidden border-2 border-primary/20">
+<img alt="Coach Profile" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBSrgv8TWEnJ4Mt3GLP0uTVa0Cxyzi0J8gwFSHvJbAmsR3MK2OUYccziFdcHxSjNEJnfao84pAuM23rXiLrIbg8_iCslUzg9z8spaSn3KaC4KQ0RTlg1ZsD9DeSjQQHl0J9SoSOU_IUP-69WK4r0jGKfXim_Qb1uu6KTrgn7BagbsGTKOc20457VLVRRRudiLx6HgcsZcg_9ZT6vBTvMTk8FMqyCV4bx8jFMeh9KXSfcONWvWJIWEufp1p5_0a0-jxbHq5S0Q4hn7A"/>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="pt-20 pb-24 px-4 max-w-4xl mx-auto">
+<div class="mb-8">
+<h2 class="font-display text-3xl font-bold text-on-surface leading-tight">Tactical Modules</h2>
+<p class="text-on-surface-variant font-body mt-2">Select a geometry framework to improve your accuracy.</p>
+</div>
+<!-- Scrollable Training Cards -->
+<div class="flex flex-col gap-6">
+<!-- Diamond System Card -->
+<div class="glass-card rounded-xl overflow-hidden border border-primary/10 shadow-sm emerald-glow transition-all duration-300">
+<div class="p-4 flex items-center justify-between border-b border-primary/5">
+<div class="flex flex-col">
+<span class="text-[10px] font-bold uppercase tracking-wider text-primary mb-1">Advanced Mechanics</span>
+<h3 class="font-headline text-lg font-bold text-on-surface">Diamond System</h3>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant/40">more_vert</span>
+</div>
+<div class="relative w-full aspect-video">
+<img alt="Diamond System Setup" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBJIXCtL8l57ZFkfn6g4Li9-kpelN92EfKCGWlK-QRrX9gcWnWfYtEgKwkP4W3z6mQA3_u9F3x5LyNxSR1f1z2ZimqCXU0l--UGTUCovbdVylHE8EeMhGJCNIRm66B8uGjKSJEn3xvnDqACrZvKMcqMzzfFIlrW9kBXlUpsFLN-yA_ecxpbKOm0eRD0aqMTfE86ZCMx8eX-yUmrnzDZzru-ZQxcOmqLeXIjxzC-kDCFmC7UnaXBcpQ7wLaPATYLuJqq0VQaFFqZ3HI"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent"></div>
+</div>
+<div class="p-5">
+<p class="font-body text-sm text-on-surface-variant leading-relaxed mb-6">
+                        Master bank shots using rail diamonds. A foundational geometry system that utilizes consistent point-to-point calculations for high-precision rail kicks and banks.
+                    </p>
+<a class="inline-flex items-center justify-center w-full py-3.5 bg-primary text-on-primary font-bold rounded-full transition-all active:scale-95 hover:bg-primary/90" href="#">
+<span class="mr-2">Start Training</span>
+<span class="material-symbols-outlined text-sm">arrow_forward</span>
+</a>
+</div>
+</div>
+<!-- Plus System Card -->
+<div class="glass-card rounded-xl overflow-hidden border border-primary/10 shadow-sm emerald-glow transition-all duration-300">
+<div class="p-4 flex items-center justify-between border-b border-primary/5">
+<div class="flex flex-col">
+<span class="text-[10px] font-bold uppercase tracking-wider text-primary mb-1">Precision Pathing</span>
+<h3 class="font-headline text-lg font-bold text-on-surface">Plus System</h3>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant/40">more_vert</span>
+</div>
+<div class="relative w-full aspect-video">
+<img alt="Plus System Setup" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBvpDP3XN1DCFDua-a_nxW3yit1j1UbAzBQEA3C2NnjSwzMAxrSlaagvvU34oHNJ0FjQ0iVQH85j_x7oCqeydZ81eMsdkQFfe4Q6EOdXimp5SJEzK7uqGReEGFG5guEfGchPQJrgNu4T_m2Qo3XiCA5XyO0bAel3agHtk37QDTSLJDeZrMg590JVltwOUSCLTeHqvg2gnV63dj4LyS0wOUw4uH30WROAN-6YD3d1j6gC2LxTEzJQweJyAfJ-x9AEh8gdATNVNFD_-0"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent"></div>
+</div>
+<div class="p-5">
+<p class="font-body text-sm text-on-surface-variant leading-relaxed mb-6">
+                        Calculate advanced rail-first hits and bank routes from the long rail. Essential for escaping safety play and converting difficult defensive positions into offensive opportunities.
+                    </p>
+<a class="inline-flex items-center justify-center w-full py-3.5 bg-primary text-on-primary font-bold rounded-full transition-all active:scale-95 hover:bg-primary/90" href="#">
+<span class="mr-2">Start Training</span>
+<span class="material-symbols-outlined text-sm">arrow_forward</span>
+</a>
+</div>
+</div>
+<!-- Renversé System Card -->
+<div class="glass-card rounded-xl overflow-hidden border border-primary/10 shadow-sm emerald-glow transition-all duration-300">
+<div class="p-4 flex items-center justify-between border-b border-primary/5">
+<div class="flex flex-col">
+<span class="text-[10px] font-bold uppercase tracking-wider text-primary mb-1">Kinetic Energy</span>
+<h3 class="font-headline text-lg font-bold text-on-surface">Renversé</h3>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant/40">more_vert</span>
+</div>
+<div class="relative w-full aspect-video">
+<img alt="Renversé Shot Setup" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAy41uM3e1J5LLZNujezBS2ns3akS7bgZT5mdfnp8vi0b4EiXLMGqwn1B6YjA4va01fc9wtNUaidnH8sb25KLDwbaO7BASYgEsR1yzxKBVwZ7Rt2TdxA_CbHI0ANR6bDN3Y2W-Re8D_JZu4kS_tGxMvTeZ5ZqaNpYgBiQCRxaoPuqXv3ruLSiZA5wFdrsxoczhwlOtULCUCA1Z3HQkcQl8qhf10y4VJCeOA5QPmVcdhFY4qkyj3UjP9ctoFT0kS3CDFlvaKwbG_HyQ"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent"></div>
+</div>
+<div class="p-5">
+<p class="font-body text-sm text-on-surface-variant leading-relaxed mb-6">
+                        Advanced spin control drills focusing on reverse english and high-deflection paths. Learn how to manipulate cue ball travel after high-speed rail impact.
+                    </p>
+<a class="inline-flex items-center justify-center w-full py-3.5 bg-primary text-on-primary font-bold rounded-full transition-all active:scale-95 hover:bg-primary/90" href="#">
+<span class="mr-2">Start Training</span>
+<span class="material-symbols-outlined text-sm">arrow_forward</span>
+</a>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full h-16 flex justify-around items-center px-6 pb-safe bg-surface/80 backdrop-blur-md z-50 shadow-lg border-none">
+<!-- Systems (Active) -->
+<a class="flex flex-col items-center justify-center text-primary relative after:content-[''] after:absolute after:bottom-0 after:w-1 after:h-8 after:bg-primary/0 hover:text-primary transition-all active:scale-90 duration-150" href="#">
+<span class="material-symbols-outlined active-icon">grid_view</span>
+<span class="font-label text-[10px] font-bold uppercase tracking-wider mt-1">Systems</span>
+<div class="absolute -bottom-1 w-1 h-1 bg-primary rounded-full"></div>
+</a>
+<!-- Training -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant/60 hover:text-primary/80 transition-all active:scale-90 duration-150" href="#">
+<span class="material-symbols-outlined">fitness_center</span>
+<span class="font-label text-[10px] font-bold uppercase tracking-wider mt-1">Training</span>
+</a>
+<!-- Progress -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant/60 hover:text-primary/80 transition-all active:scale-90 duration-150" href="#">
+<span class="material-symbols-outlined">query_stats</span>
+<span class="font-label text-[10px] font-bold uppercase tracking-wider mt-1">Progress</span>
+</a>
+<!-- Settings -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant/60 hover:text-primary/80 transition-all active:scale-90 duration-150" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label text-[10px] font-bold uppercase tracking-wider mt-1">Settings</span>
+</a>
+</nav>
+<!-- Interactive script for ripples and micro-interactions -->
+<script>
+        document.querySelectorAll('a').forEach(anchor => {
+            anchor.addEventListener('click', function(e) {
+                if(this.getAttribute('href') === '#') e.preventDefault();
+            });
+        });
+
+        // Simple scroll reveal for cards
+        const observerOptions = {
+            threshold: 0.1
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('opacity-100', 'translate-y-0');
+                    entry.target.classList.remove('opacity-0', 'translate-y-8');
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.glass-card').forEach(card => {
+            card.classList.add('transition-all', 'duration-700', 'opacity-0', 'translate-y-8');
+            observer.observe(card);
+        });
+    </script>
+</body></html>
