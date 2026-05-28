@@ -4,6 +4,7 @@ Monorepo oficial de Bandaro para app movil, paquetes compartidos y backend.
 
 ## Estructura
 
+- apps/frontend: web app React + Vite para el POC de billar
 - apps/mobile: app Expo + React Native
 - packages/core: logica de negocio compartida
 - packages/ui: componentes reutilizables
@@ -20,6 +21,8 @@ Monorepo oficial de Bandaro para app movil, paquetes compartidos y backend.
 
 - pnpm install
 - pnpm dev
+- pnpm dev:frontend
+- pnpm dev:backend
 - pnpm dev:mobile
 - pnpm dev:web
 - pnpm build
@@ -29,7 +32,7 @@ Monorepo oficial de Bandaro para app movil, paquetes compartidos y backend.
 
 1. Copia `.env.example` a `.env`.
 2. Ejecuta `pnpm install`.
-3. Ejecuta `pnpm dev:mobile`.
+3. Ejecuta `pnpm dev` para levantar frontend y backend, o `pnpm dev:mobile` para la app Expo.
 # Bandaro (Expo + Clean Architecture)
 
 Aplicacion movil para registrar partidas de billar a 3 bandas y evaluar el rendimiento por partida.

@@ -1,6 +1,11 @@
 {
-    "name": "@bandaro/config",
-    "version": "1.0.0",
-    "private": true,
-    "main": "./tailwind.config.js"
+  "name": "@bandaro/config",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "type-check": "tsc --noEmit"
+  }
 }

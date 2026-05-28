@@ -25,9 +25,6 @@
             ],
             "@bandaro/config": [
                 "./packages/config"
-            ],
-            "@/*": [
-                "./apps/mobile/*"
             ]
         }
     },

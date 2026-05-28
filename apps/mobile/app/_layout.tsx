@@ -66,6 +66,7 @@ function RootLayoutNav() {
         <Stack.Screen name="auth/login" options={{ title: t('stack.login') }} />
         <Stack.Screen name="auth/register" options={{ title: t('stack.register') }} />
         <Stack.Screen name="training/index" options={{ title: t('stack.training') }} />
+        <Stack.Screen name="training/posture" options={{ title: t('stack.trainingPosture') }} />
         <Stack.Screen name="training/[systemId]" options={{ title: t('stack.trainingSystem') }} />
         <Stack.Screen name="match/new" options={{ title: t('stack.newMatch') }} />
         <Stack.Screen name="match/live" options={{ title: t('stack.liveMatch') }} />

@@ -3,6 +3,15 @@
   "compilerOptions": {
     "strict": true,
     "paths": {
+      "@bandaro/config": [
+        "../../packages/config/src"
+      ],
+      "@bandaro/core": [
+        "../../packages/core/src"
+      ],
+      "@bandaro/ui": [
+        "../../packages/ui/src"
+      ],
       "@/*": [
         "./*"
       ]

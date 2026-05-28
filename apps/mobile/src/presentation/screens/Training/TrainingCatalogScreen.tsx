@@ -20,6 +20,10 @@ export function TrainingCatalogScreen() {
     const palette = getPalette(useColorScheme());
     const styles = getStyles(palette);
 
+    const openPostureAnalysis = () => {
+        router.push('/training/posture');
+    };
+
     const onOpenSystem = (system: TrainingSystem) => {
         router.push({ pathname: '/training/[systemId]', params: { systemId: system.id } });
     };
@@ -37,6 +41,14 @@ export function TrainingCatalogScreen() {
                 <Text style={styles.heroTag}>{t('training.catalog.tag')}</Text>
                 <Text style={styles.title}>{t('training.catalog.title')}</Text>
                 <Text style={styles.subtitle}>{t('training.catalog.subtitle')}</Text>
+                <TouchableOpacity style={styles.heroAction} activeOpacity={0.92} onPress={openPostureAnalysis}>
+                    <View style={styles.heroActionTextWrap}>
+                        <Text style={styles.heroActionLabel}>{t('training.catalog.posture.tag')}</Text>
+                        <Text style={styles.heroActionTitle}>{t('training.catalog.posture.title')}</Text>
+                        <Text style={styles.heroActionSubtitle}>{t('training.catalog.posture.subtitle')}</Text>
+                    </View>
+                    <Text style={styles.heroActionArrow}>→</Text>
+                </TouchableOpacity>
             </View>
 
             <Text style={styles.sectionTitle}>{t('training.catalog.systems')}</Text>
@@ -121,6 +133,44 @@ const getStyles = (palette: ReturnType<typeof getPalette>) =>
             color: palette.muted,
             fontSize: 14,
             lineHeight: 20,
+        },
+        heroAction: {
+            marginTop: 8,
+            borderRadius: theme.radius.md,
+            padding: theme.spacing.md,
+            backgroundColor: `${palette.primary}14`,
+            borderWidth: 1,
+            borderColor: `${palette.primary}44`,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+        },
+        heroActionTextWrap: {
+            flex: 1,
+            gap: 4,
+        },
+        heroActionLabel: {
+            color: palette.primary,
+            fontSize: 11,
+            fontWeight: '800',
+            letterSpacing: 0.8,
+            textTransform: 'uppercase',
+        },
+        heroActionTitle: {
+            color: palette.text,
+            fontSize: 16,
+            fontWeight: '900',
+        },
+        heroActionSubtitle: {
+            color: palette.muted,
+            fontSize: 12,
+            lineHeight: 18,
+        },
+        heroActionArrow: {
+            color: palette.primary,
+            fontSize: 22,
+            fontWeight: '900',
         },
         sectionTitle: {
             color: palette.text,

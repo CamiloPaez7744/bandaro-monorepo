@@ -75,13 +75,13 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build web app
-        run: pnpm --filter @bandaro/mobile build:web
+        run: pnpm --filter @bandaro/frontend build
 
       - name: Upload web artifact
         uses: actions/upload-artifact@v4
         with:
-          name: bandaro-web-build
-          path: apps/mobile/dist
+          name: bandaro-frontend-build
+          path: apps/frontend/dist
 
   build-mobile-eas:
     name: Build Mobile (EAS)
