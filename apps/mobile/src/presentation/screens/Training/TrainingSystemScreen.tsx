@@ -1,69 +1,32 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Svg, { Circle, Defs, G, Line, LinearGradient, Rect, Stop } from 'react-native-svg';
+import { useEffect, useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { useI18n } from '@/components/useLanguage';
 import { getPalette, theme } from '@/constants/theme';
+import { BilliardsTableThumbnail } from '@/src/presentation/components/Training/BilliardsTableThumbnail';
 import {
     CONTACT_PRESETS,
     EFFECT_PRESETS,
     getTrainingSystemById,
+    type Point2D,
     type ContactKey,
     type EffectKey,
-    type Point2D,
 } from '@/src/presentation/screens/Training/trainingData';
 
-const TABLE_W = 284;
-const TABLE_H = 142;
-const VIEW_W = 360;
-const VIEW_H = 220;
-const FRAME_MARGIN = 8;
-const RAIL_WIDTH = 18;
-const CUSHION_WIDTH = 10;
-
-const playableLimitW = VIEW_W - 2 * (FRAME_MARGIN + RAIL_WIDTH + CUSHION_WIDTH);
-const playableLimitH = VIEW_H - 2 * (FRAME_MARGIN + RAIL_WIDTH + CUSHION_WIDTH);
-const PLAY_W = Math.min(playableLimitW, playableLimitH * 2);
-const PLAY_H = PLAY_W / 2;
-const PLAY_X = (VIEW_W - PLAY_W) / 2;
-const PLAY_Y = (VIEW_H - PLAY_H) / 2;
-
-const CUSHION_X = PLAY_X - CUSHION_WIDTH;
-const CUSHION_Y = PLAY_Y - CUSHION_WIDTH;
-const CUSHION_W = PLAY_W + CUSHION_WIDTH * 2;
-const CUSHION_H = PLAY_H + CUSHION_WIDTH * 2;
-
-const RAIL_X = CUSHION_X - RAIL_WIDTH;
-const RAIL_Y = CUSHION_Y - RAIL_WIDTH;
-const RAIL_W = CUSHION_W + RAIL_WIDTH * 2;
-const RAIL_H = CUSHION_H + RAIL_WIDTH * 2;
-
-function mapToView(point: Point2D) {
-    return {
-        x: PLAY_X + (point.x / TABLE_W) * PLAY_W,
-        y: PLAY_Y + (point.y / TABLE_H) * PLAY_H,
-    };
-}
-
-const LONG_RAIL_DIAMONDS = Array.from({ length: 9 }, (_, idx) => idx / 8);
-const SHORT_RAIL_DIAMONDS = Array.from({ length: 5 }, (_, idx) => idx / 4);
-
-function ballColor(id: 'white' | 'yellow' | 'red') {
-    if (id === 'white') return '#F8FAFC';
-    if (id === 'yellow') return '#FBBF24';
-    return '#E11D48';
-}
+type Orientation = 'horizontal' | 'vertical';
 
 export function TrainingSystemScreen() {
     const router = useRouter();
     const params = useLocalSearchParams<{ systemId: string }>();
     const insets = useSafeAreaInsets();
+    const { width } = useWindowDimensions();
     const { t } = useI18n();
     const palette = getPalette(useColorScheme());
     const styles = getStyles(palette);
+    const defaultOrientation: Orientation = width >= 900 ? 'horizontal' : 'vertical';
 
     const system = useMemo(() => (params.systemId ? getTrainingSystemById(params.systemId) : null), [params.systemId]);
 
@@ -71,6 +34,11 @@ export function TrainingSystemScreen() {
     const [showSolution, setShowSolution] = useState(false);
     const [selectedEffect, setSelectedEffect] = useState<EffectKey>(system?.recommendedEffect ?? 'center');
     const [selectedContact, setSelectedContact] = useState<ContactKey>('1/2');
+    const [tableOrientation, setTableOrientation] = useState<Orientation>(defaultOrientation);
+
+    useEffect(() => {
+        setTableOrientation(defaultOrientation);
+    }, [defaultOrientation]);
 
     if (!system) {
         return (
@@ -87,6 +55,42 @@ export function TrainingSystemScreen() {
     const effect = EFFECT_PRESETS[selectedEffect];
     const contact = CONTACT_PRESETS[selectedContact];
     const suggestedPower = Math.round((effect.power + system.recommendedPower) / 2);
+    const aimPoint = position.trajectory[1] ?? position.white;
+    const pathEnd = position.trajectory.at(-1) ?? position.white;
+    const halfWay = (from: Point2D, to: Point2D): Point2D => ({
+        x: from.x + (to.x - from.x) * 0.5,
+        y: from.y + (to.y - from.y) * 0.5,
+    });
+    const solutionPaths = [
+        {
+            id: `${position.id}-white`,
+            points: position.trajectory,
+            color: '#f8fafc',
+            width: 2.4,
+            dash: [8, 8],
+        },
+        {
+            id: `${position.id}-yellow`,
+            points: [position.yellow, halfWay(position.yellow, aimPoint), halfWay(position.yellow, pathEnd), pathEnd],
+            color: '#facc15',
+            width: 1.7,
+            dash: [5, 7],
+            opacity: 0.9,
+        },
+        {
+            id: `${position.id}-red`,
+            points: [position.red, halfWay(position.red, position.white), halfWay(position.red, aimPoint)],
+            color: '#ef4444',
+            width: 1.7,
+            dash: [5, 7],
+            opacity: 0.9,
+        },
+    ];
+    const stageBalls = [
+        { id: 'white', x: position.white.x, y: position.white.y, color: '#f8fafc', border: '#cbd5e1' },
+        { id: 'yellow', x: position.yellow.x, y: position.yellow.y, color: '#facc15', border: '#ca8a04' },
+        { id: 'red', x: position.red.x, y: position.red.y, color: '#dc2626', border: '#991b1b' },
+    ] as const;
 
     return (
         <ScrollView
@@ -113,78 +117,38 @@ export function TrainingSystemScreen() {
             </View>
 
             <View style={styles.tableCard}>
-                <Text style={styles.cardTitle}>{t('training.system.table')}</Text>
+                <View style={styles.tableHeaderRow}>
+                    <Text style={styles.cardTitle}>{t('training.system.table')}</Text>
+                    <TouchableOpacity style={styles.orientationButton} onPress={() => setTableOrientation((prev) => (prev === 'horizontal' ? 'vertical' : 'horizontal'))}>
+                        <Text style={styles.orientationButtonLabel}>Mesa</Text>
+                        <Text style={styles.orientationButtonValue}>{tableOrientation === 'horizontal' ? 'Horizontal' : 'Vertical'}</Text>
+                    </TouchableOpacity>
+                </View>
+
                 <View style={styles.tableWrap}>
-                    <Svg width="100%" height={220} viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}>
-                        <Defs>
-                            <LinearGradient id="woodGradient" x1="0" y1="0" x2="1" y2="1">
-                                <Stop offset="0%" stopColor="#8a5a2b" />
-                                <Stop offset="100%" stopColor="#5f3b1b" />
-                            </LinearGradient>
-                            <LinearGradient id="feltGradient" x1="0" y1="0" x2="0" y2="1">
-                                <Stop offset="0%" stopColor="#2f8f6b" />
-                                <Stop offset="100%" stopColor="#246f54" />
-                            </LinearGradient>
-                            <LinearGradient id="cushionGradient" x1="0" y1="0" x2="1" y2="1">
-                                <Stop offset="0%" stopColor="#355c4b" />
-                                <Stop offset="100%" stopColor="#1f3f34" />
-                            </LinearGradient>
-                        </Defs>
+                    <BilliardsTableThumbnail
+                        orientation={tableOrientation}
+                        style={styles.tableStage}
+                        balls={stageBalls as unknown as Array<{ id: 'white' | 'yellow' | 'red'; x: number; y: number; color: string; border: string }>}
+                        aim={{ from: position.white, to: aimPoint, color: '#fbbf24' }}
+                        paths={showSolution ? solutionPaths : [{ id: `${position.id}-aim`, points: [position.white, aimPoint], color: '#fbbf24', width: 2.2, dash: [3, 7], opacity: 0.95 }]}
+                        showZones
+                    />
+                </View>
 
-                        <Rect x={0} y={0} width={VIEW_W} height={VIEW_H} rx={16} fill="#0d1117" />
-
-                        <Rect x={RAIL_X} y={RAIL_Y} width={RAIL_W} height={RAIL_H} rx={14} fill="url(#woodGradient)" />
-
-                        <Rect x={CUSHION_X} y={CUSHION_Y} width={CUSHION_W} height={CUSHION_H} rx={10} fill="url(#cushionGradient)" />
-
-                        <Rect x={PLAY_X} y={PLAY_Y} width={PLAY_W} height={PLAY_H} rx={6} fill="url(#feltGradient)" />
-
-                        {LONG_RAIL_DIAMONDS.map((ratio) => {
-                            const x = PLAY_X + PLAY_W * ratio;
-                            return (
-                                <G key={`long-${ratio}`}>
-                                    <Circle cx={x} cy={RAIL_Y + RAIL_WIDTH * 0.52} r={2.3} fill="#f8fafc" />
-                                    <Circle cx={x} cy={RAIL_Y + RAIL_H - RAIL_WIDTH * 0.52} r={2.3} fill="#f8fafc" />
-                                </G>
-                            );
-                        })}
-
-                        {SHORT_RAIL_DIAMONDS.map((ratio) => {
-                            const y = PLAY_Y + PLAY_H * ratio;
-                            return (
-                                <G key={`short-${ratio}`}>
-                                    <Circle cx={RAIL_X + RAIL_WIDTH * 0.52} cy={y} r={2.3} fill="#f8fafc" />
-                                    <Circle cx={RAIL_X + RAIL_W - RAIL_WIDTH * 0.52} cy={y} r={2.3} fill="#f8fafc" />
-                                </G>
-                            );
-                        })}
-
-                        {showSolution &&
-                            position.trajectory.slice(1).map((next, idx) => {
-                                const from = mapToView(position.trajectory[idx]);
-                                const to = mapToView(next);
-                                const isMiddle = idx > 0 && idx < position.trajectory.length - 2;
-                                return (
-                                    <Line
-                                        key={`tr-${idx}`}
-                                        x1={from.x}
-                                        y1={from.y}
-                                        x2={to.x}
-                                        y2={to.y}
-                                        stroke={isMiddle ? 'rgba(224, 231, 255, 0.45)' : 'rgba(251, 191, 36, 0.9)'}
-                                        strokeWidth={isMiddle ? 1.5 : 2.1}
-                                        strokeDasharray={isMiddle ? '6 6' : undefined}
-                                    />
-                                );
-                            })}
-
-                        {(['white', 'yellow', 'red'] as const).map((ballId) => {
-                            const pos = mapToView(position[ballId]);
-                            return (
-                                <Circle key={ballId} cx={pos.x} cy={pos.y} r={6} fill={ballColor(ballId)} stroke="rgba(0,0,0,0.45)" strokeWidth={1.2} />
-                            );
-                        })}
-                    </Svg>
+                <View style={styles.legendRow}>
+                    <View style={styles.legendChip}>
+                        <Text style={styles.legendLabel}>Ruta</Text>
+                        <Text style={styles.legendValue}>{position.trajectory.length - 1} tramos</Text>
+                    </View>
+                    <View style={styles.legendChip}>
+                        <Text style={styles.legendLabel}>Solución</Text>
+                        <Text style={styles.legendValue}>{showSolution ? 'Visible' : 'Oculta'}</Text>
+                    </View>
+                    <View style={styles.legendChip}>
+                        <Text style={styles.legendLabel}>Bandas</Text>
+                        <Text style={styles.legendValue}>3+ rebotes</Text>
+                    </View>
                 </View>
 
                 <View style={styles.positionControls}>
@@ -368,17 +332,74 @@ const getStyles = (palette: ReturnType<typeof getPalette>) =>
             padding: theme.spacing.md,
             gap: 12,
         },
+        tableHeaderRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+        },
         cardTitle: {
             color: palette.text,
             fontSize: 16,
             fontWeight: '800',
         },
-        tableWrap: {
-            borderRadius: 12,
-            overflow: 'hidden',
+        orientationButton: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+            paddingHorizontal: 12,
+            paddingVertical: 9,
+            borderRadius: 999,
+            backgroundColor: `${palette.primary}12`,
             borderWidth: 1,
-            borderColor: '#0f172a',
-            backgroundColor: '#0f172a',
+            borderColor: `${palette.primary}22`,
+        },
+        orientationButtonLabel: {
+            color: palette.muted,
+            fontSize: 10,
+            fontWeight: '800',
+            letterSpacing: 0.6,
+            textTransform: 'uppercase',
+        },
+        orientationButtonValue: {
+            color: palette.primary,
+            fontSize: 11,
+            fontWeight: '900',
+            letterSpacing: 0.4,
+            textTransform: 'uppercase',
+        },
+    tableWrap: {
+        borderRadius: 18,
+        overflow: 'hidden',
+    },
+    tableStage: {
+        width: '100%',
+    },
+        legendRow: {
+            flexDirection: 'row',
+            gap: 8,
+        },
+        legendChip: {
+            flex: 1,
+            borderRadius: 12,
+            paddingHorizontal: 10,
+            paddingVertical: 8,
+            backgroundColor: `${palette.primary}10`,
+            borderWidth: 1,
+            borderColor: `${palette.primary}18`,
+        },
+        legendLabel: {
+            color: palette.muted,
+            fontSize: 10,
+            fontWeight: '800',
+            letterSpacing: 0.6,
+            textTransform: 'uppercase',
+        },
+        legendValue: {
+            color: palette.text,
+            fontSize: 13,
+            fontWeight: '800',
+            marginTop: 2,
         },
         positionControls: {
             flexDirection: 'row',
