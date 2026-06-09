@@ -1,3 +1,5 @@
+import { type SpinEffect } from '@bandaro/core';
+
 export type EffectKey =
     | 'center'
     | 'top'
@@ -50,6 +52,38 @@ export const EFFECT_PRESETS: Record<
     left: { label: 'Lateral Izq.', description: 'Abre angulo inverso.', x: 22, y: 50, power: 68 },
     'top-left': { label: 'Corrido Izq.', description: 'Running + lateral izquierdo.', x: 28, y: 30, power: 64 },
 };
+
+export function effectKeyToSpin(effectKey: EffectKey): SpinEffect {
+    const preset = EFFECT_PRESETS[effectKey];
+    const x = (preset.x - 50) / 50;
+    const y = (50 - preset.y) / 50;
+
+    return {
+        x,
+        y,
+        magnitude: Math.min(1, Math.hypot(x, y)),
+    };
+}
+
+export function spinToEffectKey(spin: SpinEffect): EffectKey {
+    const entries = Object.entries(EFFECT_PRESETS) as Array<[EffectKey, (typeof EFFECT_PRESETS)[EffectKey]]>;
+
+    let bestKey: EffectKey = 'center';
+    let bestDistance = Number.POSITIVE_INFINITY;
+
+    for (const [key, preset] of entries) {
+        const presetSpinX = (preset.x - 50) / 50;
+        const presetSpinY = (50 - preset.y) / 50;
+        const distance = Math.hypot(spin.x - presetSpinX, spin.y - presetSpinY);
+
+        if (distance < bestDistance) {
+            bestDistance = distance;
+            bestKey = key;
+        }
+    }
+
+    return bestKey;
+}
 
 export const CONTACT_PRESETS: Record<ContactKey, { label: string; description: string }> = {
     '1/2': { label: 'Media bola', description: 'Impacto pleno para lineas estables.' },

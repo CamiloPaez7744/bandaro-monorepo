@@ -8,14 +8,18 @@ import { useColorScheme } from '@/components/useColorScheme';
 import { useI18n } from '@/components/useLanguage';
 import { getPalette, theme } from '@/constants/theme';
 import { BilliardsTableThumbnail } from '@/src/presentation/components/Training/BilliardsTableThumbnail';
+import { EffectBallSelector } from '@/src/presentation/components/Training/EffectBallSelector';
 import {
     CONTACT_PRESETS,
     EFFECT_PRESETS,
+    effectKeyToSpin,
     getTrainingSystemById,
+    spinToEffectKey,
     type Point2D,
     type ContactKey,
     type EffectKey,
 } from '@/src/presentation/screens/Training/trainingData';
+import { type SpinEffect } from '@bandaro/core';
 
 type Orientation = 'horizontal' | 'vertical';
 
@@ -184,6 +188,7 @@ function TrainingSystemWorkspace() {
     const [aimTarget, setAimTarget] = useState<Point2D>(() => initialPosition.trajectory[1] ?? initialPosition.white);
     const [showSolution, setShowSolution] = useState(false);
     const [selectedEffect, setSelectedEffect] = useState<EffectKey>(system?.recommendedEffect ?? 'center');
+    const [effectSpin, setEffectSpin] = useState<SpinEffect>(() => effectKeyToSpin(system?.recommendedEffect ?? 'center'));
     const [selectedContact, setSelectedContact] = useState<ContactKey>('1/2');
     const [guideVisibility, setGuideVisibility] = useState<GuideVisibility>({
         white: true,
@@ -213,6 +218,7 @@ function TrainingSystemWorkspace() {
         setBallPositions(nextBallPositions);
         setAimTarget(nextAimTarget);
         setSelectedEffect(system.recommendedEffect);
+        setEffectSpin(effectKeyToSpin(system.recommendedEffect));
         setSelectedContact('1/2');
         setGuideVisibility({ white: true, yellow: true, red: true });
         setShowSolution(false);
@@ -234,6 +240,7 @@ function TrainingSystemWorkspace() {
                     setBallPositions(saved.ballPositions);
                     setAimTarget(saved.aimTarget);
                     setSelectedEffect(saved.selectedEffect);
+                    setEffectSpin(effectKeyToSpin(saved.selectedEffect));
                     setSelectedContact(saved.selectedContact);
                     setGuideVisibility(saved.guideVisibility);
                     setShowSolution(saved.showSolution);
@@ -359,6 +366,7 @@ function TrainingSystemWorkspace() {
         setBallPositions(cloneStageBalls(currentPosition));
         setAimTarget(currentPosition.trajectory[1] ?? currentPosition.white);
         setSelectedEffect(system.recommendedEffect);
+        setEffectSpin(effectKeyToSpin(system.recommendedEffect));
         setSelectedContact('1/2');
         setGuideVisibility({ white: true, yellow: true, red: true });
         setShowSolution(false);
@@ -575,28 +583,15 @@ function TrainingSystemWorkspace() {
                     <View style={styles.dualSection}>
                         <View style={styles.cardHalf}>
                             <Text style={styles.cardTitle}>{t('training.system.effect')}</Text>
-                            <View style={styles.effectBoard}>
-                                <View style={styles.effectBall} />
-                                {(Object.keys(EFFECT_PRESETS) as EffectKey[]).map((key) => {
-                                    const preset = EFFECT_PRESETS[key];
-                                    const selected = selectedEffect === key;
-                                    return (
-                                        <Pressable
-                                            key={key}
-                                            style={[
-                                                styles.effectPoint,
-                                                {
-                                                    left: `${preset.x}%`,
-                                                    top: `${preset.y}%`,
-                                                    backgroundColor: selected ? '#fbbf24' : '#1d8fd8',
-                                                    borderColor: selected ? '#f59e0b' : '#93c5fd',
-                                                },
-                                            ]}
-                                            onPress={() => setSelectedEffect(key)}
-                                        />
-                                    );
-                                })}
-                            </View>
+                            <EffectBallSelector
+                                spin={effectSpin}
+                                onSpinChange={(nextSpin) => {
+                                    setEffectSpin(nextSpin);
+                                    setSelectedEffect(spinToEffectKey(nextSpin));
+                                }}
+                                size={340}
+                                initialGuidesVisible
+                            />
                             <Text style={styles.selectorTitle}>{effect.label}</Text>
                             <Text style={styles.selectorSubtitle}>{effect.description}</Text>
                             <View style={styles.effectMetaRow}>
@@ -949,87 +944,199 @@ const getStyles = (palette: ReturnType<typeof getPalette>) =>
             backgroundColor: palette.card,
             borderWidth: 1,
             borderColor: palette.border,
-            padding: theme.spacing.md,
-            gap: 10,
+            padding: theme.spacing.sm,
+            gap: 8,
         },
-        effectBoard: {
-            width: 170,
-            height: 170,
+        effectBoardShell: {
+            width: 154,
+            height: 154,
             alignSelf: 'center',
-            borderRadius: 85,
-            borderWidth: 1,
-            borderColor: '#cbd5e1',
-            backgroundColor: '#f8fafc',
+            borderRadius: 77,
+            backgroundColor: '#08110f',
+            alignItems: 'center',
+            justifyContent: 'center',
             position: 'relative',
             overflow: 'hidden',
         },
+        effectBoardHalo: {
+            position: 'absolute',
+            left: 10,
+            top: 10,
+            right: 10,
+            bottom: 10,
+            borderRadius: 77,
+            backgroundColor: 'rgba(8, 17, 15, 0.92)',
+        },
+        effectBoard: {
+            width: 126,
+            height: 126,
+            alignSelf: 'center',
+            borderRadius: 63,
+            backgroundColor: '#f2f4f5',
+            borderWidth: 1,
+            borderColor: '#d9dee3',
+            position: 'relative',
+            overflow: 'hidden',
+        },
+        effectGrid: {
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            bottom: 0,
+            left: 0,
+        },
+        effectGridLine: {
+            position: 'absolute',
+            backgroundColor: 'rgba(130, 144, 155, 0.26)',
+        },
+        effectGridLineVertical: {
+            top: 0,
+            bottom: 0,
+            width: 1,
+        },
+        effectGridLineHorizontal: {
+            left: 0,
+            right: 0,
+            height: 1,
+        },
+        effectCrosshairHorizontal: {
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: '50%',
+            height: 2,
+            marginTop: -1,
+            backgroundColor: 'rgba(56, 189, 248, 0.7)',
+            shadowColor: '#38bdf8',
+            shadowOpacity: 0.45,
+            shadowRadius: 6,
+        },
+        effectCrosshairVertical: {
+            position: 'absolute',
+            top: 0,
+            bottom: 0,
+            left: '50%',
+            width: 2,
+            marginLeft: -1,
+            backgroundColor: 'rgba(56, 189, 248, 0.7)',
+            shadowColor: '#38bdf8',
+            shadowOpacity: 0.45,
+            shadowRadius: 6,
+        },
+        effectAxisLabelTop: {
+            position: 'absolute',
+            top: 8,
+            left: '50%',
+            marginLeft: -18,
+            color: '#d7dee2',
+            fontSize: 9,
+            fontWeight: '800',
+            letterSpacing: 0.4,
+        },
+        effectAxisLabelRight: {
+            position: 'absolute',
+            right: 5,
+            top: '50%',
+            marginTop: -5,
+            color: '#d7dee2',
+            fontSize: 9,
+            fontWeight: '800',
+            letterSpacing: 0.4,
+        },
+        effectSphereShadow: {
+            position: 'absolute',
+            left: 8,
+            top: 8,
+            right: 8,
+            bottom: 8,
+            borderRadius: 63,
+            shadowColor: '#000',
+            shadowOpacity: 0.14,
+            shadowRadius: 12,
+            shadowOffset: { width: 0, height: 8 },
+            backgroundColor: 'rgba(255,255,255,0.02)',
+        },
         effectBall: {
             position: 'absolute',
-            left: 15,
-            top: 15,
-            right: 15,
-            bottom: 15,
-            borderRadius: 80,
+            left: 14,
+            top: 14,
+            right: 14,
+            bottom: 14,
+            borderRadius: 56,
             borderWidth: 1,
             borderColor: '#dbeafe',
+            backgroundColor: 'rgba(255,255,255,0.86)',
+        },
+        effectCenterPuck: {
+            position: 'absolute',
+            width: 26,
+            height: 26,
+            borderRadius: 13,
+            backgroundColor: '#22c55e',
+            borderWidth: 2,
+            borderColor: '#047857',
+            shadowColor: '#22c55e',
+            shadowOpacity: 0.45,
+            shadowRadius: 8,
+            shadowOffset: { width: 0, height: 0 },
         },
         effectPoint: {
             position: 'absolute',
-            width: 22,
-            height: 22,
-            borderRadius: 11,
+            width: 14,
+            height: 14,
+            borderRadius: 7,
             borderWidth: 2,
-            transform: [{ translateX: -11 }, { translateY: -11 }],
+            transform: [{ translateX: -7 }, { translateY: -7 }],
         },
         selectorTitle: {
             color: palette.text,
-            fontSize: 14,
+            fontSize: 13,
             fontWeight: '700',
             textAlign: 'center',
         },
         selectorSubtitle: {
             color: palette.muted,
-            fontSize: 12,
+            fontSize: 11,
             textAlign: 'center',
-            lineHeight: 18,
+            lineHeight: 16,
         },
         effectMetaRow: {
             flexDirection: 'row',
-            gap: 8,
+            gap: 6,
         },
         effectMetaChip: {
             flex: 1,
-            borderRadius: 12,
-            paddingHorizontal: 10,
-            paddingVertical: 8,
+            borderRadius: 10,
+            paddingHorizontal: 8,
+            paddingVertical: 6,
             backgroundColor: `${palette.primary}10`,
             borderWidth: 1,
             borderColor: `${palette.primary}18`,
         },
         effectMetaLabel: {
             color: palette.muted,
-            fontSize: 10,
+            fontSize: 9,
             fontWeight: '800',
             letterSpacing: 0.5,
             textTransform: 'uppercase',
         },
         effectMetaValue: {
             color: palette.text,
-            fontSize: 13,
+            fontSize: 12,
             fontWeight: '800',
-            marginTop: 2,
+            marginTop: 1,
         },
         contactWrap: {
             flexDirection: 'row',
             flexWrap: 'wrap',
-            gap: 8,
+            gap: 6,
         },
         contactButton: {
             borderWidth: 1,
             borderColor: palette.border,
-            borderRadius: 10,
-            paddingHorizontal: 12,
-            paddingVertical: 8,
+            borderRadius: 9,
+            paddingHorizontal: 10,
+            paddingVertical: 7,
             backgroundColor: palette.background,
         },
         contactButtonSelected: {
@@ -1038,7 +1145,7 @@ const getStyles = (palette: ReturnType<typeof getPalette>) =>
         },
         contactButtonText: {
             color: palette.muted,
-            fontSize: 12,
+            fontSize: 11,
             fontWeight: '700',
         },
         contactButtonTextSelected: {

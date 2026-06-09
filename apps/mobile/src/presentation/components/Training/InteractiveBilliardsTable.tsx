@@ -12,6 +12,7 @@ import {
     vec2Sub,
     vec2Normalize,
 } from '@bandaro/core';
+import { CushionRuler } from './CushionRuler';
 
 type Orientation = 'horizontal' | 'vertical';
 
@@ -27,6 +28,7 @@ interface InteractiveBilliardsTableProps {
     isEditMode?: boolean;
     showGuides?: boolean;
     maxCushionBounces?: number;
+    showRuler?: boolean;
 }
 
 const TABLE_W = DEFAULT_TABLE.width;
@@ -176,6 +178,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
         isEditMode = false,
         showGuides = true,
         maxCushionBounces = 5,
+        showRuler = false,
     } = props;
 
     const layout = getLayout(orientation);
@@ -555,6 +558,16 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                     );
                 })}
             </Svg>
+
+            {showRuler && (
+                <CushionRuler
+                    orientation={orientation}
+                    tableWidth={TABLE_W}
+                    tableHeight={TABLE_H}
+                    railThickness={railThickness}
+                    cushionThickness={cushionThickness}
+                />
+            )}
 
             {isEditMode && (
                 <View style={[styles.editOverlay, styles.pointerEventsNone]}>
