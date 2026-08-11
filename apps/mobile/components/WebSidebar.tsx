@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import { IconHome, IconClock, IconBarbell, IconUser, IconChevronRight, IconChevronLeft } from '@tabler/icons-react-native';
 import { Link, usePathname } from 'expo-router';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -53,7 +53,11 @@ export function WebSidebar({ collapsed, onToggleCollapsed }: WebSidebarProps) {
                     </View>
                 )}
                 <Pressable onPress={onToggleCollapsed} style={styles.collapseButton} accessibilityRole="button" accessibilityLabel={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
-                    <Ionicons name={collapsed ? 'chevron-forward' : 'chevron-back'} size={16} color={palette.muted} />
+                    {collapsed ? (
+                        <IconChevronRight size={16} color={palette.muted} strokeWidth={2} />
+                    ) : (
+                        <IconChevronLeft size={16} color={palette.muted} strokeWidth={2} />
+                    )}
                 </Pressable>
             </View>
 
@@ -61,11 +65,18 @@ export function WebSidebar({ collapsed, onToggleCollapsed }: WebSidebarProps) {
                 {NAV_ITEMS.map((item) => {
                     const active = isActivePath(pathname, item.href);
                     const navItemStyle = StyleSheet.flatten([styles.navItem, active ? styles.navItemActive : null]);
+                    const iconMap: Record<string, React.ComponentType<{ size: number; color: string; strokeWidth: number }>> = {
+                        home: IconHome,
+                        time: IconClock,
+                        barbell: IconBarbell,
+                        person: IconUser,
+                    };
+                    const IconComponent = iconMap[item.icon];
                     return (
                         <Link key={item.href} href={item.href} asChild>
                             <Pressable style={navItemStyle}>
                                 <View style={[styles.iconWrap, active && styles.iconWrapActive]}>
-                                    <Ionicons name={item.icon} size={18} color={active ? palette.primary : palette.muted} />
+                                    <IconComponent size={18} color={active ? palette.primary : palette.muted} strokeWidth={2} />
                                 </View>
                                 {collapsed ? null : <Text style={[styles.navText, active && styles.navTextActive]}>{t(item.key)}</Text>}
                                 {active ? <View style={styles.activeRail} /> : null}

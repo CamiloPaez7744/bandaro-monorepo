@@ -1,11 +1,14 @@
+import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { IconCamera, IconArrowRight } from '@tabler/icons-react-native';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { useI18n } from '@/components/useLanguage';
 import { getPalette, theme } from '@/constants/theme';
 import { BilliardsTableThumbnail } from '@/src/presentation/components/Training/BilliardsTableThumbnail';
+import { CameraCaptureModal } from '@/src/presentation/components/Snapshot/CameraCaptureModal';
 import { TRAINING_SYSTEMS, type TrainingSystem } from '@/src/presentation/screens/Training/trainingData';
 
 const difficultyColor = {
@@ -23,6 +26,7 @@ export function TrainingCatalogScreen() {
     const styles = getStyles(palette);
     const isWideScreen = width >= 960;
     const cardWidth = isWideScreen ? 320 : '100%';
+    const [showCameraModal, setShowCameraModal] = useState(false);
 
     const onOpenSystem = (system: TrainingSystem) => {
         router.push({ pathname: '/training/[systemId]', params: { systemId: system.id } });
@@ -42,6 +46,25 @@ export function TrainingCatalogScreen() {
                 <Text style={styles.title}>{t('training.catalog.title')}</Text>
                 <Text style={styles.subtitle}>{t('training.catalog.subtitle')}</Text>
             </View>
+
+            <TouchableOpacity
+                style={[styles.snapshotButton, { borderColor: palette.border }]}
+                activeOpacity={0.8}
+                onPress={() => setShowCameraModal(true)}>
+                <IconCamera size={32} color={palette.primary} strokeWidth={1.5} />
+                <View style={styles.snapshotInfo}>
+                    <Text style={[styles.snapshotTitle, { color: palette.text }]}>Estudiar nueva posición</Text>
+                    <Text style={[styles.snapshotSubtitle, { color: palette.muted }]}>
+                        Toma una foto de una mesa y reproduce la jugada en el simulador
+                    </Text>
+                </View>
+                <IconArrowRight size={20} color={palette.primary} strokeWidth={2.5} />
+            </TouchableOpacity>
+
+            <CameraCaptureModal
+                visible={showCameraModal}
+                onClose={() => setShowCameraModal(false)}
+            />
 
             <Text style={styles.sectionTitle}>{t('training.catalog.systems')}</Text>
 
@@ -106,7 +129,7 @@ export function TrainingCatalogScreen() {
 
                             <View style={styles.actionButton}>
                                 <Text style={styles.actionButtonText}>{t('training.catalog.tapToStart')}</Text>
-                                <Text style={styles.footerArrow}>→</Text>
+                                <IconArrowRight size={16} color="#fff" strokeWidth={2.5} />
                             </View>
                         </View>
                     </TouchableOpacity>
@@ -131,10 +154,7 @@ const getStyles = (palette: ReturnType<typeof getPalette>) =>
             padding: theme.spacing.md,
             backgroundColor: palette.card,
             gap: 8,
-            shadowColor: '#000',
-            shadowOpacity: 0.2,
-            shadowRadius: 16,
-            shadowOffset: { width: 0, height: 10 },
+            boxShadow: '0px 10px 16px rgba(0, 0, 0, 0.2)',
             elevation: 5,
         },
         heroTag: {
@@ -177,10 +197,7 @@ const getStyles = (palette: ReturnType<typeof getPalette>) =>
             borderColor: palette.border,
             backgroundColor: palette.card,
             overflow: 'hidden',
-            shadowColor: '#000',
-            shadowOpacity: 0.16,
-            shadowRadius: 18,
-            shadowOffset: { width: 0, height: 10 },
+            boxShadow: '0px 10px 18px rgba(0, 0, 0, 0.16)',
             elevation: 4,
         },
     cardTop: {
@@ -305,8 +322,34 @@ const getStyles = (palette: ReturnType<typeof getPalette>) =>
             letterSpacing: 0.3,
         },
         footerArrow: {
-            color: '#fff',
-            fontSize: 16,
-            fontWeight: '900',
+            // deprecated — replaced by IconArrowRight
+        },
+        snapshotButton: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 14,
+            borderRadius: theme.radius.lg,
+            borderWidth: 1.5,
+            borderStyle: 'dashed',
+            padding: theme.spacing.md,
+            backgroundColor: palette.card,
+        },
+        snapshotIcon: {
+            // deprecated — replaced by IconCamera
+        },
+        snapshotInfo: {
+            flex: 1,
+            gap: 2,
+        },
+        snapshotTitle: {
+            fontSize: 15,
+            fontWeight: '700',
+        },
+        snapshotSubtitle: {
+            fontSize: 12,
+            lineHeight: 16,
+        },
+        snapshotArrow: {
+            // deprecated — replaced by IconArrowRight
         },
     });

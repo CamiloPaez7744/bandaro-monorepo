@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { IconHome, IconClock, IconBarbell, IconUser } from '@tabler/icons-react-native';
 import { Platform, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -8,19 +8,19 @@ import { useColorScheme } from '@/components/useColorScheme';
 import { useI18n } from '@/components/useLanguage';
 
 function HomeTabIcon({ color, size }: Readonly<{ color: string; size: number }>) {
-  return <Ionicons name="home" size={size} color={color} />;
+  return <IconHome size={size} color={color} strokeWidth={2} />;
 }
 
 function HistoryTabIcon({ color, size }: Readonly<{ color: string; size: number }>) {
-  return <Ionicons name="time" size={size} color={color} />;
+  return <IconClock size={size} color={color} strokeWidth={2} />;
 }
 
 function TrainingTabIcon({ color, size }: Readonly<{ color: string; size: number }>) {
-  return <Ionicons name="barbell" size={size} color={color} />;
+  return <IconBarbell size={size} color={color} strokeWidth={2} />;
 }
 
 function ProfileTabIcon({ color, size }: Readonly<{ color: string; size: number }>) {
-  return <Ionicons name="person" size={size} color={color} />;
+  return <IconUser size={size} color={color} strokeWidth={2} />;
 }
 
 export default function TabLayout() {

@@ -8,11 +8,13 @@
         "dev": "tsc -p tsconfig.json --watch",
         "lint": "echo \"No lint configured\"",
         "type-check": "tsc -p tsconfig.json --noEmit",
-        "test": "echo \"No tests configured\"",
+        "test": "vitest run",
+        "test:watch": "vitest",
         "clean": "rimraf dist"
     },
     "devDependencies": {
         "rimraf": "^6.0.1",
-        "typescript": "~5.9.3"
+        "typescript": "~5.9.3",
+        "vitest": "^3.0.0"
     }
 }

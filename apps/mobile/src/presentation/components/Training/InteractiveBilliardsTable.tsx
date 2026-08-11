@@ -1,6 +1,7 @@
 import { memo, useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import { StyleSheet, View, Text, type StyleProp, type ViewStyle, PanResponder, GestureResponderEvent } from 'react-native';
 import Svg, { Circle, Defs, G, Line, LinearGradient, Polyline, RadialGradient, Rect, Stop } from 'react-native-svg';
+import { IconHandClick, IconTarget } from '@tabler/icons-react-native';
 
 import {
     Ball,
@@ -13,6 +14,7 @@ import {
     vec2Normalize,
 } from '@bandaro/core';
 import { CushionRuler } from './CushionRuler';
+import { SystemNumberingOverlay, NumberAnchor, Formula } from './SystemNumberingOverlay';
 
 type Orientation = 'horizontal' | 'vertical';
 
@@ -27,8 +29,11 @@ interface InteractiveBilliardsTableProps {
     isSimulating?: boolean;
     isEditMode?: boolean;
     showGuides?: boolean;
-    maxCushionBounces?: number;
     showRuler?: boolean;
+    numberingAnchors?: NumberAnchor[];
+    numberingFormula?: Formula | null;
+    showNumbering?: boolean;
+    onNumberingAnchorsChange?: (anchors: NumberAnchor[]) => void;
 }
 
 const TABLE_W = DEFAULT_TABLE.width;
@@ -165,6 +170,43 @@ function getDiamondPoints(orientation: Orientation, layout: ReturnType<typeof ge
     };
 }
 
+function getDiamondSvgPosition(
+    side: 'top' | 'bottom' | 'left' | 'right',
+    index: number,
+    orientation: Orientation,
+    layout: ReturnType<typeof getLayout>
+): { x: number; y: number } | null {
+    const labelOffset = railThickness * 1.2;
+    const railCenterTop = layout.railY + railThickness / 2;
+    const railCenterBottom = layout.railY + layout.railH - railThickness / 2;
+    const railCenterLeft = layout.railX + railThickness / 2;
+    const railCenterRight = layout.railX + layout.railW - railThickness / 2;
+
+    let baseX: number;
+    let baseY: number;
+
+    switch (side) {
+        case 'top':
+            baseX = layout.playX + (layout.playW * index) / 8;
+            baseY = railCenterTop;
+            return { x: baseX, y: baseY - labelOffset };
+        case 'bottom':
+            baseX = layout.playX + (layout.playW * index) / 8;
+            baseY = railCenterBottom;
+            return { x: baseX, y: baseY + labelOffset };
+        case 'left':
+            baseX = railCenterLeft;
+            baseY = layout.playY + (layout.playH * index) / 4;
+            return { x: baseX - labelOffset, y: baseY };
+        case 'right':
+            baseX = railCenterRight;
+            baseY = layout.playY + (layout.playH * index) / 4;
+            return { x: baseX + labelOffset, y: baseY };
+        default:
+            return null;
+    }
+}
+
 function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTableProps>) {
     const {
         orientation = 'vertical',
@@ -177,8 +219,11 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
         isSimulating = false,
         isEditMode = false,
         showGuides = true,
-        maxCushionBounces = 5,
         showRuler = false,
+        numberingAnchors = [],
+        numberingFormula = null,
+        showNumbering = false,
+        onNumberingAnchorsChange,
     } = props;
 
     const layout = getLayout(orientation);
@@ -195,7 +240,11 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
     const orientationRef = useRef(orientation);
     const onBallMoveRef = useRef(onBallMove);
     const onAimChangeRef = useRef(onAimChange);
+    const onNumberingAnchorsChangeRef = useRef(onNumberingAnchorsChange);
+    const numberingAnchorsRef = useRef(numberingAnchors);
+    const showNumberingRef = useRef(showNumbering);
     const draggingBallIdRef = useRef<BallId | null>(null);
+    const draggingNumberIdRef = useRef<string | null>(null);
 
     useEffect(() => { isEditModeRef.current = isEditMode; }, [isEditMode]);
     useEffect(() => { isSimulatingRef.current = isSimulating; }, [isSimulating]);
@@ -206,6 +255,9 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
     useEffect(() => { orientationRef.current = orientation; }, [orientation]);
     useEffect(() => { onBallMoveRef.current = onBallMove; }, [onBallMove]);
     useEffect(() => { onAimChangeRef.current = onAimChange; }, [onAimChange]);
+    useEffect(() => { onNumberingAnchorsChangeRef.current = onNumberingAnchorsChange; }, [onNumberingAnchorsChange]);
+    useEffect(() => { numberingAnchorsRef.current = numberingAnchors; }, [numberingAnchors]);
+    useEffect(() => { showNumberingRef.current = showNumbering; }, [showNumbering]);
     useEffect(() => { draggingBallIdRef.current = draggingBallId; }, [draggingBallId]);
 
     const ballColors: Record<BallId, { color: string; border: string; gradientId: string }> = {
@@ -251,6 +303,41 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
         []
     );
 
+    const findNumberAtSvgPoint = useCallback(
+        (svgX: number, svgY: number): string | null => {
+            const lay = layoutRef.current;
+            const orient = orientationRef.current;
+            const anchors = numberingAnchorsRef.current;
+            const hitRadius = railThickness * 0.8;
+
+            for (const anchor of anchors) {
+                let ax: number;
+                let ay: number;
+
+                if (anchor.x !== undefined && anchor.y !== undefined) {
+                    ax = anchor.x;
+                    ay = anchor.y;
+                } else if (anchor.side !== undefined && anchor.diamondIndex !== undefined) {
+                    const diamond = getDiamondSvgPosition(anchor.side, anchor.diamondIndex, orient, lay);
+                    if (!diamond) continue;
+                    ax = diamond.x;
+                    ay = diamond.y;
+                } else {
+                    continue;
+                }
+
+                const dx = ax - svgX;
+                const dy = ay - svgY;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < hitRadius) {
+                    return anchor.id;
+                }
+            }
+            return null;
+        },
+        []
+    );
+
     const panResponder = useRef(
         PanResponder.create({
             onStartShouldSetPanResponder: () => !isSimulatingRef.current,
@@ -259,14 +346,32 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                 if (isSimulatingRef.current) return;
 
                 const { locationX, locationY } = event.nativeEvent;
-                const tablePos = screenToTableRef(locationX, locationY);
+                const size = containerSizeRef.current;
+                const lay = layoutRef.current;
+
+                if (size.width === 0 || size.height === 0) return;
+
+                const svgX = locationX * (lay.viewBox.width / size.width);
+                const svgY = locationY * (lay.viewBox.height / size.height);
 
                 if (isEditModeRef.current) {
+                    // Check if tapping on a number (when numbering is visible)
+                    if (showNumberingRef.current) {
+                        const numberId = findNumberAtSvgPoint(svgX, svgY);
+                        if (numberId) {
+                            draggingNumberIdRef.current = numberId;
+                            return;
+                        }
+                    }
+
+                    // Check if tapping on a ball
+                    const tablePos = screenToTableRef(locationX, locationY);
                     const ballId = findBallAtPointRef(tablePos.x, tablePos.y);
                     if (ballId) {
                         setDraggingBallId(ballId);
                     }
                 } else {
+                    const tablePos = screenToTableRef(locationX, locationY);
                     const cueBall = ballsRef.current.find((b) => b.id === cueBallIdRef.current);
                     if (cueBall && onAimChangeRef.current) {
                         const direction = vec2Normalize(vec2Sub(tablePos, cueBall.pos));
@@ -278,6 +383,29 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                 if (isSimulatingRef.current) return;
 
                 const { locationX, locationY } = event.nativeEvent;
+                const size = containerSizeRef.current;
+                const lay = layoutRef.current;
+
+                if (size.width === 0 || size.height === 0) return;
+
+                const svgX = locationX * (lay.viewBox.width / size.width);
+                const svgY = locationY * (lay.viewBox.height / size.height);
+
+                // Handle number dragging
+                const currentDraggingNumber = draggingNumberIdRef.current;
+                if (isEditModeRef.current && currentDraggingNumber && onNumberingAnchorsChangeRef.current) {
+                    const anchors = numberingAnchorsRef.current;
+                    const updatedAnchors = anchors.map((anchor) => {
+                        if (anchor.id === currentDraggingNumber) {
+                            return { ...anchor, x: svgX, y: svgY, side: undefined, diamondIndex: undefined };
+                        }
+                        return anchor;
+                    });
+                    onNumberingAnchorsChangeRef.current(updatedAnchors);
+                    return;
+                }
+
+                // Handle ball dragging
                 const tablePos = screenToTableRef(locationX, locationY);
                 const currentDraggingBall = draggingBallIdRef.current;
 
@@ -319,9 +447,11 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
             },
             onPanResponderRelease: () => {
                 setDraggingBallId(null);
+                draggingNumberIdRef.current = null;
             },
             onPanResponderTerminate: () => {
                 setDraggingBallId(null);
+                draggingNumberIdRef.current = null;
             },
         })
     ).current;
@@ -354,24 +484,9 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                 }
             }
 
-            // Filtrar puntos por maxCushionBounces (solo para cue ball)
+            // Filtrar puntos ya recorridos durante simulación
             const isCueBall = path.ballId === cueBallId;
-            let filteredPoints = path.points.slice(startIndex);
-            
-            if (isCueBall && maxCushionBounces > 0) {
-                let cushionCount = 0;
-                const cutoffIndex = filteredPoints.findIndex((p) => {
-                    if (p.type === 'cushion') {
-                        cushionCount++;
-                        return cushionCount > maxCushionBounces;
-                    }
-                    return false;
-                });
-                
-                if (cutoffIndex !== -1) {
-                    filteredPoints = filteredPoints.slice(0, cutoffIndex);
-                }
-            }
+            const filteredPoints = path.points.slice(startIndex);
 
             if (filteredPoints.length < 2) return null;
 
@@ -425,7 +540,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                 </G>
             );
         });
-    }, [trajectory, orientation, layout, balls, cueBallId, showGuides, maxCushionBounces, isSimulating]);
+    }, [trajectory, orientation, layout, balls, cueBallId, showGuides, isSimulating]);
 
     const diamonds = getDiamondPoints(orientation, layout);
 
@@ -569,10 +684,23 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                 />
             )}
 
+            {showNumbering && (
+                <SystemNumberingOverlay
+                    orientation={orientation}
+                    tableWidth={TABLE_W}
+                    tableHeight={TABLE_H}
+                    railThickness={railThickness}
+                    cushionThickness={cushionThickness}
+                    anchors={numberingAnchors}
+                    formula={numberingFormula ?? undefined}
+                    isEditMode={isEditMode}
+                />
+            )}
+
             {isEditMode && (
                 <View style={[styles.editOverlay, styles.pointerEventsNone]}>
                     <View style={styles.editBadge}>
-                        <Text style={styles.editBadgeIcon}>{'\u270B'}</Text>
+                        <IconHandClick size={18} color="#78350f" strokeWidth={2} />
                     </View>
                 </View>
             )}
@@ -580,7 +708,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
             {!isEditMode && !isSimulating && (
                 <View style={[styles.editOverlay, styles.pointerEventsNone]}>
                     <View style={styles.aimBadge}>
-                        <Text style={styles.aimBadgeIcon}>{'\u{1F3AF}'}</Text>
+                        <IconTarget size={16} color="#1e3a5f" strokeWidth={2} />
                     </View>
                 </View>
             )}
@@ -614,7 +742,7 @@ const styles = StyleSheet.create({
         elevation: 4,
     },
     editBadgeIcon: {
-        fontSize: 18,
+        // deprecated — replaced by IconHandClick
     },
     aimBadge: {
         width: 36,
@@ -626,6 +754,6 @@ const styles = StyleSheet.create({
         elevation: 4,
     },
     aimBadgeIcon: {
-        fontSize: 16,
+        // deprecated — replaced by IconTarget
     },
 });
