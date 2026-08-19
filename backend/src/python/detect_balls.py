@@ -1,24 +1,24 @@
 #!/usr/bin/env python3
 """
-Automatic billiard table + ball detection pipeline.
+Automatic billiard table + ball detection pipeline v2.
 
-No manual corner selection needed. The system automatically:
-1. Detects the green felt region (table surface)
-2. Finds the table boundary via contour approximation
-3. Applies perspective correction to get top-down view
-4. Detects billiard balls and classifies by color
+Improvements over v1:
+- Multi-colorspace table detection (HSV + LAB + adaptive)
+- SimpleBlobDetector for more robust ball detection
+- Diamond-based coordinate calibration
+- Better perspective warp with cushion-edge detection
+- Multiple detection strategies merged
 
 Usage:
     python detect_balls.py <image_path> [<corners_json>]
 
-corners_json is OPTIONAL. If provided, it overrides auto-detection.
 Output: JSON to stdout with detected ball positions (normalized 0-1).
 """
 
 import base64
 import json
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import cv2
 import numpy as np
@@ -26,35 +26,95 @@ import numpy as np
 # Standard 3-cushion table dimensions (matches @bandaro/core DEFAULT_TABLE)
 DEFAULT_TABLE_W = 284.0
 DEFAULT_TABLE_H = 142.0
-RAIL_CUSHION_OFFSET = 13.0  # rail(8.27) + cushion(4.73)
+TABLE_ASPECT = DEFAULT_TABLE_W / DEFAULT_TABLE_H  # ~2.0
 
 
 @dataclass
 class DetectedBall:
     label: str
-    x: float  # normalized 0-1 relative to top-down image
+    x: float  # normalized 0-1 relative to playing surface
     y: float
     radius: float
     confidence: float
     hsv_sample: np.ndarray | None = None
 
 
-def find_table_contour(image: np.ndarray) -> np.ndarray | None:
-    """Find the billiard table by detecting the green felt region.
+# ---------------------------------------------------------------------------
+# Table detection
+# ---------------------------------------------------------------------------
 
-    Strategy:
-    1. Convert to HSV and threshold for green (billiard felt color)
-    2. Find contours in the green mask
-    3. Pick the largest contour that approximates to a quadrilateral
+def find_table_contour(image: np.ndarray) -> np.ndarray | None:
+    """Find the billiard table using multi-colorspace detection.
+
+    Tries HSV green detection with multiple threshold ranges, then falls back
+    to LAB colorspace and adaptive thresholding.
     """
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
 
-    # Green felt: H=35-85, S=40-255, V=40-255 (wide range for different lighting)
-    lower_green = np.array([35, 40, 40])
-    upper_green = np.array([85, 255, 255])
-    mask = cv2.inRange(hsv, lower_green, upper_green)
+    # Multiple green/blue felt threshold ranges for different table colors
+    green_ranges = [
+        (np.array([35, 40, 40]),  np.array([85, 255, 255])),   # standard green
+        (np.array([30, 25, 25]),  np.array([90, 255, 255])),   # wider tolerance
+        (np.array([38, 50, 50]),  np.array([82, 255, 255])),   # tighter hue
+        (np.array([25, 30, 30]),  np.array([95, 255, 255])),   # very wide
+        (np.array([85, 30, 30]),  np.array([120, 255, 255])),  # blue-green / cyan
+    ]
 
-    # Clean up noise
+    best_contour = None
+    best_area = 0
+    img_area = image.shape[0] * image.shape[1]
+
+    for lower, upper in green_ranges:
+        mask = cv2.inRange(hsv, lower, upper)
+        contour = _extract_quadrilateral(mask, image, min_area_ratio=0.08)
+        if contour is not None:
+            area = cv2.contourArea(contour)
+            if area > best_area:
+                best_area = area
+                best_contour = contour
+
+    if best_contour is not None and best_area >= img_area * 0.08:
+        return best_contour
+
+    # Fallback: LAB colorspace (L>80, a<130, b>120 for green felt)
+    lower_lab = np.array([60, 0, 100])
+    upper_lab = np.array([255, 140, 200])
+    mask_lab = cv2.inRange(lab, lower_lab, upper_lab)
+    contour = _extract_quadrilateral(mask_lab, image, min_area_ratio=0.10)
+    if contour is not None:
+        return contour
+
+    # Fallback: adaptive threshold on saturation channel
+    s_channel = hsv[:, :, 1]
+    _, sat_mask = cv2.threshold(s_channel, 40, 255, cv2.THRESH_BINARY)
+    contour = _extract_quadrilateral(sat_mask, image, min_area_ratio=0.10)
+    if contour is not None:
+        return contour
+
+    # Fallback: largest edge contour via minAreaRect (handles non-quadrilateral contours)
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+    edges = cv2.Canny(blurred, 50, 150)
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+    edges = cv2.dilate(edges, kernel, iterations=1)
+    edge_contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if edge_contours:
+        edge_contours = sorted(edge_contours, key=cv2.contourArea, reverse=True)
+        img_area = image.shape[0] * image.shape[1]
+        for cnt in edge_contours[:5]:
+            area = cv2.contourArea(cnt)
+            if area < img_area * 0.15:
+                continue
+            rect = cv2.minAreaRect(cnt)
+            box = cv2.boxPoints(rect)
+            return box.astype(np.float32)
+
+    return None
+
+
+def _extract_quadrilateral(mask: np.ndarray, image: np.ndarray, min_area_ratio: float = 0.08) -> np.ndarray | None:
+    """Try to extract a quadrilateral from a binary mask."""
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
     mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=3)
     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=2)
@@ -63,30 +123,22 @@ def find_table_contour(image: np.ndarray) -> np.ndarray | None:
     if not contours:
         return None
 
-    # Sort by area, largest first
     contours = sorted(contours, key=cv2.contourArea, reverse=True)
+    img_area = image.shape[0] * image.shape[1]
 
     for contour in contours[:5]:
         area = cv2.contourArea(contour)
-        img_area = image.shape[0] * image.shape[1]
-
-        # Table should be at least 10% of the image
-        if area < img_area * 0.08:
+        if area < img_area * min_area_ratio:
             continue
 
-        # Approximate contour to polygon
+        # Try multiple epsilon values for polygon approximation
         peri = cv2.arcLength(contour, True)
-        approx = cv2.approxPolyDP(contour, 0.02 * peri, True)
+        for eps_factor in [0.02, 0.03, 0.04, 0.05]:
+            approx = cv2.approxPolyDP(contour, eps_factor * peri, True)
+            if len(approx) == 4:
+                return approx.reshape(4, 2).astype(np.float32)
 
-        if len(approx) == 4:
-            return approx.reshape(4, 2).astype(np.float32)
-
-        # If not exactly 4 points, try with larger epsilon
-        approx = cv2.approxPolyDP(contour, 0.04 * peri, True)
-        if len(approx) == 4:
-            return approx.reshape(4, 2).astype(np.float32)
-
-    # Fallback: use minimum area rectangle of the largest green contour
+    # Fallback: minimum area rectangle
     largest = contours[0]
     rect = cv2.minAreaRect(largest)
     box = cv2.boxPoints(rect)
@@ -94,10 +146,7 @@ def find_table_contour(image: np.ndarray) -> np.ndarray | None:
 
 
 def find_table_by_edges(image: np.ndarray) -> np.ndarray | None:
-    """Fallback: detect table via edge detection when green detection fails.
-
-    Works for tables with non-standard felt colors or poor lighting.
-    """
+    """Fallback: detect table via edge detection when green detection fails."""
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
     edges = cv2.Canny(blurred, 50, 150)
@@ -118,27 +167,100 @@ def find_table_by_edges(image: np.ndarray) -> np.ndarray | None:
             continue
 
         peri = cv2.arcLength(contour, True)
-        approx = cv2.approxPolyDP(contour, 0.02 * peri, True)
-
-        if len(approx) == 4:
-            return approx.reshape(4, 2).astype(np.float32)
+        for eps_factor in [0.02, 0.03, 0.04]:
+            approx = cv2.approxPolyDP(contour, eps_factor * peri, True)
+            if len(approx) == 4:
+                return approx.reshape(4, 2).astype(np.float32)
 
     return None
 
 
+# ---------------------------------------------------------------------------
+# Corner ordering and perspective warp
+# ---------------------------------------------------------------------------
+
 def order_corners(pts: np.ndarray) -> np.ndarray:
-    """Order 4 corners as: top-left, top-right, bottom-right, bottom-left."""
-    s = pts.sum(axis=1)
-    d = np.diff(pts, axis=1).flatten()
+    """Order 4 corners so that the LONG edges are always horizontal (top/bottom).
 
-    ordered = np.zeros((4, 2), dtype=np.float32)
-    ordered[0] = pts[np.argmin(s)]   # top-left
-    ordered[2] = pts[np.argmax(s)]   # bottom-right
-    ordered[1] = pts[np.argmin(d)]   # top-right
-    ordered[3] = pts[np.argmax(d)]   # bottom-left
+    Standard billiard table orientation:
+        [0]----[1]    <- long rail (top)
+         |      |
+        [3]----[2]    <- long rail (bottom)
 
-    return ordered
+    The long rails always map to the x-axis, short rails to y-axis.
+    """
+    # Compute all 4 edge lengths
+    edges = []
+    for i in range(4):
+        j = (i + 1) % 4
+        length = np.linalg.norm(pts[j] - pts[i])
+        edges.append((i, j, length))
 
+    # Opposite edge pairs: (0-1, 2-3) and (1-2, 3-0)
+    pair_a_len = edges[0][2] + edges[2][2]  # edges 0-1 and 2-3
+    pair_b_len = edges[1][2] + edges[3][2]  # edges 1-2 and 3-0
+
+    if pair_a_len >= pair_b_len:
+        # Edges 0-1 and 2-3 are the long rails
+        # Vertices: 0=top-left, 1=top-right, 2=bottom-right, 3=bottom-left
+        # Check if we need to flip to ensure left side is correct
+        # Use the midpoints to determine orientation
+        mid_top = (pts[0] + pts[1]) / 2
+        mid_bot = (pts[2] + pts[3]) / 2
+        mid_left = (pts[0] + pts[3]) / 2
+        mid_right = (pts[1] + pts[2]) / 2
+
+        # Ensure top edge is "above" bottom edge in image coordinates
+        # (smaller y = higher in image)
+        if mid_top[1] > mid_bot[1]:
+            # Swap: what was "top" is actually bottom
+            pts = np.array([pts[3], pts[2], pts[1], pts[0]], dtype=np.float32)
+    else:
+        # Edges 1-2 and 3-0 are the long rails
+        # Re-map vertices: new[0]=old[1], new[1]=old[2], new[2]=old[3], new[3]=old[0]
+        pts = np.array([pts[1], pts[2], pts[3], pts[0]], dtype=np.float32)
+
+        mid_top = (pts[0] + pts[1]) / 2
+        mid_bot = (pts[2] + pts[3]) / 2
+
+        if mid_top[1] > mid_bot[1]:
+            pts = np.array([pts[3], pts[2], pts[1], pts[0]], dtype=np.float32)
+
+    return pts
+
+
+def warp_perspective(image: np.ndarray, corners: np.ndarray) -> np.ndarray:
+    """Apply perspective warp to get top-down panoramic view.
+
+    Always produces landscape orientation with long rail as width.
+    """
+    ordered = order_corners(corners)
+
+    # Long rail (top and bottom edges)
+    top_w = np.linalg.norm(ordered[1] - ordered[0])
+    bot_w = np.linalg.norm(ordered[2] - ordered[3])
+    # Short rail (left and right edges)
+    left_h = np.linalg.norm(ordered[3] - ordered[0])
+    right_h = np.linalg.norm(ordered[2] - ordered[1])
+
+    # Output is always landscape: width = long rail, height = short rail
+    dst_w = 1000
+    dst_h = int(dst_w / TABLE_ASPECT)
+
+    dst_pts = np.array([
+        [0, 0],
+        [dst_w - 1, 0],
+        [dst_w - 1, dst_h - 1],
+        [0, dst_h - 1],
+    ], dtype=np.float32)
+
+    matrix = cv2.getPerspectiveTransform(ordered, dst_pts)
+    return cv2.warpPerspective(image, matrix, (dst_w, dst_h))
+
+
+# ---------------------------------------------------------------------------
+# Diamond detection for coordinate calibration
+# ---------------------------------------------------------------------------
 
 def detect_diamonds_on_rails(image: np.ndarray, corners: np.ndarray) -> list[tuple[float, float]]:
     """Detect diamond markers on the table rails.
@@ -153,10 +275,10 @@ def detect_diamonds_on_rails(image: np.ndarray, corners: np.ndarray) -> list[tup
     expanded = []
     for pt in ordered:
         direction = pt - center
-        expanded.append(pt + direction * 0.25)
+        expanded.append(pt + direction * 0.30)
     expanded = np.array(expanded, dtype=np.float32)
 
-    # Create mask for rail region (between table contour and expanded contour)
+    # Create mask for rail region
     rail_mask = np.zeros(image.shape[:2], dtype=np.uint8)
     cv2.fillPoly(rail_mask, [expanded.astype(np.int32)], 255)
     table_mask = np.zeros(image.shape[:2], dtype=np.uint8)
@@ -165,7 +287,7 @@ def detect_diamonds_on_rails(image: np.ndarray, corners: np.ndarray) -> list[tup
 
     # Detect bright spots on the rail (diamonds are white/silver)
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    _, bright = cv2.threshold(gray, 180, 255, cv2.THRESH_BINARY)
+    _, bright = cv2.threshold(gray, 160, 255, cv2.THRESH_BINARY)
     diamond_mask = cv2.bitwise_and(bright, rail_only)
 
     # Clean up
@@ -177,17 +299,17 @@ def detect_diamonds_on_rails(image: np.ndarray, corners: np.ndarray) -> list[tup
     if not contours:
         return []
 
-    # Filter by size (diamonds are small, roughly circular)
+    # Filter by size and circularity
     diamonds = []
     for cnt in contours:
         area = cv2.contourArea(cnt)
-        if area < 20 or area > 500:
+        if area < 15 or area > 600:
             continue
         perimeter = cv2.arcLength(cnt, True)
         if perimeter == 0:
             continue
         circularity = 4 * np.pi * area / (perimeter * perimeter)
-        if circularity < 0.4:
+        if circularity < 0.3:
             continue
         M = cv2.moments(cnt)
         if M["m00"] == 0:
@@ -199,132 +321,216 @@ def detect_diamonds_on_rails(image: np.ndarray, corners: np.ndarray) -> list[tup
     return diamonds
 
 
-def map_balls_with_diamonds(
+def calibrate_with_diamonds(
     balls: list[DetectedBall],
     diamonds: list[tuple[float, float]],
-    corners: np.ndarray,
-    warped_shape: tuple,
+    img_shape: tuple,
 ) -> list[DetectedBall]:
     """Use detected diamonds to improve coordinate normalization.
 
     Diamonds are at known fractional positions along the table rails.
     Standard 3-cushion table:
-    - Long rail: 6 diamonds at 1/7, 2/7, 3/7, 4/7, 5/7, 6/7
+    - Long rail: 7 diamonds at 1/8, 2/8, ..., 7/8
     - Short rail: 3 diamonds at 1/4, 2/4, 3/4
 
-    If we detect enough diamonds, we can establish a more accurate
-    coordinate mapping for partial tables.
+    If we detect enough diamonds, we establish a more accurate coordinate
+    mapping that accounts for partial tables or imperfect perspective warp.
     """
-    if len(diamonds) < 2:
+    if len(diamonds) < 3:
         return balls
 
-    img_h, img_w = warped_shape[:2]
+    img_h, img_w = img_shape[:2]
 
-    # Sort diamonds by position to identify which rail they're on
-    # For now, use simple min/max of diamond positions as reference
-    xs = [d[0] for d in diamonds]
-    ys = [d[1] for d in diamonds]
+    # Convert diamond positions from image coords to normalized coords
+    norm_diamonds = [(d[0] / img_w, d[1] / img_h) for d in diamonds]
 
-    # Reference bounds from diamonds (more accurate than contour for partial tables)
-    ref_left = min(xs)
-    ref_right = max(xs)
-    ref_top = min(ys)
-    ref_bottom = max(ys)
+    # Separate into horizontal and vertical clusters
+    xs = [d[0] for d in norm_diamonds]
+    ys = [d[1] for d in norm_diamonds]
 
-    ref_w = ref_right - ref_left
-    ref_h = ref_bottom - ref_top
+    # Diamonds on long rails have similar y (top/bottom), short rails have similar x
+    x_std = np.std(xs)
+    y_std = np.std(ys)
 
-    if ref_w < 10 or ref_h < 10:
-        return balls
+    # If we have diamonds on both axes, we can calibrate
+    if x_std > 0.1 and y_std > 0.1:
+        # Has diamonds on both long and short rails
+        ref_left = min(xs)
+        ref_right = max(xs)
+        ref_top = min(ys)
+        ref_bottom = max(ys)
+        ref_w = ref_right - ref_left
+        ref_h = ref_bottom - ref_top
 
-    # Re-normalize balls using diamond-derived bounds
-    for ball in balls:
-        ball.x = float(round((ball.x * img_w - ref_left) / ref_w, 4))
-        ball.y = float(round((ball.y * img_h - ref_top) / ref_h, 4))
+        if ref_w > 0.1 and ref_h > 0.1:
+            # Re-normalize balls using diamond-derived bounds
+            for ball in balls:
+                ball.x = float(round((ball.x - ref_left) / ref_w, 4))
+                ball.y = float(round((ball.y - ref_top) / ref_h, 4))
 
     return balls
 
 
-def warp_perspective(image: np.ndarray, corners: np.ndarray) -> np.ndarray:
-    """Apply perspective warp to get top-down view of the table.
+# ---------------------------------------------------------------------------
+# Playing surface mask
+# ---------------------------------------------------------------------------
 
-    Auto-detects orientation: if the table is taller than wide in the photo,
-    the output is portrait (500x1000) instead of landscape (1000x500).
+def _create_felt_mask(warped: np.ndarray) -> np.ndarray:
+    """Create a binary mask of the playing surface (felt area, excluding rails).
+
+    The warped image includes both the felt and the rail/cushion border.
+    This mask identifies just the playing surface where balls can be.
     """
-    ordered = order_corners(corners)
+    hsv = cv2.cvtColor(warped, cv2.COLOR_BGR2HSV)
+    img_h, img_w = warped.shape[:2]
 
-    # Detect orientation from the contour shape
-    top_w = np.linalg.norm(ordered[1] - ordered[0])
-    bot_w = np.linalg.norm(ordered[2] - ordered[3])
-    left_h = np.linalg.norm(ordered[3] - ordered[0])
-    right_h = np.linalg.norm(ordered[2] - ordered[1])
-    avg_w = (top_w + bot_w) / 2
-    avg_h = (left_h + right_h) / 2
+    # Detect dominant felt color
+    s_channel = hsv[:, :, 1]
+    h_channel = hsv[:, :, 0]
+    saturated = s_channel > 25
 
-    if avg_h > avg_w * 1.2:
-        # Portrait orientation
-        dst_w = 500
-        dst_h = 1000
-    else:
-        # Landscape orientation (default)
-        dst_w = 1000
-        dst_h = 500
+    if np.sum(saturated) < 500:
+        # Fallback: use center crop (90% of image)
+        margin_x = int(img_w * 0.05)
+        margin_y = int(img_h * 0.05)
+        mask = np.zeros((img_h, img_w), dtype=np.uint8)
+        mask[margin_y:img_h - margin_y, margin_x:img_w - margin_x] = 255
+        return mask
 
-    dst_pts = np.array([
-        [0, 0],
-        [dst_w - 1, 0],
-        [dst_w - 1, dst_h - 1],
-        [0, dst_h - 1],
-    ], dtype=np.float32)
+    h_vals = h_channel[saturated]
+    hist, bin_edges = np.histogram(h_vals, bins=18, range=(0, 180))
+    dominant_bin = np.argmax(hist)
+    dominant_hue_low = int(bin_edges[dominant_bin])
+    dominant_hue_high = int(bin_edges[dominant_bin + 1])
 
-    matrix = cv2.getPerspectiveTransform(ordered, dst_pts)
-    return cv2.warpPerspective(image, matrix, (dst_w, dst_h))
+    # Build felt mask
+    hue_margin = 15
+    low_h = max(0, dominant_hue_low - hue_margin)
+    high_h = min(179, dominant_hue_high + hue_margin)
+
+    felt_mask = cv2.inRange(hsv, np.array([low_h, 20, 20]), np.array([high_h, 255, 255]))
+
+    # Clean up: close holes, remove noise
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (15, 15))
+    felt_mask = cv2.morphologyEx(felt_mask, cv2.MORPH_CLOSE, kernel, iterations=3)
+    felt_mask = cv2.morphologyEx(felt_mask, cv2.MORPH_OPEN, kernel, iterations=2)
+
+    # Find the largest connected component (should be the playing surface)
+    contours, _ = cv2.findContours(felt_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if not contours:
+        margin_x = int(img_w * 0.05)
+        margin_y = int(img_h * 0.05)
+        mask = np.zeros((img_h, img_w), dtype=np.uint8)
+        mask[margin_y:img_h - margin_y, margin_x:img_w - margin_x] = 255
+        return mask
+
+    # Keep only the largest contour
+    largest = max(contours, key=cv2.contourArea)
+    mask = np.zeros((img_h, img_w), dtype=np.uint8)
+    cv2.drawContours(mask, [largest], -1, 255, -1)
+
+    # Erode slightly to exclude cushion/felt boundary
+    kernel_small = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
+    mask = cv2.erode(mask, kernel_small, iterations=2)
+    return mask
 
 
-def detect_circles(warped: np.ndarray) -> np.ndarray | None:
-    """Detect circular shapes (billiard balls) using Hough Circle Transform."""
-    gray = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
-    blurred = cv2.GaussianBlur(gray, (9, 9), 2)
+# ---------------------------------------------------------------------------
+# Ball detection
+# ---------------------------------------------------------------------------
 
-    circles = cv2.HoughCircles(
-        blurred,
-        cv2.HOUGH_GRADIENT,
-        dp=1.2,
-        minDist=20,
-        param1=50,
-        param2=20,
-        minRadius=8,
-        maxRadius=45,
-    )
+def detect_balls_multi_method(warped: np.ndarray, felt_mask: np.ndarray | None = None) -> tuple[np.ndarray | None, str]:
+    """Detect balls using multiple methods and return the best result.
 
-    return circles[0] if circles is not None else None
+    Methods:
+    1. Color-blob detection (non-green regions)
+    2. SimpleBlobDetector with tuned parameters
+    3. HoughCircles with multiple parameter sets
+    """
+    results = []
+
+    # Apply felt mask to exclude rail area
+    masked_warped = warped.copy()
+    if felt_mask is not None:
+        masked_warped[felt_mask == 0] = [0, 0, 0]
+
+    # Method 1: Color-blob detection
+    circles_color = _detect_balls_by_color(masked_warped)
+    if circles_color is not None and len(circles_color) >= 3:
+        results.append((circles_color, "color_blob"))
+
+    # Method 2: SimpleBlobDetector
+    circles_blob = _detect_balls_by_blob(masked_warped)
+    if circles_blob is not None and len(circles_blob) >= 3:
+        results.append((circles_blob, "simple_blob"))
+
+    # Method 3: HoughCircles with multiple param sets
+    circles_hough = _detect_balls_by_hough(masked_warped)
+    if circles_hough is not None and len(circles_hough) >= 3:
+        results.append((circles_hough, "hough"))
+
+    # Pick the result with the most detections (up to 6)
+    if not results:
+        # Method 4: Edge-based contour detection (works regardless of table color)
+        circles_edge = _detect_balls_by_edge_contours(masked_warped)
+        if circles_edge is not None and len(circles_edge) >= 3:
+            return circles_edge, "edge_contours"
+
+        # Last resort: ultra-lenient Hough
+        circles_last = _detect_balls_by_hough_ultra(masked_warped)
+        if circles_last is not None and len(circles_last) > 0:
+            return circles_last, "hough_ultra"
+        return None, "none"
+
+    # Prefer color_blob (most reliable for billiard tables), then by count
+    results.sort(key=lambda r: (0 if r[1] == "color_blob" else 1, -len(r[0])))
+    return results[0]
 
 
-def detect_balls_by_color(warped: np.ndarray) -> np.ndarray | None:
-    """Detect billiard balls by finding non-green blobs on the felt.
+def _detect_balls_by_color(warped: np.ndarray) -> np.ndarray | None:
+    """Detect balls by finding blobs that contrast with the dominant table color.
 
-    More robust than HoughCircles for partial tables, varying angles,
-    and imperfect circle shapes. Works by:
-    1. Masking out the green felt
-    2. Finding contours of remaining colored regions
-    3. Filtering by circularity and size
+    Automatically detects the felt color (green, brown, blue, etc.) and finds
+    blobs that differ significantly from it.
     """
     hsv = cv2.cvtColor(warped, cv2.COLOR_BGR2HSV)
     img_h, img_w = warped.shape[:2]
     min_dim = min(img_h, img_w)
 
-    # Mask: everything that is NOT green felt
-    lower_green = np.array([30, 30, 30])
-    upper_green = np.array([90, 255, 255])
-    felt_mask = cv2.inRange(hsv, lower_green, upper_green)
+    # Detect dominant table color by hue histogram of saturated pixels
+    s_channel = hsv[:, :, 1]
+    h_channel = hsv[:, :, 0]
+    saturated = s_channel > 25
+    if np.sum(saturated) < 500:
+        return None
+
+    h_vals = h_channel[saturated]
+    hist, bin_edges = np.histogram(h_vals, bins=18, range=(0, 180))
+    dominant_bin = np.argmax(hist)
+    dominant_hue_low = int(bin_edges[dominant_bin])
+    dominant_hue_high = int(bin_edges[dominant_bin + 1])
+
+    # Build felt mask: dominant hue ± 15 degrees, moderate saturation, moderate brightness
+    hue_margin = 15
+    low_h = max(0, dominant_hue_low - hue_margin)
+    high_h = min(179, dominant_hue_high + hue_margin)
+
+    if low_h >= 0 and high_h <= 179:
+        felt_mask = cv2.inRange(hsv, np.array([low_h, 25, 25]), np.array([high_h, 255, 255]))
+    else:
+        # Hue wraps around 0/180 (red tables)
+        mask_lo = cv2.inRange(hsv, np.array([0, 25, 25]), np.array([high_h, 255, 255]))
+        mask_hi = cv2.inRange(hsv, np.array([low_h, 25, 25]), np.array([179, 255, 255]))
+        felt_mask = cv2.bitwise_or(mask_lo, mask_hi)
 
     # Also exclude very dark areas (shadows, rails)
-    _, bright_mask = cv2.threshold(cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY), 25, 255, cv2.THRESH_BINARY)
+    gray = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
+    _, bright_mask = cv2.threshold(gray, 20, 255, cv2.THRESH_BINARY)
 
-    # Ball mask = not green AND not too dark
+    # Ball mask = not felt color AND not too dark
     ball_mask = cv2.bitwise_and(cv2.bitwise_not(felt_mask), bright_mask)
 
-    # Clean up noise
+    # Clean up
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
     ball_mask = cv2.morphologyEx(ball_mask, cv2.MORPH_CLOSE, kernel, iterations=2)
     ball_mask = cv2.morphologyEx(ball_mask, cv2.MORPH_OPEN, kernel, iterations=1)
@@ -334,27 +540,21 @@ def detect_balls_by_color(warped: np.ndarray) -> np.ndarray | None:
     if not contours:
         return None
 
-    # Filter contours that look like balls
     candidates = []
     for cnt in contours:
         area = cv2.contourArea(cnt)
-        # Ball area should be reasonable relative to image size
-        # Min: very small ball (far away), Max: not the whole table
-        min_area = max(50, (min_dim * 0.005) ** 2 * np.pi)
-        max_area = (min_dim * 0.15) ** 2 * np.pi
+        min_area = max(100, (min_dim * 0.006) ** 2 * np.pi)
+        max_area = (min_dim * 0.18) ** 2 * np.pi
         if area < min_area or area > max_area:
             continue
 
-        # Check circularity
         perimeter = cv2.arcLength(cnt, True)
         if perimeter == 0:
             continue
         circularity = 4 * np.pi * area / (perimeter * perimeter)
-        # Balls are roughly circular (0.5+ even with perspective distortion)
-        if circularity < 0.3:
+        if circularity < 0.30:
             continue
 
-        # Get center and equivalent radius
         M = cv2.moments(cnt)
         if M["m00"] == 0:
             continue
@@ -367,32 +567,188 @@ def detect_balls_by_color(warped: np.ndarray) -> np.ndarray | None:
     if not candidates:
         return None
 
-    # Sort by area (largest first), take top 10
     candidates.sort(key=lambda c: c[2], reverse=True)
     candidates = candidates[:10]
 
     return np.array(candidates, dtype=np.float32)
 
 
+def _detect_balls_by_blob(warped: np.ndarray) -> np.ndarray | None:
+    """Detect balls using OpenCV SimpleBlobDetector."""
+    img_h, img_w = warped.shape[:2]
+    min_dim = min(img_h, img_w)
+
+    gray = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
+    blurred = cv2.GaussianBlur(gray, (9, 9), 2)
+
+    params = cv2.SimpleBlobDetector_Params()
+    params.filterByArea = True
+    params.minArea = max(100, int((min_dim * 0.006) ** 2 * np.pi))
+    params.maxArea = int((min_dim * 0.18) ** 2 * np.pi)
+
+    params.filterByCircularity = True
+    params.minCircularity = 0.3
+
+    params.filterByConvexity = True
+    params.minConvexity = 0.4
+
+    params.filterByInertia = True
+    params.minInertiaRatio = 0.3
+
+    params.filterByColor = True
+    params.blobColor = 255  # detect bright blobs
+
+    detector = cv2.SimpleBlobDetector_create(params)
+    keypoints = detector.detect(blurred)
+
+    if not keypoints:
+        # Try with less strict params
+        params.minCircularity = 0.15
+        params.minConvexity = 0.2
+        params.minInertiaRatio = 0.15
+        detector = cv2.SimpleBlobDetector_create(params)
+        keypoints = detector.detect(blurred)
+
+    if not keypoints:
+        # Try dark blobs too (dark balls on light felt)
+        params.blobColor = 0
+        params.minCircularity = 0.15
+        detector = cv2.SimpleBlobDetector_create(params)
+        keypoints = detector.detect(blurred)
+
+    if not keypoints:
+        return None
+
+    candidates = []
+    for kp in keypoints:
+        x, y = kp.pt
+        r = kp.size / 2  # keypoint.size is diameter
+        candidates.append((float(x), float(y), float(r)))
+
+    candidates.sort(key=lambda c: c[2], reverse=True)
+    candidates = candidates[:10]
+
+    return np.array(candidates, dtype=np.float32)
+
+
+def _detect_balls_by_hough(warped: np.ndarray) -> np.ndarray | None:
+    """Detect balls using HoughCircles with multiple parameter sets."""
+    gray = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
+    img_h, img_w = warped.shape[:2]
+    min_dim = min(img_h, img_w)
+
+    min_r = max(3, int(min_dim * 0.006))
+    max_r = int(min_dim * 0.12)
+
+    param_sets = [
+        (1.2, 20, 50, 20, min_r, max_r, 9, 2),
+        (1.2, 15, 50, 15, min_r, max_r, 9, 2),
+        (1.0, 12, 40, 12, max(3, min_r - 2), max_r + 5, 7, 1),
+        (1.0, 10, 35, 10, 3, max_r + 10, 5, 1),
+    ]
+
+    for dp, minDist, p1, p2, minR, maxR, bk, bs in param_sets:
+        blurred = cv2.GaussianBlur(gray, (bk, bk), bs)
+        result = cv2.HoughCircles(
+            blurred, cv2.HOUGH_GRADIENT,
+            dp=dp, minDist=minDist, param1=p1, param2=p2,
+            minRadius=minR, maxRadius=maxR,
+        )
+        if result is not None and len(result[0]) >= 3:
+            return result[0]
+
+    return None
+
+
+def _detect_balls_by_hough_ultra(warped: np.ndarray) -> np.ndarray | None:
+    """Ultra-lenient HoughCircles as last resort."""
+    gray = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
+    blurred = cv2.GaussianBlur(gray, (5, 5), 1)
+
+    result = cv2.HoughCircles(
+        blurred, cv2.HOUGH_GRADIENT,
+        dp=1.0, minDist=8, param1=25, param2=8,
+        minRadius=3, maxRadius=80,
+    )
+    return result[0] if result is not None else None
+
+
+def _detect_balls_by_edge_contours(warped: np.ndarray) -> np.ndarray | None:
+    """Detect balls via edge detection and circular contour matching.
+
+    Works regardless of table color — finds strong circular edges.
+    """
+    gray = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
+    img_h, img_w = warped.shape[:2]
+    min_dim = min(img_h, img_w)
+
+    blurred = cv2.GaussianBlur(gray, (9, 9), 2)
+    edges = cv2.Canny(blurred, 30, 100)
+
+    # Dilate to connect broken edges
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+    edges = cv2.dilate(edges, kernel, iterations=1)
+
+    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if not contours:
+        return None
+
+    candidates = []
+    min_r = max(3, int(min_dim * 0.006))
+    max_r = int(min_dim * 0.12)
+    min_area_circ = np.pi * min_r ** 2
+    max_area_circ = np.pi * max_r ** 2
+
+    for cnt in contours:
+        area = cv2.contourArea(cnt)
+        if area < min_area_circ * 0.5 or area > max_area_circ * 2:
+            continue
+
+        perimeter = cv2.arcLength(cnt, True)
+        if perimeter == 0:
+            continue
+        circularity = 4 * np.pi * area / (perimeter * perimeter)
+        if circularity < 0.3:
+            continue
+
+        M = cv2.moments(cnt)
+        if M["m00"] == 0:
+            continue
+        cx = M["m10"] / M["m00"]
+        cy = M["m01"] / M["m00"]
+        radius = np.sqrt(area / np.pi)
+
+        if radius < min_r * 0.5 or radius > max_r * 1.5:
+            continue
+
+        candidates.append((float(cx), float(cy), float(radius)))
+
+    if len(candidates) < 3:
+        return None
+
+    candidates.sort(key=lambda c: c[2], reverse=True)
+    candidates = candidates[:10]
+
+    return np.array(candidates, dtype=np.float32)
+
+
+# ---------------------------------------------------------------------------
+# Ball color classification
+# ---------------------------------------------------------------------------
+
 def classify_ball_color(hsv_mean: np.ndarray) -> str:
     """Classify ball color from mean HSV values.
 
-    Supports all 3-cushion ball sets:
-    - Standard: white, yellow, red
-    - Variant 1: white, orange, red
-    - Variant 2: white, yellow, blue
-    - Variant 3: habana, orange, red
-
-    NEVER returns 'unknown' — always maps to a standard color.
-    Check colored balls FIRST, white LAST (white = low saturation fallback).
+    Supports all 3-cushion ball sets. NEVER returns 'unknown'.
+    Check colored balls FIRST, white LAST.
     """
     h, s, v = float(hsv_mean[0]), float(hsv_mean[1]), float(hsv_mean[2])
 
-    # Blue: hue 85-145, must have clear blue hue
+    # Blue: hue 85-145
     if 85 <= h <= 145 and s > 40 and v > 30:
         return "blue"
 
-    # Red: hue near 0 or 180 (wraps around)
+    # Red: hue near 0 or 180
     if (h < 20 or h > 160) and s > 40 and v > 30:
         return "red"
 
@@ -412,7 +768,7 @@ def classify_ball_color(hsv_mean: np.ndarray) -> str:
     if s < 30 and v > 140:
         return "white"
 
-    # Fallback based on hue (never return unknown)
+    # Fallback based on hue
     if h < 20 or h > 160:
         return "red"
     if h < 40:
@@ -420,24 +776,23 @@ def classify_ball_color(hsv_mean: np.ndarray) -> str:
     return "white"
 
 
-def extract_and_classify(warped: np.ndarray, circles: np.ndarray, is_partial: bool = False) -> list[DetectedBall]:
-    """Extract color features for each detected circle and classify.
+# ---------------------------------------------------------------------------
+# Extraction and classification
+# ---------------------------------------------------------------------------
 
-    Coordinates are normalized to 0-1 across the warped image.
-    No size filtering — all detected blobs are considered potential balls.
-    """
+def extract_and_classify(warped: np.ndarray, circles: np.ndarray) -> list[DetectedBall]:
+    """Extract color features for each detected circle and classify."""
     hsv = cv2.cvtColor(warped, cv2.COLOR_BGR2HSV)
     balls = []
-
     img_h, img_w = warped.shape[:2]
 
-    for i, (x, y, r) in enumerate(circles):
+    for x, y, r in circles:
         xi, yi = int(x), int(y)
         ri = int(r)
         y1 = max(0, yi - ri)
-        y2 = min(hsv.shape[0], yi + ri)
+        y2 = min(img_h, yi + ri)
         x1 = max(0, xi - ri)
-        x2 = min(hsv.shape[1], xi + ri)
+        x2 = min(img_w, xi + ri)
 
         roi_h = y2 - y1
         roi_w = x2 - x1
@@ -446,13 +801,15 @@ def extract_and_classify(warped: np.ndarray, circles: np.ndarray, is_partial: bo
 
         roi = hsv[y1:y2, x1:x2]
 
-        # Center of ball relative to ROI (handles edge clipping)
+        # Center of ball relative to ROI
         cx = xi - x1
         cy = yi - y1
         actual_r = min(cx, cy, roi_w - cx, roi_h - cy)
 
+        # Sample from inner 60% of ball radius to avoid felt bleed
+        inner_r = max(1, int(actual_r * 0.6))
         mask = np.zeros((roi_h, roi_w), dtype=np.uint8)
-        cv2.circle(mask, (cx, cy), max(1, actual_r), 255, -1)
+        cv2.circle(mask, (cx, cy), inner_r, 255, -1)
 
         masked_hsv = roi[mask > 0]
         if len(masked_hsv) == 0:
@@ -499,31 +856,22 @@ def deduplicate(balls: list[DetectedBall], min_dist: float = 0.03) -> list[Detec
 
 
 def disambiguate_colors(balls: list[DetectedBall], hsv_image: np.ndarray) -> list[DetectedBall]:
-    """Ensure all 3 balls have different colors: white, yellow, red.
-
-    If duplicates exist, reclassify based on HSV proximity to expected colors.
-    Expected target colors in HSV (OpenCV scale, H=0-180):
-      white:  H=any, S=0-30,   V=200-255
-      yellow: H=25-35, S=150-255, V=180-255
-      red:    H=0-10 or 170-180, S=150-255, V=150-255
-    """
+    """Ensure all 3 balls have different colors: white, yellow, red."""
     TARGET_HSV = {
-        "white":  np.array([0, 15, 230]),     # low S, high V
-        "yellow": np.array([30, 200, 220]),    # warm hue, high S
-        "red":    np.array([5, 200, 200]),     # red hue, high S
+        "white":  np.array([0, 15, 230]),
+        "yellow": np.array([30, 200, 220]),
+        "red":    np.array([5, 200, 200]),
     }
 
     if len(balls) < 2:
         return balls
 
-    # Check for duplicate labels
     labels = [b.label for b in balls]
     has_dup = len(labels) != len(set(labels))
 
     if not has_dup:
         return balls
 
-    # Re-read HSV from the warped image for each ball
     img_h, img_w = hsv_image.shape[:2]
     for ball in balls:
         xi, yi = int(ball.x * img_w), int(ball.y * img_h)
@@ -536,7 +884,6 @@ def disambiguate_colors(balls: list[DetectedBall], hsv_image: np.ndarray) -> lis
         else:
             ball.hsv_sample = np.array([0, 0, 0])
 
-    # Find which target colors are missing and which are duplicated
     target_colors = ["white", "yellow", "red"]
     used = {}
     for b in balls:
@@ -544,9 +891,7 @@ def disambiguate_colors(balls: list[DetectedBall], hsv_image: np.ndarray) -> lis
 
     missing = [c for c in target_colors if c not in labels]
 
-    # For each duplicate, reassign the one closest to a missing color
     for missing_color in missing:
-        # Find the ball whose HSV is closest to the missing color's target
         best_idx = -1
         best_dist = float("inf")
         for i, ball in enumerate(balls):
@@ -564,16 +909,38 @@ def disambiguate_colors(balls: list[DetectedBall], hsv_image: np.ndarray) -> lis
     return balls
 
 
-def filter_valid(balls: list[DetectedBall]) -> list[DetectedBall]:
-    """Keep all detected balls — the classifier always returns a valid color."""
+# ---------------------------------------------------------------------------
+# Coordinate validation
+# ---------------------------------------------------------------------------
+
+def validate_and_clamp(balls: list[DetectedBall]) -> list[DetectedBall]:
+    """Validate ball positions are within expected bounds and clamp if needed.
+
+    Balls should be within the playing surface (0-1 normalized).
+    Balls too close to edges (<2% from border) are suspicious and may
+    indicate detection error.
+    """
+    for ball in balls:
+        # Clamp to valid range
+        ball.x = max(0.0, min(1.0, ball.x))
+        ball.y = max(0.0, min(1.0, ball.y))
+
+        # Reduce confidence for balls near edges
+        edge_margin = 0.02
+        if ball.x < edge_margin or ball.x > (1 - edge_margin):
+            ball.confidence *= 0.7
+        if ball.y < edge_margin or ball.y > (1 - edge_margin):
+            ball.confidence *= 0.7
+
     return balls
 
 
-def detect_from_image(image_path: str, corners_override: list[dict] | None = None) -> dict:
-    """Main detection pipeline. Automatically finds the table.
+# ---------------------------------------------------------------------------
+# Main pipeline
+# ---------------------------------------------------------------------------
 
-    If corners_override is provided, uses those instead of auto-detection.
-    """
+def detect_from_image(image_path: str, corners_override: list[dict] | None = None) -> dict:
+    """Main detection pipeline."""
     image = cv2.imread(image_path)
     if image is None:
         return {"error": f"Could not read image: {image_path}", "balls": []}
@@ -601,54 +968,21 @@ def detect_from_image(image_path: str, corners_override: list[dict] | None = Non
                 "detectionMethod": "none",
             }
 
-    # 2. Detect if table is partial (doesn't fill the full image)
-    img_area = image.shape[0] * image.shape[1]
-    contour_area = cv2.contourArea(corners)
-    is_partial = contour_area < img_area * 0.6
+    # 2. Detect diamonds for calibration
+    diamonds = detect_diamonds_on_rails(image, corners)
 
     # 3. Warp perspective
     warped = warp_perspective(image, corners)
 
-    # 4. Detect balls — try color-based first (more robust), fall back to Hough
-    circles = detect_balls_by_color(warped)
-    detection_source = "color_blob"
+    # 3b. Create playing surface mask (exclude rail area)
+    felt_mask = _create_felt_mask(warped)
 
-    if circles is None or len(circles) < 3:
-        # Try HoughCircles with multiple param sets
-        gray = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
-        param_sets = [
-            (1.2, 20, 50, 20, 8, 45, 9, 2),
-            (1.2, 15, 50, 15, 5, 50, 9, 2),
-            (1.0, 12, 40, 12, 5, 55, 7, 1),
-            (1.0, 10, 35, 10, 4, 60, 5, 1),
-        ]
-        for dp, minDist, p1, p2, minR, maxR, bk, bs in param_sets:
-            blurred = cv2.GaussianBlur(gray, (bk, bk), bs)
-            result = cv2.HoughCircles(
-                blurred, cv2.HOUGH_GRADIENT,
-                dp=dp, minDist=minDist, param1=p1, param2=p2,
-                minRadius=minR, maxRadius=maxR,
-            )
-            if result is not None and len(result[0]) >= 3:
-                circles = result[0]
-                detection_source = f"hough({dp},{minDist},{p2},{minR}-{maxR})"
-                break
-
-        # Last resort: ultra-lenient Hough
-        if circles is None or len(circles) < 3:
-            blurred = cv2.GaussianBlur(gray, (5, 5), 1)
-            result = cv2.HoughCircles(
-                blurred, cv2.HOUGH_GRADIENT,
-                dp=1.0, minDist=8, param1=30, param2=8,
-                minRadius=3, maxRadius=65,
-            )
-            if result is not None:
-                circles = result[0]
-                detection_source = "hough_ultra"
+    # 4. Detect balls using multiple methods
+    circles, detection_source = detect_balls_multi_method(warped, felt_mask)
 
     import sys as _sys
     circle_count = 0 if circles is None else len(circles)
-    print(f"[debug] detection: {detection_source}, circles: {circle_count}, warped: {warped.shape[1]}x{warped.shape[0]}", file=_sys.stderr)
+    print(f"[debug] detection: {detection_source}, circles: {circle_count}, warped: {warped.shape[1]}x{warped.shape[0]}, diamonds: {len(diamonds)}", file=_sys.stderr)
 
     if circles is None or len(circles) == 0:
         return {
@@ -656,21 +990,38 @@ def detect_from_image(image_path: str, corners_override: list[dict] | None = Non
             "balls": [],
             "topDownImage": "",
             "detectionMethod": detection_method,
-            "isPartial": is_partial,
         }
 
     # 5. Classify balls
-    balls = extract_and_classify(warped, circles, is_partial=is_partial)
+    balls = extract_and_classify(warped, circles)
     balls = deduplicate(balls)
 
-    # 5b. Ensure no duplicate colors — each ball must be white, yellow, or red
+    # 5b. Ensure no duplicate colors
     hsv_warped = cv2.cvtColor(warped, cv2.COLOR_BGR2HSV)
     balls = disambiguate_colors(balls, hsv_warped)
 
-    for b in balls:
-        print(f"[debug]   ball: {b.label} ({b.x:.3f}, {b.y:.3f}) r={b.radius:.1f}", file=_sys.stderr)
+    # 5c. Calibrate coordinates using diamonds if available
+    if len(diamonds) >= 3:
+        balls = calibrate_with_diamonds(balls, diamonds, warped.shape)
 
-    balls = filter_valid(balls)
+    # 5d. Validate and clamp positions
+    balls = validate_and_clamp(balls)
+
+    # 5e. Filter to best 3 balls by size consistency and confidence
+    if len(balls) > 3:
+        # Keep only the 3 balls closest to the median radius
+        if len(balls) > 0:
+            radii = [b.radius for b in balls]
+            median_r = sorted(radii)[len(radii) // 2]
+            for b in balls:
+                size_penalty = abs(b.radius - median_r) / max(median_r, 1)
+                b.confidence *= max(0.3, 1.0 - size_penalty)
+        balls.sort(key=lambda b: b.confidence, reverse=True)
+        balls = balls[:3]
+
+    for b in balls:
+        print(f"[debug]   ball: {b.label} ({b.x:.3f}, {b.y:.3f}) r={b.radius:.1f} conf={b.confidence:.2f}", file=_sys.stderr)
+
     print(f"[debug] final: {len(balls)} balls", file=_sys.stderr)
 
     if len(balls) < 3:
@@ -682,7 +1033,6 @@ def detect_from_image(image_path: str, corners_override: list[dict] | None = Non
             ],
             "topDownImage": "",
             "detectionMethod": detection_method,
-            "isPartial": is_partial,
         }
 
     # 6. Encode top-down image
@@ -701,10 +1051,10 @@ def detect_from_image(image_path: str, corners_override: list[dict] | None = Non
             for b in balls
         ],
         "topDownImage": top_down_b64,
-        "totalDetected": len(circles),
+        "totalDetected": circle_count,
         "totalValid": len(balls),
         "detectionMethod": detection_method,
-        "isPartial": is_partial,
+        "diamondsDetected": len(diamonds),
     }
 
 
@@ -720,7 +1070,7 @@ def main():
         try:
             corners_override = json.loads(sys.argv[2])
         except json.JSONDecodeError:
-            pass  # ignore invalid corners, use auto-detection
+            pass
 
     result = detect_from_image(image_path, corners_override)
     print(json.dumps(result))

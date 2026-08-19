@@ -42,8 +42,8 @@ export function normalizeBalls(balls: VisionBall[]): NormalizedBall[] {
         const used = new Set<string>();
         const result: NormalizedBall[] = [];
 
-        // Sort by x position (left to right)
-        const sorted = [...mapped].sort((a, b) => a.x - b.x);
+        // Sort by x position (left to right), then by y (top to bottom)
+        const sorted = [...mapped].sort((a, b) => a.x - b.x || a.y - b.y);
 
         for (const ball of sorted) {
             if (!used.has(ball.label)) {
