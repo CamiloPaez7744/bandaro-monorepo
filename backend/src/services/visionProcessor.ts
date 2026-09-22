@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { writeFile, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -17,12 +18,23 @@ interface PythonBall {
     confidence: number;
 }
 
+export interface DetectedDiamond {
+    x: number;
+    y: number;
+    rail: string;
+    index: number;
+}
+
 export interface VisionResult {
     balls: PythonBall[];
     topDownImage: string;
     totalDetected: number;
     totalValid: number;
     detectionMethod?: string;
+    detectedCorners?: Point[];
+    detectedDiamonds?: DetectedDiamond[];
+    cameraAngle?: string;
+    aspectRatio?: number;
     error?: string;
 }
 
@@ -34,13 +46,24 @@ export async function processImage(
     const jobId = uuid();
     const ext = mimeType.includes('png') ? 'png' : 'jpg';
     const inputPath = join(tmpdir(), `bandaro_${jobId}.${ext}`);
-    const pythonPath = process.env.PYTHON_PATH ?? 'python3';
-    const scriptPath = join(
+    const defaultWinPython = 'C:\\Users\\camil\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe';
+    const pythonPath = process.env.PYTHON_PATH ?? (process.platform === 'win32' ? defaultWinPython : 'python3');
+    let scriptPath = join(
         import.meta.dirname ?? process.cwd(),
         '..',
         'python',
         'detect_balls.py',
     );
+    if (!existsSync(scriptPath)) {
+        scriptPath = join(
+            import.meta.dirname ?? process.cwd(),
+            '..',
+            '..',
+            'src',
+            'python',
+            'detect_balls.py',
+        );
+    }
 
     try {
         await writeFile(inputPath, imageBuffer);
@@ -52,7 +75,7 @@ export async function processImage(
 
         const { stdout, stderr } = await execFileAsync(pythonPath, args, {
             timeout: 30_000,
-            maxBuffer: 10 * 1024 * 1024,
+            maxBuffer: 15 * 1024 * 1024,
         });
 
         if (stderr) {
@@ -65,6 +88,10 @@ export async function processImage(
             totalDetected?: number;
             totalValid?: number;
             detectionMethod?: string;
+            detectedCorners?: Point[];
+            detectedDiamonds?: DetectedDiamond[];
+            cameraAngle?: string;
+            aspectRatio?: number;
             error?: string;
         };
 
@@ -74,6 +101,10 @@ export async function processImage(
             totalDetected: result.totalDetected ?? 0,
             totalValid: result.totalValid ?? 0,
             detectionMethod: result.detectionMethod,
+            detectedCorners: result.detectedCorners,
+            detectedDiamonds: result.detectedDiamonds,
+            cameraAngle: result.cameraAngle,
+            aspectRatio: result.aspectRatio,
             error: result.error,
         };
     } catch (err) {

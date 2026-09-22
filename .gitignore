@@ -49,9 +49,20 @@ yarn-error.*
 /ios
 /android
 
+# Python & caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+**/_cache/
+
 # Temporary files, scrapers, and datasets
 tmp/
 **/tmp/
 scraper/
 *.log
+docs/training-images/
+
+
 

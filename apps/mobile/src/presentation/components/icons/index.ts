@@ -38,6 +38,12 @@ import IconHome from '@tabler/icons-react-native/IconHome';
 import IconClock from '@tabler/icons-react-native/IconClock';
 import IconBarbell from '@tabler/icons-react-native/IconBarbell';
 import IconUser from '@tabler/icons-react-native/IconUser';
+import IconArrowsExchange from '@tabler/icons-react-native/IconArrowsExchange';
+import IconClipboard from '@tabler/icons-react-native/IconClipboard';
+import IconMinus from '@tabler/icons-react-native/IconMinus';
+import IconSettings from '@tabler/icons-react-native/IconSettings';
+import IconStar from '@tabler/icons-react-native/IconStar';
+import IconStarFilled from '@tabler/icons-react-native/IconStarFilled';
 
 export {
     IconTrophy,
@@ -80,4 +86,11 @@ export {
     IconClock,
     IconBarbell,
     IconUser,
+    IconArrowsExchange,
+    IconClipboard,
+    IconMinus,
+    IconSettings,
+    IconStar,
+    IconStarFilled,
 };
+

@@ -11,8 +11,35 @@ interface VisionResponse {
     detectionMethod?: string;
 }
 
+export interface VisionDetailedResponse {
+    snapshotId: string;
+    balls: { label: string; x: number; y: number; radius?: number; confidence?: number }[];
+    detectedCorners?: { x: number; y: number }[];
+    detectedDiamonds?: { x: number; y: number; rail: string; index: number }[];
+    cameraAngle?: string;
+    aspectRatio?: number;
+    topDownImage?: string;
+    detectionMethod?: string;
+    warning?: string;
+}
+
 export class ApiSnapshotRepository implements ISnapshotRepository {
-    async submit(imageUri: string): Promise<TableSnapshot> {
+    async submit(imageUri: string, corners?: { x: number; y: number }[]): Promise<TableSnapshot> {
+        const data = await this.submitWithDetails(imageUri, corners);
+        const balls: TableSnapshotBall[] = data.balls.map((b) => ({
+            label: b.label as TableSnapshotBall['label'],
+            x: b.x,
+            y: b.y,
+        }));
+
+        return {
+            id: data.snapshotId,
+            balls,
+            createdAt: new Date().toISOString(),
+        };
+    }
+
+    async submitWithDetails(imageUri: string, corners?: { x: number; y: number }[]): Promise<VisionDetailedResponse> {
         const filename = imageUri.split('/').pop() ?? 'photo.jpg';
         const ext = filename.split('.').pop()?.toLowerCase() ?? 'jpeg';
         const mimeType = ext === 'png' ? 'image/png' : 'image/jpeg';
@@ -31,6 +58,10 @@ export class ApiSnapshotRepository implements ISnapshotRepository {
             } as unknown as Blob);
         }
 
+        if (corners && corners.length === 4) {
+            formData.append('corners', JSON.stringify(corners));
+        }
+
         const response = await fetch(`${API_URL}/vision/table-snapshot`, {
             method: 'POST',
             body: formData,
@@ -42,19 +73,7 @@ export class ApiSnapshotRepository implements ISnapshotRepository {
             throw new Error(message);
         }
 
-        const data = (await response.json()) as VisionResponse;
-
-        const balls: TableSnapshotBall[] = data.balls.map((b) => ({
-            label: b.label as TableSnapshotBall['label'],
-            x: b.x,
-            y: b.y,
-        }));
-
-        return {
-            id: data.snapshotId,
-            balls,
-            createdAt: new Date().toISOString(),
-        };
+        return (await response.json()) as VisionDetailedResponse;
     }
 
     async getById(id: string): Promise<TableSnapshot | null> {

@@ -89,10 +89,14 @@ visionRouter.post('/table-snapshot', upload.single('image'), async (req, res) =>
             warning: countCheck.warning,
             topDownImage: visionResult.topDownImage,
             detectionMethod: visionResult.detectionMethod,
+            detectedCorners: visionResult.detectedCorners,
+            detectedDiamonds: visionResult.detectedDiamonds,
+            cameraAngle: visionResult.cameraAngle,
+            aspectRatio: visionResult.aspectRatio,
         });
     } catch (error) {
         console.error('[vision] error:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' });
     }
 });
 

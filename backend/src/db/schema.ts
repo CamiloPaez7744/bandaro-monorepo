@@ -1,12 +1,12 @@
 import { decimal, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
-export const tableSnapshot = pgTable('table_snapshot', {
+export const tableSnapshot = pgTable('table_snapshots', {
     id: uuid('id').primaryKey().defaultRandom(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     sourceImageUrl: text('source_image_url'),
 });
 
-export const ballPosition = pgTable('ball_position', {
+export const ballPosition = pgTable('ball_positions', {
     id: uuid('id').primaryKey().defaultRandom(),
     snapshotId: uuid('snapshot_id')
         .notNull()

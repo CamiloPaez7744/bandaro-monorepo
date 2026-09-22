@@ -546,10 +546,32 @@ export function TrainingActiveSessionScreen() {
         />
       </Modal>
 
-      {/* Camera Capture Modal */}
+      {/* Camera Capture & Calibration Studio Modal */}
       <CameraCaptureModal
         visible={cameraModalVisible}
         onClose={() => setCameraModalVisible(false)}
+        onSelectPosition={(pos) => {
+          const newPos: PositionData = {
+            id: `snapshot-${Date.now()}`,
+            name: pos.name || 'Posición Capturada',
+            category: 'Captura / YouTube',
+            hint: 'Posición extraída y calibrada con visión por computadora.',
+            difficulty: 3,
+            white: pos.white,
+            yellow: pos.yellow,
+            red: pos.red,
+          };
+          setPositions((prev) => {
+            const next = [...prev, newPos];
+            setCurrentPosIndex(next.length - 1);
+            return next;
+          });
+          setMadeHits(0);
+          setSessionResults((prev) => ({
+            ...prev,
+            [newPos.id]: { target: targetReps, hits: 0 },
+          }));
+        }}
       />
 
       {/* Session Complete Celebration Trophy Modal */}
