@@ -3,8 +3,9 @@ export type LanguagePreference = 'system' | Language;
 
 const es = {
     'tabs.home': 'Inicio',
-    'tabs.history': 'Historial',
+    'tabs.catalog': 'Catálogo',
     'tabs.training': 'Entrenamiento',
+    'tabs.history': 'Historial',
     'tabs.profile': 'Perfil',
 
     'stack.login': 'Iniciar sesión',
@@ -193,8 +194,9 @@ export type TranslationKey = keyof typeof es;
 
 const en: Record<TranslationKey, string> = {
     'tabs.home': 'Home',
-    'tabs.history': 'History',
+    'tabs.catalog': 'Catalog',
     'tabs.training': 'Training',
+    'tabs.history': 'History',
     'tabs.profile': 'Profile',
 
     'stack.login': 'Sign In',

@@ -1,11 +1,28 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, ScrollView, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { IconSearch, IconAdjustments, IconX } from '@tabler/icons-react-native';
+import {
+    ActivityIndicator,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+    useWindowDimensions,
+} from 'react-native';
+import {
+    IconSearch,
+    IconX,
+    IconSparkles,
+    IconTarget,
+    IconAdjustments,
+} from '@tabler/icons-react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useShotCatalog } from '@/src/presentation/hooks/useShotCatalog';
 import { useColorScheme } from '@/components/useColorScheme';
-import { getPalette } from '@/constants/theme';
+import { getPalette, theme } from '@/constants/theme';
 import { useSidebarWidth } from '@/components/LayoutContext';
 import { ShotCatalogCard } from '@/src/presentation/components/Catalog/ShotCatalogCard';
 import type { CatalogShot } from '@/src/infrastructure/catalog/shotAdapter';
@@ -33,32 +50,42 @@ const CATEGORY_NAMES: Record<string, string> = {
     side_spin: 'Lateral',
     follow: 'Seguimiento',
     cut: 'Corte',
-    big_spin: 'Gran Rot.',
+    big_spin: 'Gran Rotación',
     standing: 'Vertical',
     double_cushion: 'Doble Banda',
     cross_table: 'Travesía',
     reverse: 'Reversa',
     come_back: 'Regreso',
     bounce: 'Rebote',
-    bank_shot: 'Banco',
+    bank_shot: 'Banda Previa',
     basic: 'Básico',
     rescue: 'Rescate',
     ball_choice: 'Selección',
 };
 
-const CARD_GAP = 16;
+export interface ShotCatalogScreenProps {
+    onSelectShot?: (shot: CatalogShot) => void;
+    mode?: 'default' | 'picker';
+    onClosePicker?: () => void;
+}
 
-export function ShotCatalogScreen({ onSelectShot }: { onSelectShot?: (shot: CatalogShot) => void }) {
+export function ShotCatalogScreen({
+    onSelectShot,
+    mode = 'default',
+    onClosePicker,
+}: ShotCatalogScreenProps) {
     const colorScheme = useColorScheme();
     const palette = getPalette(colorScheme);
     const { width: windowWidth } = useWindowDimensions();
     const sidebarWidth = useSidebarWidth();
+    const insets = useSafeAreaInsets();
     const router = useRouter();
 
-    const contentWidth = windowWidth - sidebarWidth;
-    const containerPadding = contentWidth >= 1024 ? 24 : 16;
-
-    const [filtersVisible, setFiltersVisible] = useState(false);
+    const isPickerMode = mode === 'picker';
+    const contentWidth = isPickerMode ? windowWidth : windowWidth - sidebarWidth;
+    const isWide = contentWidth >= 800;
+    const paddingHorizontal = isWide ? theme.spacing.lg : theme.spacing.md;
+    const paddingTop = isPickerMode ? Math.max(insets.top, 16) : 16;
 
     const {
         shots,
@@ -74,255 +101,207 @@ export function ShotCatalogScreen({ onSelectShot }: { onSelectShot?: (shot: Cata
         loadMore,
     } = useShotCatalog();
 
-    const handlePress = useCallback(
+    const handlePressDetail = useCallback(
+        (shot: CatalogShot) => {
+            router.push({ pathname: '/catalog/[shotId]', params: { shotId: String(shot.id) } });
+        },
+        [router]
+    );
+
+    const handleTrainShot = useCallback(
         (shot: CatalogShot) => {
             if (onSelectShot) {
                 onSelectShot(shot);
+                if (onClosePicker) {
+                    onClosePicker();
+                }
             } else {
-                router.push({ pathname: '/catalog/[shotId]', params: { shotId: String(shot.id) } });
+                router.push({
+                    pathname: '/training/session',
+                    params: { shotId: String(shot.id) },
+                });
             }
         },
-        [onSelectShot, router]
+        [onSelectShot, onClosePicker, router]
     );
 
-    const isDark = palette.background === '#112118';
-    const activeFilterCount = selectedCategory ? 1 : 0;
-
     return (
-        <View style={{ flex: 1, backgroundColor: palette.background }}>
-            {/* Header */}
-            <View style={{ paddingHorizontal: containerPadding, paddingTop: 16, paddingBottom: 8 }}>
-                <Text style={{ fontSize: 22, fontWeight: '800', color: palette.text }}>
-                    Catálogo de Jugadas
-                </Text>
-                <Text style={{ fontSize: 13, color: palette.muted, marginTop: 2 }}>
-                    {total.toLocaleString()} jugadas de billiard-bible.com
-                </Text>
-            </View>
+        <View style={[styles.container, { backgroundColor: palette.background }]}>
+            {/* Top Bar Header */}
+            <View style={[styles.header, { paddingHorizontal, paddingTop, borderColor: palette.border }]}>
+                <View style={styles.headerTitleRow}>
+                    <View style={styles.headerTitles}>
+                        <View style={styles.badgeRow}>
+                            <View style={[styles.pillBadge, { backgroundColor: `${palette.primary}18`, borderColor: `${palette.primary}33` }]}>
+                                <IconSparkles size={13} color={palette.primary} />
+                                <Text style={[styles.pillBadgeText, { color: palette.primary }]}>
+                                    {isPickerMode ? 'SELECTOR DE ENTRENAMIENTO' : 'BIBLIA DE CARAMBOLAS UMB'}
+                                </Text>
+                            </View>
+                            <Text style={[styles.totalCountText, { color: palette.muted }]}>
+                                {total.toLocaleString()} jugadas
+                            </Text>
+                        </View>
+                        <Text style={[styles.title, { color: palette.text }]}>
+                            {isPickerMode ? 'Elige una Jugada para Entrenar' : 'Catálogo de Jugadas'}
+                        </Text>
+                        <Text style={[styles.subtitle, { color: palette.muted }]}>
+                            {isPickerMode
+                                ? 'Selecciona la posición que deseas añadir a tu mesa de práctica.'
+                                : 'Explora tiros profesionales con diagramas balísticos, efectos y trayectorias exactas.'}
+                        </Text>
+                    </View>
 
-            {/* Search bar + Filter button */}
-            <View style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                paddingHorizontal: containerPadding,
-                paddingBottom: 12,
-                gap: 8,
-            }}>
-                {/* Search input */}
-                <View style={{
-                    flex: 1,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    backgroundColor: isDark ? '#1a2f24' : '#f1f5f9',
-                    borderRadius: 12,
-                    borderWidth: 1,
-                    borderColor: isDark ? '#274a39' : '#e2e8f0',
-                    paddingHorizontal: 12,
-                    height: 42,
-                }}>
-                    <IconSearch size={18} color={palette.muted} strokeWidth={2} />
-                    <TextInput
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                        placeholder="Buscar por ID, jugador, club..."
-                        placeholderTextColor={palette.muted}
-                        style={{
-                            flex: 1,
-                            marginLeft: 8,
-                            fontSize: 13,
-                            color: palette.text,
-                            outlineStyle: 'none',
-                        } as any}
-                    />
-                    {searchQuery ? (
-                        <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
-                            <IconX size={16} color={palette.muted} strokeWidth={2} />
-                        </Pressable>
-                    ) : null}
+                    {isPickerMode && onClosePicker ? (
+                        <TouchableOpacity
+                            style={[styles.closeBtn, { backgroundColor: palette.surfaceLow }]}
+                            onPress={onClosePicker}
+                            accessibilityLabel="Cerrar selector">
+                            <IconX size={20} color={palette.text} />
+                        </TouchableOpacity>
+                    ) : (
+                        <TouchableOpacity
+                            style={[styles.quickStartBtn, { backgroundColor: palette.primary }]}
+                            onPress={() => router.push('/training/session')}
+                            activeOpacity={0.85}>
+                            <IconTarget size={18} color="#FFFFFF" strokeWidth={2.2} />
+                            <Text style={styles.quickStartBtnText}>Sesión Libre</Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
 
-                {/* Filter toggle button */}
-                <Pressable
-                    onPress={() => setFiltersVisible((v) => !v)}
-                    style={({ pressed }) => ({
-                        width: 42,
-                        height: 42,
-                        borderRadius: 12,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: filtersVisible
-                            ? palette.primary
-                            : isDark ? '#1a2f24' : '#f1f5f9',
-                        borderWidth: 1,
-                        borderColor: filtersVisible
-                            ? 'transparent'
-                            : isDark ? '#274a39' : '#e2e8f0',
-                        opacity: pressed ? 0.8 : 1,
-                    })}
-                >
-                    <IconAdjustments
-                        size={18}
-                        color={filtersVisible ? '#fff' : palette.muted}
-                        strokeWidth={2}
-                    />
-                    {activeFilterCount > 0 && !filtersVisible ? (
-                        <View style={{
-                            position: 'absolute',
-                            top: -3,
-                            right: -3,
-                            width: 16,
-                            height: 16,
-                            borderRadius: 8,
-                            backgroundColor: palette.primary,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                        }}>
-                            <Text style={{ fontSize: 9, fontWeight: '800', color: '#fff' }}>
-                                {activeFilterCount}
-                            </Text>
-                        </View>
-                    ) : null}
-                </Pressable>
-            </View>
-
-            {/* Collapsible filter panel */}
-            {filtersVisible ? (
-                <View style={{
-                    paddingHorizontal: containerPadding,
-                    paddingBottom: 12,
-                }}>
-                    <View style={{
-                        backgroundColor: isDark ? '#1a2f24' : '#f8fafc',
-                        borderRadius: 14,
-                        borderWidth: 1,
-                        borderColor: isDark ? '#274a39' : '#e2e8f0',
-                        padding: 12,
-                    }}>
-                        <View style={{
-                            flexDirection: 'row',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            marginBottom: 10,
-                        }}>
-                            <Text style={{
-                                fontSize: 12,
-                                fontWeight: '700',
-                                color: palette.text,
-                                textTransform: 'uppercase',
-                                letterSpacing: 0.5,
-                            }}>
-                                Categoría
-                            </Text>
-                            {selectedCategory ? (
-                                <Pressable onPress={() => setSelectedCategory(undefined)}>
-                                    <Text style={{
-                                        fontSize: 11,
-                                        fontWeight: '600',
-                                        color: palette.primary,
-                                    }}>
-                                        Limpiar
-                                    </Text>
-                                </Pressable>
-                            ) : null}
-                        </View>
-                        <View style={{
-                            flexDirection: 'row',
-                            flexWrap: 'wrap',
-                            gap: 6,
-                        }}>
-                            {/* All pill */}
-                            <Pressable
-                                onPress={() => setSelectedCategory(undefined)}
-                                style={({ pressed }) => ({
-                                    backgroundColor: !selectedCategory ? palette.primary : (isDark ? '#274a39' : '#e2e8f0'),
-                                    borderRadius: 10,
-                                    paddingHorizontal: 12,
-                                    paddingVertical: 6,
-                                    opacity: pressed ? 0.7 : 1,
-                                })}
-                            >
-                                <Text style={{
-                                    fontSize: 11,
-                                    fontWeight: '600',
-                                    color: !selectedCategory ? '#fff' : palette.muted,
-                                }}>
-                                    Todas ({total})
-                                </Text>
-                            </Pressable>
-
-                            {categories.map((item) => {
-                                const isActive = item.category === selectedCategory;
-                                const catColor = CATEGORY_COLORS[item.category] ?? palette.muted;
-                                return (
-                                    <Pressable
-                                        key={item.category}
-                                        onPress={() => setSelectedCategory(isActive ? undefined : item.category)}
-                                        style={({ pressed }) => ({
-                                            backgroundColor: isActive ? catColor : (isDark ? '#274a39' : '#e2e8f0'),
-                                            borderRadius: 10,
-                                            paddingHorizontal: 12,
-                                            paddingVertical: 6,
-                                            opacity: pressed ? 0.7 : 1,
-                                        })}
-                                    >
-                                        <Text style={{
-                                            fontSize: 11,
-                                            fontWeight: '600',
-                                            color: isActive ? '#fff' : palette.muted,
-                                        }}>
-                                            {CATEGORY_NAMES[item.category] ?? item.category} ({item.count})
-                                        </Text>
-                                    </Pressable>
-                                );
-                            })}
-                        </View>
+                {/* Search & Filter Bar */}
+                <View style={styles.searchRow}>
+                    <View style={[styles.searchInputWrap, { backgroundColor: palette.card, borderColor: palette.border }]}>
+                        <IconSearch size={18} color={palette.muted} strokeWidth={2} />
+                        <TextInput
+                            value={searchQuery}
+                            onChangeText={setSearchQuery}
+                            placeholder="Buscar por ID, efecto, jugador, categoría..."
+                            placeholderTextColor={palette.muted}
+                            style={[styles.searchInput, { color: palette.text }]}
+                        />
+                        {searchQuery ? (
+                            <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={8}>
+                                <IconX size={16} color={palette.muted} strokeWidth={2} />
+                            </TouchableOpacity>
+                        ) : null}
                     </View>
                 </View>
-            ) : null}
 
+                {/* Horizontal Category Filter Pills Carousel */}
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.categoriesScroll}>
+                    {/* All categories pill */}
+                    <TouchableOpacity
+                        style={[
+                            styles.categoryChip,
+                            !selectedCategory
+                                ? [styles.categoryChipActive, { backgroundColor: palette.primary, borderColor: palette.primary }]
+                                : [styles.categoryChipInactive, { backgroundColor: palette.card, borderColor: palette.border }],
+                        ]}
+                        activeOpacity={0.8}
+                        onPress={() => setSelectedCategory(undefined)}>
+                        <Text
+                            style={[
+                                styles.categoryChipText,
+                                !selectedCategory ? styles.categoryChipTextActive : { color: palette.muted },
+                            ]}>
+                            Todas ({total})
+                        </Text>
+                    </TouchableOpacity>
+
+                    {/* Specific categories */}
+                    {categories.map((item) => {
+                        const isActive = item.category === selectedCategory;
+                        const catColor = CATEGORY_COLORS[item.category] ?? palette.primary;
+                        return (
+                            <TouchableOpacity
+                                key={item.category}
+                                style={[
+                                    styles.categoryChip,
+                                    isActive
+                                        ? [styles.categoryChipActive, { backgroundColor: catColor, borderColor: catColor }]
+                                        : [styles.categoryChipInactive, { backgroundColor: palette.card, borderColor: palette.border }],
+                                ]}
+                                activeOpacity={0.8}
+                                onPress={() => setSelectedCategory(isActive ? undefined : item.category)}>
+                                <View
+                                    style={[
+                                        styles.categoryDot,
+                                        { backgroundColor: isActive ? '#FFFFFF' : catColor },
+                                    ]}
+                                />
+                                <Text
+                                    style={[
+                                        styles.categoryChipText,
+                                        isActive ? styles.categoryChipTextActive : { color: palette.text },
+                                    ]}>
+                                    {CATEGORY_NAMES[item.category] ?? item.category} ({item.count})
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </ScrollView>
+            </View>
+
+            {/* Content Body: Grid of Shots */}
             {loading ? (
-                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <View style={styles.centerContainer}>
                     <ActivityIndicator size="large" color={palette.primary} />
-                    <Text style={{ marginTop: 8, color: palette.muted }}>Cargando jugadas...</Text>
+                    <Text style={[styles.loadingText, { color: palette.muted }]}>
+                        Cargando catálogo balístico...
+                    </Text>
                 </View>
             ) : error ? (
-                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-                    <Text style={{ color: palette.danger, fontSize: 14 }}>{error}</Text>
+                <View style={styles.centerContainer}>
+                    <Text style={[styles.errorText, { color: palette.danger }]}>{error}</Text>
                 </View>
             ) : (
                 <ScrollView
-                    contentContainerStyle={{
-                        paddingHorizontal: containerPadding,
-                        paddingTop: 8,
-                        paddingBottom: 80,
-                    }}
+                    contentContainerStyle={[
+                        styles.scrollContent,
+                        { paddingHorizontal, paddingBottom: 100 },
+                    ]}
                     onScroll={(e) => {
                         const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
-                        if (contentOffset.y + layoutMeasurement.height >= contentSize.height - 200) {
+                        if (contentOffset.y + layoutMeasurement.height >= contentSize.height - 250) {
                             loadMore();
                         }
                     }}
                     scrollEventThrottle={16}
-                >
-                    <View style={{
-                        flexDirection: 'row',
-                        flexWrap: 'wrap',
-                        gap: CARD_GAP,
-                    }}>
-                        {shots.map((shot) => (
-                            <View key={shot.id} style={{ flexGrow: 1, flexBasis: 300 }}>
-                                <ShotCatalogCard shot={shot} onPress={handlePress} palette={palette} />
-                            </View>
-                        ))}
-                    </View>
-                    {loadingMore ? (
-                        <View style={{ paddingVertical: 16 }}>
-                            <ActivityIndicator size="small" color={palette.primary} />
-                        </View>
-                    ) : null}
+                    showsVerticalScrollIndicator={false}>
                     {shots.length === 0 ? (
-                        <View style={{ padding: 40, alignItems: 'center' }}>
-                            <Text style={{ color: palette.muted, fontSize: 14 }}>No se encontraron jugadas</Text>
+                        <View style={styles.emptyContainer}>
+                            <IconAdjustments size={40} color={palette.muted} strokeWidth={1.5} />
+                            <Text style={[styles.emptyTitle, { color: palette.text }]}>
+                                No se encontraron jugadas
+                            </Text>
+                            <Text style={[styles.emptyDesc, { color: palette.muted }]}>
+                                Prueba ajustando tu búsqueda o seleccionando otra categoría.
+                            </Text>
+                        </View>
+                    ) : (
+                        <View style={styles.cardsGrid}>
+                            {shots.map((shot) => (
+                                <View key={shot.id} style={styles.cardItem}>
+                                    <ShotCatalogCard
+                                        shot={shot}
+                                        onPress={handlePressDetail}
+                                        onTrain={handleTrainShot}
+                                        palette={palette}
+                                        isPickerMode={isPickerMode}
+                                    />
+                                </View>
+                            ))}
+                        </View>
+                    )}
+
+                    {loadingMore ? (
+                        <View style={styles.loadingMoreWrap}>
+                            <ActivityIndicator size="small" color={palette.primary} />
                         </View>
                     ) : null}
                 </ScrollView>
@@ -330,3 +309,172 @@ export function ShotCatalogScreen({ onSelectShot }: { onSelectShot?: (shot: Cata
         </View>
     );
 }
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+    },
+    header: {
+        paddingTop: 16,
+        paddingBottom: 12,
+        borderBottomWidth: 1,
+        gap: 12,
+    },
+    headerTitleRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        gap: 12,
+    },
+    headerTitles: {
+        flex: 1,
+        gap: 4,
+    },
+    badgeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    pillBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: theme.radius.full,
+        borderWidth: 1,
+    },
+    pillBadgeText: {
+        fontSize: 10,
+        fontWeight: '700',
+        letterSpacing: 0.5,
+    },
+    totalCountText: {
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    title: {
+        fontSize: 22,
+        fontWeight: '700',
+    },
+    subtitle: {
+        fontSize: 13,
+        lineHeight: 18,
+    },
+    closeBtn: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    quickStartBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: theme.radius.md,
+    },
+    quickStartBtnText: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    searchRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    searchInputWrap: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        height: 42,
+        borderRadius: theme.radius.md,
+        borderWidth: 1,
+        gap: 8,
+    },
+    searchInput: {
+        flex: 1,
+        fontSize: 13,
+        paddingVertical: 0,
+    },
+    categoriesScroll: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingVertical: 2,
+    },
+    categoryChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: theme.radius.sm,
+        borderWidth: 1,
+    },
+    categoryChipActive: {},
+    categoryChipInactive: {},
+    categoryDot: {
+        width: 7,
+        height: 7,
+        borderRadius: 4,
+    },
+    categoryChipText: {
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    categoryChipTextActive: {
+        color: '#FFFFFF',
+        fontWeight: '700',
+    },
+    scrollContent: {
+        paddingTop: 16,
+    },
+    cardsGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 16,
+    },
+    cardItem: {
+        flexGrow: 1,
+        flexBasis: 300,
+        maxWidth: 600,
+    },
+    centerContainer: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 12,
+        padding: 24,
+    },
+    loadingText: {
+        fontSize: 13,
+    },
+    errorText: {
+        fontSize: 14,
+        textAlign: 'center',
+    },
+    emptyContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 60,
+        gap: 10,
+    },
+    emptyTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    emptyDesc: {
+        fontSize: 13,
+        textAlign: 'center',
+        maxWidth: 320,
+    },
+    loadingMoreWrap: {
+        paddingVertical: 24,
+        alignItems: 'center',
+    },
+});

@@ -1,4 +1,4 @@
-import { IconHome, IconClock, IconBarbell, IconUser, IconChevronRight, IconChevronLeft } from '@tabler/icons-react-native';
+import { IconHome, IconBook, IconClock, IconBarbell, IconUser, IconChevronRight, IconChevronLeft } from '@tabler/icons-react-native';
 import { Link, usePathname } from 'expo-router';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -6,12 +6,13 @@ import { useColorScheme } from '@/components/useColorScheme';
 import { useI18n } from '@/components/useLanguage';
 import { getPalette, theme } from '@/constants/theme';
 
-type SidebarHref = '/' | '/(tabs)/history' | '/(tabs)/training' | '/(tabs)/profile';
+type SidebarHref = '/' | '/(tabs)/catalog' | '/(tabs)/training' | '/(tabs)/history' | '/(tabs)/profile';
 
-const NAV_ITEMS: ReadonlyArray<{ href: SidebarHref; icon: 'home' | 'time' | 'barbell' | 'person'; key: 'tabs.home' | 'tabs.history' | 'tabs.training' | 'tabs.profile' }> = [
+const NAV_ITEMS: ReadonlyArray<{ href: SidebarHref; icon: 'home' | 'book' | 'barbell' | 'time' | 'person'; key: 'tabs.home' | 'tabs.catalog' | 'tabs.training' | 'tabs.history' | 'tabs.profile' }> = [
     { href: '/', icon: 'home', key: 'tabs.home' },
-    { href: '/(tabs)/history', icon: 'time', key: 'tabs.history' },
+    { href: '/(tabs)/catalog', icon: 'book', key: 'tabs.catalog' },
     { href: '/(tabs)/training', icon: 'barbell', key: 'tabs.training' },
+    { href: '/(tabs)/history', icon: 'time', key: 'tabs.history' },
     { href: '/(tabs)/profile', icon: 'person', key: 'tabs.profile' },
 ];
 
@@ -67,6 +68,7 @@ export function WebSidebar({ collapsed, onToggleCollapsed }: WebSidebarProps) {
                     const navItemStyle = StyleSheet.flatten([styles.navItem, active ? styles.navItemActive : null]);
                     const iconMap: Record<string, React.ComponentType<{ size: number; color: string; strokeWidth: number }>> = {
                         home: IconHome,
+                        book: IconBook,
                         time: IconClock,
                         barbell: IconBarbell,
                         person: IconUser,

@@ -4,7 +4,7 @@ import {
     useWindowDimensions, Modal, StyleSheet, type ViewStyle,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { IconX, IconPlayerPlay, IconBookmark } from '@tabler/icons-react-native';
+import { IconX, IconPlayerPlay, IconBookmark, IconTarget } from '@tabler/icons-react-native';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { getPalette } from '@/constants/theme';
@@ -217,20 +217,32 @@ export function ShotDetailScreen({ shotId: propShotId, onClose, onSimulate }: Sh
                 </View>
             ) : null}
 
-            {/* Simulate button */}
-            <Pressable
-                style={[styles.simulateBtn, { backgroundColor: color }]}
-                onPress={() => {
-                    if (onSimulate) {
-                        onSimulate(shot);
-                    } else {
-                        router.push({ pathname: '/training/simulate', params: { shotId: String(shot.id) } });
-                    }
-                }}
-            >
-                <IconPlayerPlay size={18} color="#fff" />
-                <Text style={styles.simulateBtnText}>Simular tiro</Text>
-            </Pressable>
+            {/* Action buttons: Entrenar & Simular */}
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
+                <Pressable
+                    style={[styles.simulateBtn, { flex: 1, backgroundColor: '#0d5e2f' }]}
+                    onPress={() => {
+                        handleClose();
+                        router.push({ pathname: '/training/session', params: { shotId: String(shot.id) } });
+                    }}
+                >
+                    <IconTarget size={18} color="#fff" />
+                    <Text style={styles.simulateBtnText}>Entrenar</Text>
+                </Pressable>
+                <Pressable
+                    style={[styles.simulateBtn, { flex: 1, backgroundColor: color }]}
+                    onPress={() => {
+                        if (onSimulate) {
+                            onSimulate(shot);
+                        } else {
+                            router.push({ pathname: '/training/simulate', params: { shotId: String(shot.id) } });
+                        }
+                    }}
+                >
+                    <IconPlayerPlay size={18} color="#fff" />
+                    <Text style={styles.simulateBtnText}>Simular</Text>
+                </Pressable>
+            </View>
 
             <View style={{ height: 40 }} />
         </ScrollView>

@@ -177,7 +177,7 @@ function EffectBallSelectorBase(props: Readonly<EffectBallSelectorProps>) {
                     ]}
                     accessibilityRole="button"
                     accessibilityLabel="Alternar guías"
-                    accessibilityState={{ pressed: guidesVisible }}>
+                    accessibilityState={{ selected: guidesVisible }}>
                     <Svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <Circle cx={12} cy={12} r={3} />
                         <Line x1={3} y1={12} x2={6} y2={12} />

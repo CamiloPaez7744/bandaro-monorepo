@@ -270,6 +270,34 @@ export function TrainingSimulationScreen() {
                     <View style={styles.headerButtonsRow}>
                         <TouchableOpacity
                             style={[
+                                styles.trainButton,
+                                {
+                                    backgroundColor: palette.primary,
+                                },
+                            ]}
+                            onPress={() => {
+                                const whiteB = state.balls.find((b) => b.id === 'white');
+                                const yellowB = state.balls.find((b) => b.id === 'yellow');
+                                const redB = state.balls.find((b) => b.id === 'red');
+                                router.push({
+                                    pathname: '/training/session',
+                                    params: {
+                                        customName: system?.name ? `Práctica: ${system.name}` : 'Posición de Simulador',
+                                        whiteX: String(Math.round(whiteB ? whiteB.pos.x : 50)),
+                                        whiteY: String(Math.round(whiteB ? whiteB.pos.y : 71)),
+                                        yellowX: String(Math.round(yellowB ? yellowB.pos.x : 142)),
+                                        yellowY: String(Math.round(yellowB ? yellowB.pos.y : 71)),
+                                        redX: String(Math.round(redB ? redB.pos.x : 220)),
+                                        redY: String(Math.round(redB ? redB.pos.y : 71)),
+                                    },
+                                });
+                            }}
+                            disabled={state.isSimulating}>
+                            <IconTarget size={16} color="#fff" strokeWidth={2.2} />
+                            <Text style={styles.trainButtonText}>Entrenar</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[
                                 styles.iconButton,
                                 {
                                     backgroundColor: isEditMode ? '#fbbf24' : `${palette.primary}22`,
@@ -631,6 +659,20 @@ const getStyles = (palette: ReturnType<typeof getPalette>) =>
             borderRadius: 18,
             alignItems: 'center',
             justifyContent: 'center',
+        },
+        trainButton: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: 36,
+            paddingHorizontal: 12,
+            borderRadius: 18,
+            gap: 4,
+        },
+        trainButtonText: {
+            color: '#fff',
+            fontSize: 12,
+            fontWeight: '700',
         },
         mainLayout: {
             flex: 1,

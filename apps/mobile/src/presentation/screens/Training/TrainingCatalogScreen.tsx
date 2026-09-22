@@ -1,14 +1,16 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { IconCamera, IconArrowRight } from '@tabler/icons-react-native';
+import { IconCamera, IconArrowRight, IconPlayerPlay, IconSparkles } from '@tabler/icons-react-native';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { useI18n } from '@/components/useLanguage';
 import { getPalette, theme } from '@/constants/theme';
 import { BilliardsTableThumbnail } from '@/src/presentation/components/Training/BilliardsTableThumbnail';
 import { CameraCaptureModal } from '@/src/presentation/components/Snapshot/CameraCaptureModal';
+import { TrainingPositionSelectorModal } from '@/src/presentation/components/Training/TrainingPositionSelectorModal';
+import { getRandomTrainingQuote } from '@/src/presentation/screens/Training/trainingQuotes';
 import { TRAINING_SYSTEMS, type TrainingSystem } from '@/src/presentation/screens/Training/trainingData';
 
 const difficultyColor = {
@@ -27,9 +29,15 @@ export function TrainingCatalogScreen() {
     const isWideScreen = width >= 960;
     const cardWidth = isWideScreen ? 320 : '100%';
     const [showCameraModal, setShowCameraModal] = useState(false);
+    const [showSelectorModal, setShowSelectorModal] = useState(false);
+    const quote = useMemo(() => getRandomTrainingQuote(), []);
 
     const onOpenSystem = (system: TrainingSystem) => {
         router.push({ pathname: '/training/[systemId]', params: { systemId: system.id } });
+    };
+
+    const onStartSession = () => {
+        router.push('/training/session');
     };
 
     return (
@@ -47,24 +55,58 @@ export function TrainingCatalogScreen() {
                 <Text style={styles.subtitle}>{t('training.catalog.subtitle')}</Text>
             </View>
 
+            {/* Main Action: Iniciar Sesión de Entrenamiento */}
+            <TouchableOpacity
+                style={[styles.startSessionButton, { backgroundColor: palette.primary }]}
+                activeOpacity={0.85}
+                onPress={() => setShowSelectorModal(true)}>
+                <View style={styles.startSessionIconWrap}>
+                    <IconPlayerPlay size={22} color="#ffffff" />
+                </View>
+                <View style={styles.startSessionInfo}>
+                    <View style={styles.startSessionTagRow}>
+                        <IconSparkles size={13} color="#ffffff" />
+                        <Text style={styles.startSessionTag}>MÓDULO ACTIVO</Text>
+                    </View>
+                    <Text style={styles.startSessionTitle}>Iniciar Sesión de Entrenamiento</Text>
+                    <Text style={styles.startSessionDesc}>
+                        Configura repeticiones (5, 10, 15), registra aciertos y sube de nivel
+                    </Text>
+                </View>
+                <IconArrowRight size={20} color="#ffffff" strokeWidth={2} />
+            </TouchableOpacity>
+
             <TouchableOpacity
                 style={[styles.snapshotButton, { borderColor: palette.border }]}
                 activeOpacity={0.8}
                 onPress={() => setShowCameraModal(true)}>
-                <IconCamera size={32} color={palette.primary} strokeWidth={1.5} />
+                <IconCamera size={28} color={palette.primary} strokeWidth={1.5} />
                 <View style={styles.snapshotInfo}>
-                    <Text style={[styles.snapshotTitle, { color: palette.text }]}>Estudiar nueva posición</Text>
+                    <Text style={[styles.snapshotTitle, { color: palette.text }]}>Escanear Mesa con Foto</Text>
                     <Text style={[styles.snapshotSubtitle, { color: palette.muted }]}>
-                        Toma una foto de una mesa y reproduce la jugada en el simulador
+                        Toma una foto de una mesa física y entrena la posición exacta
                     </Text>
                 </View>
                 <IconArrowRight size={20} color={palette.primary} strokeWidth={2.5} />
             </TouchableOpacity>
 
+            <TrainingPositionSelectorModal
+                visible={showSelectorModal}
+                quote={quote.text}
+                onClose={() => setShowSelectorModal(false)}
+                onSelectCatalog={() => {
+                    setShowSelectorModal(false);
+                    router.push('/catalog');
+                }}
+                onOpenSimulator={() => router.push('/training/simulate')}
+                onCapturePhoto={() => setShowCameraModal(true)}
+            />
+
             <CameraCaptureModal
                 visible={showCameraModal}
                 onClose={() => setShowCameraModal(false)}
             />
+
 
             <Text style={styles.sectionTitle}>{t('training.catalog.systems')}</Text>
 
@@ -324,6 +366,53 @@ const getStyles = (palette: ReturnType<typeof getPalette>) =>
         footerArrow: {
             // deprecated — replaced by IconArrowRight
         },
+        startSessionButton: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 14,
+            borderRadius: theme.radius.lg,
+            padding: theme.spacing.md,
+            shadowColor: palette.primary,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.3,
+            shadowRadius: 10,
+            elevation: 4,
+        },
+        startSessionIconWrap: {
+            width: 44,
+            height: 44,
+            borderRadius: theme.radius.md,
+            backgroundColor: 'rgba(255, 255, 255, 0.2)',
+            alignItems: 'center',
+            justifyContent: 'center',
+        },
+        startSessionInfo: {
+            flex: 1,
+            gap: 3,
+        },
+        startSessionTagRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 4,
+        },
+        startSessionTag: {
+            color: '#ffffff',
+            fontSize: 10,
+            fontWeight: '700',
+            letterSpacing: 0.5,
+            textTransform: 'uppercase',
+        },
+        startSessionTitle: {
+            color: '#ffffff',
+            fontSize: 16,
+            fontWeight: '700',
+        },
+        startSessionDesc: {
+            color: 'rgba(255, 255, 255, 0.85)',
+            fontSize: 12,
+            lineHeight: 16,
+            fontWeight: '400',
+        },
         snapshotButton: {
             flexDirection: 'row',
             alignItems: 'center',
@@ -353,3 +442,4 @@ const getStyles = (palette: ReturnType<typeof getPalette>) =>
             // deprecated — replaced by IconArrowRight
         },
     });
+

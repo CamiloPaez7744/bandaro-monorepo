@@ -48,3 +48,10 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Temporary files, scrapers, and datasets
+tmp/
+**/tmp/
+scraper/
+*.log
+
