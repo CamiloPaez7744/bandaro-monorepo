@@ -3,6 +3,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export type DiamondShape = 'rhombus' | 'circle';
 export type DiamondCount = '9_5' | '7_3';
 export type WoodFinish = 'ebony' | 'mahogany' | 'walnut';
+export type CornerMetalStyle = 'brass' | 'gold_24k' | 'chrome' | 'neon_cyan' | 'antique_bronze';
+export type TableDecal = 'tournament_crest' | 'skull' | 'crown_filigree' | 'cyber_rings' | 'classic_carom' | 'none';
 
 export interface ClothSkinPreset {
   id: string;
@@ -10,6 +12,108 @@ export interface ClothSkinPreset {
   hex: string;
   description: string;
 }
+
+export interface TableArenaSkin {
+  id: string;
+  name: string;
+  subtitle: string;
+  description: string;
+  clothColor: string;
+  clothVignetteHex: string;
+  woodFinish: WoodFinish;
+  cornerMetal: CornerMetalStyle;
+  diamondShape: DiamondShape;
+  diamondColor: string;
+  tableDecal: TableDecal;
+  accentGlow: string;
+}
+
+export const TABLE_ARENA_SKINS: TableArenaSkin[] = [
+  {
+    id: 'rebel_skull',
+    name: 'Rebel Skull Arena',
+    subtitle: 'Edición Calavera Street & Rock',
+    description: 'Diseño audaz con la icónica marca de agua Calavera (Skull), paño gris carbón de alta visibilidad, madera de ébano y cantoneras cromadas.',
+    clothColor: '#1e293b',
+    clothVignetteHex: '#0f172a',
+    woodFinish: 'ebony',
+    cornerMetal: 'chrome',
+    diamondShape: 'rhombus',
+    diamondColor: '#f8fafc',
+    tableDecal: 'skull',
+    accentGlow: '#94a3b8',
+  },
+  {
+    id: 'tournament_umb',
+    name: 'Arena Torneo UMB',
+    subtitle: 'Simonis 300 Rapide Oficial',
+    description: 'La mesa oficial de los campeonatos mundiales. Paño azul clásico, madera noble de caoba y cantoneras de bronce satinado.',
+    clothColor: '#10638c',
+    clothVignetteHex: '#1b80b0',
+    woodFinish: 'mahogany',
+    cornerMetal: 'brass',
+    diamondShape: 'rhombus',
+    diamondColor: '#f1f5f9',
+    tableDecal: 'tournament_crest',
+    accentGlow: '#38bdf8',
+  },
+  {
+    id: 'royal_high_roller',
+    name: 'Royal High Roller',
+    subtitle: 'Edición Las Vegas VIP',
+    description: 'Lujo absoluto: paño azul noche con filigranas de oro, madera negro piano laqueado y esquineras de oro de 24 quilates.',
+    clothColor: '#0b192c',
+    clothVignetteHex: '#142c4c',
+    woodFinish: 'ebony',
+    cornerMetal: 'gold_24k',
+    diamondShape: 'rhombus',
+    diamondColor: '#fbbf24',
+    tableDecal: 'crown_filigree',
+    accentGlow: '#fbbf24',
+  },
+  {
+    id: 'neo_tokyo_cyber',
+    name: 'Neo-Tokyo Cybercarom',
+    subtitle: 'Futurista & Luminiscente',
+    description: 'Estética ciberpunk arcade: paño grafito/cian eléctrico, marco negro de fibra de carbono e inserciones de neón cian radiante.',
+    clothColor: '#081d28',
+    clothVignetteHex: '#0c354a',
+    woodFinish: 'ebony',
+    cornerMetal: 'neon_cyan',
+    diamondShape: 'circle',
+    diamondColor: '#22d3ee',
+    tableDecal: 'cyber_rings',
+    accentGlow: '#06b6d4',
+  },
+  {
+    id: 'monte_carlo_luxe',
+    name: 'Monte Carlo Grand Luxe',
+    subtitle: 'Granate Francés & Platino',
+    description: 'Elegancia clásica europea: paño de terciopelo borgoña tinto, madera de nogal italiano y cantoneras de platino cromado.',
+    clothColor: '#6b1422',
+    clothVignetteHex: '#881b2d',
+    woodFinish: 'walnut',
+    cornerMetal: 'chrome',
+    diamondShape: 'rhombus',
+    diamondColor: '#ffffff',
+    tableDecal: 'classic_carom',
+    accentGlow: '#f43f5e',
+  },
+  {
+    id: 'emerald_classic',
+    name: 'Esmeralda Tradicional',
+    subtitle: 'El Billar de Siempre',
+    description: 'El verde eterno del billar clásico, realzado con maderas cálidas de roble oscuro y cantoneras de latón envejecido.',
+    clothColor: '#0d5c3a',
+    clothVignetteHex: '#13784d',
+    woodFinish: 'walnut',
+    cornerMetal: 'antique_bronze',
+    diamondShape: 'circle',
+    diamondColor: '#fef08a',
+    tableDecal: 'classic_carom',
+    accentGlow: '#4ade80',
+  },
+];
 
 export const CLOTH_SKIN_PRESETS: ClothSkinPreset[] = [
   {
@@ -51,24 +155,37 @@ export const CLOTH_SKIN_PRESETS: ClothSkinPreset[] = [
 ];
 
 export interface TablePreferences {
+  activeSkinId: string; // 'tournament_umb' | 'royal_high_roller' | ...
   clothColor: string; // Preset id or raw hex ('#10638c')
-  diamondShape: DiamondShape; // 'rhombus' (rombos al centro) | 'circle' (puntos)
-  diamondCount: DiamondCount; // '9_5' (9 largas, 5 cortas) | '7_3' (7 largas, 3 cortas)
+  diamondShape: DiamondShape; // 'rhombus' | 'circle'
+  diamondCount: DiamondCount; // '9_5' | '7_3'
   showCornerDiamonds: boolean; // Mostrar u ocultar diamantes en las esquinas
   showGrid: boolean; // Cuadrícula táctica 8x4
   showDiamondNumbers: boolean; // Numeración del sistema de diamantes
   woodFinish: WoodFinish; // Acabado de la madera del pasamanos
+  cornerMetal: CornerMetalStyle; // Estilo metálico de las cantoneras
+  tableDecal: TableDecal; // Marca de agua central del paño
+  decalOpacity: number; // Opacidad de la marca de agua del paño (0.05 a 0.50)
+  showSpotlight: boolean; // Luz cenital de estadio
+  showTableDecal: boolean; // Mostrar emblema central
 }
 
 export const DEFAULT_TABLE_PREFERENCES: TablePreferences = {
+  activeSkinId: 'tournament_umb',
   clothColor: 'tournament_blue',
   diamondShape: 'rhombus',
   diamondCount: '9_5',
   showCornerDiamonds: true,
   showGrid: true,
   showDiamondNumbers: false,
-  woodFinish: 'ebony',
+  woodFinish: 'mahogany',
+  cornerMetal: 'brass',
+  tableDecal: 'tournament_crest',
+  decalOpacity: 0.18,
+  showSpotlight: true,
+  showTableDecal: true,
 };
+
 
 const STORAGE_KEY = '@bandaro_table_preferences_v1';
 
@@ -191,3 +308,77 @@ export function resolveWoodPalette(finish: WoodFinish = 'ebony') {
       };
   }
 }
+
+/**
+ * Resolves metallic corner bracket gradient colors.
+ */
+export function resolveCornerMetalPalette(style: CornerMetalStyle = 'brass') {
+  switch (style) {
+    case 'gold_24k':
+      return {
+        base: '#d97706',
+        highlight: '#fef08a',
+        mid: '#f59e0b',
+        dark: '#78350f',
+        rivet: '#fde047',
+        border: 'rgba(254, 240, 138, 0.6)',
+      };
+    case 'chrome':
+      return {
+        base: '#94a3b8',
+        highlight: '#f8fafc',
+        mid: '#cbd5e1',
+        dark: '#334155',
+        rivet: '#e2e8f0',
+        border: 'rgba(248, 250, 252, 0.7)',
+      };
+    case 'neon_cyan':
+      return {
+        base: '#0891b2',
+        highlight: '#67e8f9',
+        mid: '#06b6d4',
+        dark: '#164e63',
+        rivet: '#a5f3fc',
+        border: 'rgba(103, 232, 249, 0.8)',
+      };
+    case 'antique_bronze':
+      return {
+        base: '#78350f',
+        highlight: '#d97706',
+        mid: '#92400e',
+        dark: '#451a03',
+        rivet: '#b45309',
+        border: 'rgba(217, 119, 6, 0.5)',
+      };
+    case 'brass':
+    default:
+      return {
+        base: '#b45309',
+        highlight: '#fef3c7',
+        mid: '#d97706',
+        dark: '#451a03',
+        rivet: '#fcd34d',
+        border: 'rgba(254, 243, 199, 0.5)',
+      };
+  }
+}
+
+/**
+ * Applies a full table arena skin to a preferences object.
+ */
+export function applyArenaSkin(skinId: string, currentPrefs: TablePreferences): TablePreferences {
+  const skin = TABLE_ARENA_SKINS.find((s) => s.id === skinId);
+  if (!skin) return currentPrefs;
+
+  return {
+    ...currentPrefs,
+    activeSkinId: skin.id,
+    clothColor: skin.clothColor,
+    woodFinish: skin.woodFinish,
+    cornerMetal: skin.cornerMetal,
+    diamondShape: skin.diamondShape,
+    tableDecal: skin.tableDecal,
+    showTableDecal: skin.tableDecal !== 'none',
+  };
+}
+

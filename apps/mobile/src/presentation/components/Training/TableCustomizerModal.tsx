@@ -10,6 +10,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Image,
 } from 'react-native';
 import {
   IconCheck,
@@ -20,11 +21,15 @@ import {
 import {
   CLOTH_SKIN_PRESETS,
   DEFAULT_TABLE_PREFERENCES,
+  TABLE_ARENA_SKINS,
+  applyArenaSkin,
+  type CornerMetalStyle,
   type DiamondCount,
   type DiamondShape,
   type TablePreferences,
   type WoodFinish,
 } from './tablePreferences';
+import { TABLE_DECAL_DEFS } from './tableDecals';
 
 interface TableCustomizerModalProps {
   visible: boolean;
@@ -90,9 +95,79 @@ function TableCustomizerModalBase({
           </View>
 
           <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent}>
+            {/* SECCIÓN 0: SKINS OFICIALES DE ARENA (ESTILO 8-BALL POOL & TORNEO) */}
+            <View style={s.section}>
+              <Text style={s.sectionTitle}>Skins Temáticas de Arena (Estilo Torneo)</Text>
+              <Text style={s.sectionDesc}>
+                Aplica sets completos de competición inspirados en los mejores salones del mundo:
+              </Text>
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={s.arenaSkinsScroll}>
+                {TABLE_ARENA_SKINS.map((skin) => {
+                  const isActive = preferences.activeSkinId === skin.id;
+                  return (
+                    <TouchableOpacity
+                      key={skin.id}
+                      style={[s.arenaSkinCard, isActive && s.arenaSkinCardActive]}
+                      onPress={() => onChangePreferences(applyArenaSkin(skin.id, preferences))}
+                      activeOpacity={0.8}>
+                      <View
+                        style={[
+                          s.arenaPreviewBox,
+                          {
+                            backgroundColor: skin.clothColor,
+                            borderColor: skin.accentGlow,
+                          },
+                        ]}>
+                        <View
+                          style={[
+                            s.arenaPreviewBorder,
+                            {
+                              borderColor:
+                                skin.woodFinish === 'ebony'
+                                  ? '#1e120c'
+                                  : skin.woodFinish === 'mahogany'
+                                  ? '#3b1812'
+                                  : '#3a2718',
+                            },
+                          ]}
+                        />
+                        <View
+                          style={[
+                            s.arenaPreviewCorner,
+                            {
+                              backgroundColor:
+                                skin.cornerMetal === 'gold_24k'
+                                  ? '#f59e0b'
+                                  : skin.cornerMetal === 'chrome'
+                                  ? '#cbd5e1'
+                                  : skin.cornerMetal === 'neon_cyan'
+                                  ? '#06b6d4'
+                                  : skin.cornerMetal === 'antique_bronze'
+                                  ? '#78350f'
+                                  : '#d97706',
+                            },
+                          ]}
+                        />
+                      </View>
+                      <Text style={[s.arenaSkinName, isActive && s.arenaSkinNameActive]}>
+                        {skin.name}
+                      </Text>
+                      <Text style={s.arenaSkinSub} numberOfLines={1}>
+                        {skin.subtitle}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
             {/* 1. SECCIÓN: COLOR & SKINS DEL PAÑO */}
             <View style={s.section}>
-              <Text style={s.sectionTitle}>1. Skin & Color del Paño</Text>
+              <Text style={s.sectionTitle}>1. Skin & Color del Paño Individual</Text>
               <Text style={s.sectionDesc}>
                 Elige un paño oficial de torneo o define tu propio color personalizado:
               </Text>
@@ -341,6 +416,149 @@ function TableCustomizerModalBase({
                 })}
               </View>
             </View>
+
+            {/* 6. SECCIÓN: CANTONERAS METÁLICAS DE ESQUINA */}
+            <View style={s.section}>
+              <Text style={s.sectionTitle}>6. Cantoneras Metálicas de Esquina</Text>
+              <Text style={s.sectionDesc}>
+                Herrajes de refuerzo pulidos con remaches estilo arcade de billar:
+              </Text>
+              <View style={s.woodRow}>
+                {(
+                  [
+                    { id: 'brass', label: 'Bronce', color: '#b45309' },
+                    { id: 'gold_24k', label: 'Oro 24K', color: '#f59e0b' },
+                    { id: 'chrome', label: 'Cromo', color: '#94a3b8' },
+                    { id: 'neon_cyan', label: 'Neón', color: '#06b6d4' },
+                    { id: 'antique_bronze', label: 'Antiguo', color: '#78350f' },
+                  ] as const
+                ).map((m) => {
+                  const isActive = preferences.cornerMetal === m.id;
+                  return (
+                    <Pressable
+                      key={m.id}
+                      style={[s.woodBtn, isActive && s.woodBtnActive]}
+                      onPress={() => update({ cornerMetal: m.id as CornerMetalStyle })}>
+                      <View style={[s.woodDot, { backgroundColor: m.color }]} />
+                      <Text style={[s.woodBtnText, isActive && s.woodBtnTextActive]}>
+                        {m.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* 7. SECCIÓN: EFECTOS VISUALES & ILUMINACIÓN DE TORNEO */}
+            <View style={s.section}>
+              <Text style={s.sectionTitle}>7. Iluminación Cenital & Atmósfera</Text>
+
+              <View style={s.switchRow}>
+                <View style={s.switchTextCol}>
+                  <Text style={s.switchLabel}>Foco Cenital de Torneo</Text>
+                  <Text style={s.switchSub}>
+                    Iluminación oval difusa sobre el paño inspirada en mesas de competición
+                  </Text>
+                </View>
+                <Switch
+                  value={preferences.showSpotlight}
+                  onValueChange={(val) => update({ showSpotlight: val })}
+                  trackColor={{ false: '#334155', true: '#059669' }}
+                  thumbColor={preferences.showSpotlight ? '#10b981' : '#cbd5e1'}
+                />
+              </View>
+            </View>
+
+            {/* 6. SECCIÓN: CALCOMANÍAS & MARCA DE AGUA DEL PAÑO (STICKERS / SKINS) */}
+            <View style={s.section}>
+              <View style={s.switchRow}>
+                <View style={s.switchTextCol}>
+                  <Text style={s.sectionTitle}>6. Calcomanía de Paño (Stickers / Decals)</Text>
+                  <Text style={s.switchSub}>
+                    Graba una ilustración o emblema central en el paño con efecto marca de agua
+                  </Text>
+                </View>
+                <Switch
+                  value={preferences.showTableDecal}
+                  onValueChange={(val) => update({ showTableDecal: val })}
+                  trackColor={{ false: '#334155', true: '#059669' }}
+                  thumbColor={preferences.showTableDecal ? '#10b981' : '#cbd5e1'}
+                />
+              </View>
+
+              {preferences.showTableDecal && (
+                <>
+                  <Text style={[s.sectionDesc, { marginTop: 10 }]}>
+                    Selecciona el diseño central para la mesa:
+                  </Text>
+
+                  <View style={s.decalGrid}>
+                    {TABLE_DECAL_DEFS.map((decal) => {
+                      const isSelected = preferences.tableDecal === decal.id;
+                      return (
+                        <TouchableOpacity
+                          key={decal.id}
+                          style={[s.decalCard, isSelected && s.decalCardActive]}
+                          onPress={() => update({ tableDecal: decal.id })}
+                          activeOpacity={0.75}>
+                          <View style={s.decalBadgeBox}>
+                            {decal.isImage && decal.imageSource ? (
+                              <Image
+                                source={decal.imageSource}
+                                style={s.decalThumbImage}
+                                resizeMode="contain"
+                              />
+                            ) : (
+                              <Text style={s.decalBadgeIcon}>{decal.badge}</Text>
+                            )}
+                          </View>
+                          <View style={s.decalInfo}>
+                            <Text style={[s.decalName, isSelected && s.decalNameActive]}>
+                              {decal.name}
+                            </Text>
+                            <Text style={s.decalDesc} numberOfLines={2}>
+                              {decal.description}
+                            </Text>
+                          </View>
+                          {isSelected && (
+                            <View style={s.decalCheckDot}>
+                              <IconCheck size={12} color="#0a100d" strokeWidth={3} />
+                            </View>
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  {/* Selector de Transparencia / Marca de Agua */}
+                  {preferences.tableDecal !== 'none' && (
+                    <View style={s.opacitySection}>
+                      <Text style={s.opacityTitle}>Intensidad de la Marca de Agua (Transparencia):</Text>
+                      <View style={s.opacityOptionsRow}>
+                        {[
+                          { label: 'Muy Sutil (10%)', val: 0.10 },
+                          { label: 'Marca de Agua (18%) ⭐', val: 0.18 },
+                          { label: 'Marcado (28%)', val: 0.28 },
+                          { label: 'Intenso (40%)', val: 0.40 },
+                        ].map((op) => {
+                          const isActive = Math.abs((preferences.decalOpacity ?? 0.18) - op.val) < 0.04;
+                          return (
+                            <TouchableOpacity
+                              key={op.val}
+                              style={[s.opacityBtn, isActive && s.opacityBtnActive]}
+                              onPress={() => update({ decalOpacity: op.val })}>
+                              <Text style={[s.opacityBtnText, isActive && s.opacityBtnTextActive]}>
+                                {op.label}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  )}
+                </>
+              )}
+            </View>
           </ScrollView>
 
           {/* Footer Actions */}
@@ -455,6 +673,61 @@ const s = StyleSheet.create({
     fontSize: 12,
     color: '#8aa196',
     lineHeight: 16,
+  },
+  arenaSkinsScroll: {
+    gap: 12,
+    paddingVertical: 4,
+  },
+  arenaSkinCard: {
+    width: 140,
+    backgroundColor: '#14231c',
+    borderRadius: 14,
+    padding: 10,
+    borderWidth: 1.5,
+    borderColor: '#1d3329',
+    alignItems: 'center',
+    gap: 6,
+  },
+  arenaSkinCardActive: {
+    borderColor: '#10b981',
+    backgroundColor: '#133526',
+  },
+  arenaPreviewBox: {
+    width: 110,
+    height: 60,
+    borderRadius: 8,
+    borderWidth: 2,
+    position: 'relative',
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  arenaPreviewBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderWidth: 4,
+    borderRadius: 6,
+  },
+  arenaPreviewCorner: {
+    position: 'absolute',
+    top: 2,
+    left: 2,
+    width: 10,
+    height: 10,
+    borderRadius: 2,
+  },
+  arenaSkinName: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#e2e8f0',
+    textAlign: 'center',
+  },
+  arenaSkinNameActive: {
+    color: '#34d399',
+  },
+  arenaSkinSub: {
+    fontSize: 10,
+    color: '#8aa196',
+    textAlign: 'center',
   },
   presetsGrid: {
     flexDirection: 'row',
@@ -722,6 +995,107 @@ const s = StyleSheet.create({
   },
   woodBtnTextActive: {
     color: '#f1f5f3',
+  },
+  decalGrid: {
+    gap: 8,
+    marginTop: 8,
+  },
+  decalCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#12231c',
+    borderWidth: 1,
+    borderColor: '#1e382d',
+    borderRadius: 12,
+    padding: 10,
+    gap: 12,
+  },
+  decalCardActive: {
+    borderColor: '#10b981',
+    backgroundColor: '#173327',
+  },
+  decalBadgeBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: '#0a1611',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#1e382d',
+    overflow: 'hidden',
+  },
+  decalThumbImage: {
+    width: 38,
+    height: 38,
+  },
+  decalBadgeIcon: {
+    fontSize: 20,
+  },
+  decalInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  decalName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#f1f5f3',
+  },
+  decalNameActive: {
+    color: '#34d399',
+  },
+  decalDesc: {
+    fontSize: 11,
+    color: '#94a39d',
+    lineHeight: 14,
+  },
+  decalCheckDot: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#10b981',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  opacitySection: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#0c1913',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#193328',
+    gap: 8,
+  },
+  opacityTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#cbd5e1',
+  },
+  opacityOptionsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  opacityBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: '#13241d',
+    borderWidth: 1,
+    borderColor: '#1e382d',
+  },
+  opacityBtnActive: {
+    backgroundColor: '#10b981',
+    borderColor: '#10b981',
+  },
+  opacityBtnText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#94a39d',
+  },
+  opacityBtnTextActive: {
+    color: '#0a100d',
+    fontWeight: '700',
   },
   footer: {
     flexDirection: 'row',

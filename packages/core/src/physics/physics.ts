@@ -121,22 +121,47 @@ export function checkCushionCollision(
     return null;
 }
 
+export function computeCushionSpinImpulse(
+    spin: Vec2,
+    normal: Vec2,
+    normalSpeed: number
+): Vec2 {
+    const factor = PHYSICS.englishBounceFactor;
+    const sideSpin = spin.x; // +1 right/horario, -1 left/antihorario
+    const magnitude = Math.abs(normalSpeed) * factor * sideSpin;
+
+    if (normal.x > 0.5) {
+        // Left cushion (normal points right: +x)
+        return vec2(0, -magnitude);
+    } else if (normal.x < -0.5) {
+        // Right cushion (normal points left: -x)
+        return vec2(0, magnitude);
+    } else if (normal.y > 0.5) {
+        // Top cushion (normal points down: +y)
+        return vec2(magnitude, 0);
+    } else if (normal.y < -0.5) {
+        // Bottom cushion (normal points up: -y)
+        return vec2(-magnitude, 0);
+    }
+    return vec2(0, 0);
+}
+
 export function resolveCushionCollision(ball: Ball, normal: Vec2): Ball {
     const dot = vec2Dot(ball.vel, normal);
     const reflected = vec2Sub(ball.vel, vec2Scale(normal, 2 * dot));
     const newVel = vec2Scale(reflected, PHYSICS.cushionRestitution);
 
-    const tangent = vec2(-normal.y, normal.x);
-    const spinForce = vec2Length(ball.spin) * 1.8;
-    const spinDirection = vec2Normalize(ball.spin);
-    const spinInfluence = vec2Scale(tangent, vec2Dot(spinDirection, tangent) * spinForce);
+    // Apply spin English impulse along the cushion rail
+    const spinImpulse = computeCushionSpinImpulse(ball.spin, normal, dot);
+    const finalVel = vec2Add(newVel, spinImpulse);
 
-    const finalVel = vec2Add(newVel, spinInfluence);
+    // Cushion consumes part of the side spin
+    const remainingSpin = vec2(ball.spin.x * 0.70, ball.spin.y * 0.85);
 
     return {
         ...ball,
         vel: finalVel,
-        spin: vec2Scale(ball.spin, 0.6),
+        spin: remainingSpin,
     };
 }
 
@@ -145,26 +170,63 @@ export function checkBallCollision(b1: Ball, b2: Ball): boolean {
     return distance < b1.radius + b2.radius;
 }
 
+export function applyLongitudinalSpinAfterCollision(
+    cueBall: Ball,
+    targetBall: Ball,
+    normal: Vec2,
+    impulseMagnitude: number
+): Ball {
+    const longitudinalSpin = cueBall.spin.y; // +1 = corrido (follow), -1 = retroceso (draw)
+    if (Math.abs(longitudinalSpin) < 0.05) return cueBall;
+
+    if (longitudinalSpin > 0) {
+        // Corrido (Follow / Topspin): empuja hacia adelante a lo largo del vector de impacto
+        const followBoost = vec2Scale(normal, longitudinalSpin * impulseMagnitude * 0.38);
+        return {
+            ...cueBall,
+            vel: vec2Add(cueBall.vel, followBoost),
+            spin: vec2(cueBall.spin.x * 0.75, cueBall.spin.y * 0.40),
+        };
+    } else {
+        // Retroceso (Draw / Backspin): frena y muerde el paño hacia atrás (-normal)
+        const drawPull = vec2Scale(normal, longitudinalSpin * impulseMagnitude * 0.55); // longitudinalSpin es negativo
+        return {
+            ...cueBall,
+            vel: vec2Add(cueBall.vel, drawPull),
+            spin: vec2(cueBall.spin.x * 0.75, cueBall.spin.y * 0.30),
+        };
+    }
+}
+
 export function resolveBallCollision(b1: Ball, b2: Ball): [Ball, Ball] {
     const normal = vec2Normalize(vec2Sub(b2.pos, b1.pos));
     const relVel = vec2Sub(b1.vel, b2.vel);
     const velAlongNormal = vec2Dot(relVel, normal);
 
-    if (velAlongNormal > 0) return [b1, b2];
+    // Si velAlongNormal <= 0, las bolas ya se están alejando entre sí
+    if (velAlongNormal <= 0) return [b1, b2];
 
     const impulse = vec2Scale(normal, velAlongNormal * PHYSICS.ballRestitution);
 
-    const newB1Vel = vec2Sub(b1.vel, impulse);
+    let newB1Vel = vec2Sub(b1.vel, impulse);
     const newB2Vel = vec2Add(b2.vel, impulse);
+
+    // Apply spin reactions for draw / follow if either ball has longitudinal spin
+    let b1Result: Ball = {
+        ...b1,
+        vel: newB1Vel,
+    };
+    if (Math.abs(b1.spin.y) > 0.05) {
+        b1Result = applyLongitudinalSpinAfterCollision(b1Result, b2, normal, Math.abs(velAlongNormal));
+    }
 
     const overlap = b1.radius + b2.radius - vec2Distance(b1.pos, b2.pos);
     const separation = vec2Scale(normal, overlap / 2);
 
     return [
         {
-            ...b1,
+            ...b1Result,
             pos: vec2Sub(b1.pos, separation),
-            vel: newB1Vel,
         },
         {
             ...b2,
@@ -182,7 +244,7 @@ export function applyShot(
 ): Ball {
     const normalizedDir = vec2Normalize(direction);
     const velocity = vec2Scale(normalizedDir, power);
-    const spinVec = vec2Scale(vec2(spin.x, spin.y), spin.magnitude);
+    const spinVec = vec2(spin.x * spin.magnitude, spin.y * spin.magnitude);
 
     return {
         ...ball,
@@ -199,154 +261,101 @@ export function simulateStep(
     let updatedBalls = balls.map((b) => ({ ...b }));
     
     const SUBSTEPS = 8;
-    const FRICTION = 0.992;
-    const CUSHION_RESTITUTION = 0.90;
+    const FRICTION = PHYSICS.friction;
 
-    // Simulate with substeps for consistency with predictTrajectory
+    // Simulate with substeps for consistency and tunneling prevention
     for (let sub = 0; sub < SUBSTEPS; sub++) {
-        // Update positions
+        // 1. Update ball positions and check cushion bounds
         for (let i = 0; i < updatedBalls.length; i++) {
             const ball = updatedBalls[i];
             if (!isBallMoving(ball)) continue;
 
-            // Move ball (velocity divided by substeps)
-            updatedBalls[i] = {
-                ...ball,
-                pos: {
-                    x: ball.pos.x + ball.vel.x / SUBSTEPS,
-                    y: ball.pos.y + ball.vel.y / SUBSTEPS,
-                },
+            const nextPos = {
+                x: ball.pos.x + ball.vel.x / SUBSTEPS,
+                y: ball.pos.y + ball.vel.y / SUBSTEPS,
             };
 
-            // Cushion collisions
             const minX = ball.radius;
             const maxX = table.width - ball.radius;
             const minY = ball.radius;
             const maxY = table.height - ball.radius;
 
-            let newVel = { ...updatedBalls[i].vel };
-            let newPos = { ...updatedBalls[i].pos };
+            let normal: Vec2 | null = null;
+            let side: 'left' | 'right' | 'top' | 'bottom' | null = null;
+            const clampedPos = { ...nextPos };
 
-            if (newPos.x < minX) {
-                newPos.x = minX;
-                newVel.x = -newVel.x * CUSHION_RESTITUTION;
-                events.push({
-                    type: 'cushion',
-                    timestamp: 0,
-                    data: {
-                        position: { x: minX, y: newPos.y },
-                        normal: vec2(1, 0),
-                        timestamp: 0,
-                    },
-                });
-            }
-            if (newPos.x > maxX) {
-                newPos.x = maxX;
-                newVel.x = -newVel.x * CUSHION_RESTITUTION;
-                events.push({
-                    type: 'cushion',
-                    timestamp: 0,
-                    data: {
-                        position: { x: maxX, y: newPos.y },
-                        normal: vec2(-1, 0),
-                        timestamp: 0,
-                    },
-                });
-            }
-            if (newPos.y < minY) {
-                newPos.y = minY;
-                newVel.y = -newVel.y * CUSHION_RESTITUTION;
-                events.push({
-                    type: 'cushion',
-                    timestamp: 0,
-                    data: {
-                        position: { x: newPos.x, y: minY },
-                        normal: vec2(0, 1),
-                        timestamp: 0,
-                    },
-                });
-            }
-            if (newPos.y > maxY) {
-                newPos.y = maxY;
-                newVel.y = -newVel.y * CUSHION_RESTITUTION;
-                events.push({
-                    type: 'cushion',
-                    timestamp: 0,
-                    data: {
-                        position: { x: newPos.x, y: maxY },
-                        normal: vec2(0, -1),
-                        timestamp: 0,
-                    },
-                });
+            if (nextPos.x <= minX) {
+                clampedPos.x = minX;
+                normal = vec2(1, 0);
+                side = 'left';
+            } else if (nextPos.x >= maxX) {
+                clampedPos.x = maxX;
+                normal = vec2(-1, 0);
+                side = 'right';
+            } else if (nextPos.y <= minY) {
+                clampedPos.y = minY;
+                normal = vec2(0, 1);
+                side = 'top';
+            } else if (nextPos.y >= maxY) {
+                clampedPos.y = maxY;
+                normal = vec2(0, -1);
+                side = 'bottom';
             }
 
-            updatedBalls[i] = {
-                ...updatedBalls[i],
-                pos: newPos,
-                vel: newVel,
-            };
+            if (normal && side) {
+                const resolved = resolveCushionCollision({ ...ball, pos: clampedPos }, normal);
+                updatedBalls[i] = resolved;
+
+                events.push({
+                    type: 'cushion',
+                    timestamp: 0,
+                    data: {
+                        ballId: ball.id,
+                        side,
+                        position: { x: clampedPos.x, y: clampedPos.y },
+                        normal,
+                        timestamp: 0,
+                    },
+                });
+            } else {
+                updatedBalls[i] = {
+                    ...ball,
+                    pos: clampedPos,
+                };
+            }
         }
 
-        // Ball-to-ball collisions
+        // 2. Ball-to-ball collisions
         for (let i = 0; i < updatedBalls.length; i++) {
             for (let j = i + 1; j < updatedBalls.length; j++) {
                 const b1 = updatedBalls[i];
                 const b2 = updatedBalls[j];
                 const dx = b2.pos.x - b1.pos.x;
                 const dy = b2.pos.y - b1.pos.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
+                const dist = Math.hypot(dx, dy);
                 const minDist = b1.radius + b2.radius;
 
-                if (dist < minDist && dist > 0) {
-                    // Resolve overlap
-                    const overlap = minDist - dist;
-                    const nx = dx / dist;
-                    const ny = dy / dist;
+                if (dist < minDist && dist > 0.001) {
+                    const [res1, res2] = resolveBallCollision(b1, b2);
+                    updatedBalls[i] = res1;
+                    updatedBalls[j] = res2;
 
-                    const newB1Pos = {
-                        x: b1.pos.x - nx * overlap * 0.5,
-                        y: b1.pos.y - ny * overlap * 0.5,
-                    };
-                    const newB2Pos = {
-                        x: b2.pos.x + nx * overlap * 0.5,
-                        y: b2.pos.y + ny * overlap * 0.5,
-                    };
-
-                    // Elastic collision - momentum transfer
-                    const kx = b1.vel.x - b2.vel.x;
-                    const ky = b1.vel.y - b2.vel.y;
-                    const p = nx * kx + ny * ky;
-
-                    if (p > 0) {
-                        const newB1Vel = {
-                            x: b1.vel.x - nx * p,
-                            y: b1.vel.y - ny * p,
-                        };
-                        const newB2Vel = {
-                            x: b2.vel.x + nx * p,
-                            y: b2.vel.y + ny * p,
-                        };
-
-                        updatedBalls[i] = { ...b1, pos: newB1Pos, vel: newB1Vel };
-                        updatedBalls[j] = { ...b2, pos: newB2Pos, vel: newB2Vel };
-
-                        events.push({
-                            type: 'ball_collision',
+                    events.push({
+                        type: 'ball_collision',
+                        timestamp: 0,
+                        data: {
+                            ball1: b1.id,
+                            ball2: b2.id,
+                            position: { x: (b1.pos.x + b2.pos.x) / 2, y: (b1.pos.y + b2.pos.y) / 2 },
                             timestamp: 0,
-                            data: {
-                                ball1: b1.id,
-                                ball2: b2.id,
-                                position: newB1Pos,
-                                timestamp: 0,
-                            },
-                        });
-                    }
+                        },
+                    });
                 }
             }
         }
     }
 
-    // Apply friction once per step
+    // 3. Apply cloth friction and spin decay once per full step
     for (let i = 0; i < updatedBalls.length; i++) {
         updatedBalls[i] = {
             ...updatedBalls[i],
@@ -362,10 +371,20 @@ export function simulateShot(
     initialBalls: Ball[],
     maxIterations: number = PHYSICS.maxIterations,
     table: TableDimensions = DEFAULT_TABLE
-): { finalBalls: Ball[]; events: ShotEvent[] } {
+): {
+    finalBalls: Ball[];
+    events: ShotEvent[];
+    trails: Record<BallId, { pos: Vec2; timestamp: number }[]>;
+} {
     let balls = initialBalls.map((b) => ({ ...b }));
     const allEvents: ShotEvent[] = [];
     let iterations = 0;
+
+    const trails: Record<BallId, { pos: Vec2; timestamp: number }[]> = {
+        white: [{ pos: { ...balls.find((b) => b.id === 'white')?.pos ?? vec2(0, 0) }, timestamp: 0 }],
+        yellow: [{ pos: { ...balls.find((b) => b.id === 'yellow')?.pos ?? vec2(0, 0) }, timestamp: 0 }],
+        red: [{ pos: { ...balls.find((b) => b.id === 'red')?.pos ?? vec2(0, 0) }, timestamp: 0 }],
+    };
 
     while (iterations < maxIterations) {
         const anyMoving = balls.some((b) => isBallMoving(b));
@@ -374,8 +393,14 @@ export function simulateShot(
         const { balls: newBalls, events } = simulateStep(balls, table);
         balls = newBalls;
         allEvents.push(...events);
+
+        for (const b of balls) {
+            trails[b.id].push({ pos: { ...b.pos }, timestamp: iterations });
+        }
+
         iterations++;
     }
 
-    return { finalBalls: balls, events: allEvents };
+    return { finalBalls: balls, events: allEvents, trails };
 }
+

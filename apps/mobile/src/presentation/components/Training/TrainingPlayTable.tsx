@@ -1,8 +1,9 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import Svg, { Circle, Defs, G, Line, LinearGradient, Path, Polygon, RadialGradient, Rect, Stop, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, Defs, G, Line, LinearGradient, Path, Polygon, RadialGradient, Rect, Stop, Text as SvgText, Image as SvgImage } from 'react-native-svg';
 
 import { resolveBilliardPhysics } from './billiardPhysics';
+import { SKULL_DECAL_SOURCE } from './tableDecals';
 import {
   type TablePreferences,
   type DiamondShape,
@@ -81,6 +82,9 @@ function TrainingPlayTableBase({
   const activeShowGrid = effectivePrefs?.showGrid ?? showGrid;
   const activeShowNumbers = effectivePrefs?.showDiamondNumbers ?? showDiamondNumbers;
   const activeWoodFinish = effectivePrefs?.woodFinish ?? woodFinish;
+  const activeShowTableDecal = effectivePrefs?.showTableDecal ?? true;
+  const activeTableDecal = effectivePrefs?.tableDecal ?? 'tournament_crest';
+  const activeDecalOpacity = effectivePrefs?.decalOpacity ?? 0.18;
 
   const clothPalette = useMemo(() => resolveClothPalette(activeClothColor), [activeClothColor]);
   const woodPalette = useMemo(() => resolveWoodPalette(activeWoodFinish), [activeWoodFinish]);
@@ -429,6 +433,82 @@ function TrainingPlayTableBase({
           strokeWidth={1.2}
           opacity={0.6}
         />
+
+        {/* Table Decal / Watermark on Cloth */}
+        {activeShowTableDecal && activeTableDecal !== 'none' && (() => {
+          const centerX = PLAY_OFFSET_X + TABLE_W / 2;
+          const centerY = PLAY_OFFSET_Y + TABLE_H / 2;
+          const minDim = Math.min(TABLE_W, TABLE_H);
+
+          if (activeTableDecal === 'skull') {
+            const decalSize = minDim * 0.78;
+            return (
+              <SvgImage
+                key="training-decal-skull"
+                href={SKULL_DECAL_SOURCE}
+                x={centerX - decalSize / 2}
+                y={centerY - decalSize / 2}
+                width={decalSize}
+                height={decalSize}
+                opacity={activeDecalOpacity}
+                preserveAspectRatio="xMidYMid meet"
+              />
+            );
+          }
+
+          if (activeTableDecal === 'crown_filigree') {
+            return (
+              <G key="training-decal-crown" opacity={activeDecalOpacity} transform={`translate(${centerX}, ${centerY})`}>
+                <Path
+                  d="M -22 10 L 22 10 L 25 -8 L 12 0 L 0 -16 L -12 0 L -25 -8 Z"
+                  fill="none"
+                  stroke="#fbbf24"
+                  strokeWidth={1.2}
+                />
+                <Circle cx={0} cy={-16} r={2} fill="#fbbf24" />
+                <Circle cx={-25} cy={-8} r={1.6} fill="#fbbf24" />
+                <Circle cx={25} cy={-8} r={1.6} fill="#fbbf24" />
+                <Circle cx={0} cy={2} r={3} fill="#fbbf24" opacity={0.6} />
+                <Circle cx={0} cy={0} r={28} fill="none" stroke="#fbbf24" strokeWidth={0.6} strokeDasharray="3 3" />
+              </G>
+            );
+          }
+
+          if (activeTableDecal === 'cyber_rings') {
+            return (
+              <G key="training-decal-cyber" opacity={activeDecalOpacity} transform={`translate(${centerX}, ${centerY})`}>
+                <Circle cx={0} cy={0} r={32} fill="none" stroke="#22d3ee" strokeWidth={0.8} />
+                <Circle cx={0} cy={0} r={28} fill="none" stroke="#06b6d4" strokeWidth={0.5} strokeDasharray="4 2" />
+                <Circle cx={0} cy={0} r={20} fill="none" stroke="#22d3ee" strokeWidth={0.6} />
+                <Line x1={-36} y1={0} x2={36} y2={0} stroke="#22d3ee" strokeWidth={0.6} />
+                <Line x1={0} y1={-36} x2={0} y2={36} stroke="#22d3ee" strokeWidth={0.6} />
+              </G>
+            );
+          }
+
+          if (activeTableDecal === 'classic_carom') {
+            return (
+              <G key="training-decal-classic" opacity={activeDecalOpacity} transform={`translate(${centerX}, ${centerY})`}>
+                <Circle cx={0} cy={-8} r={6} fill="none" stroke="#ffffff" strokeWidth={1} />
+                <Circle cx={-8} cy={6} r={6} fill="none" stroke="#fef08a" strokeWidth={1} />
+                <Circle cx={8} cy={6} r={6} fill="none" stroke="#fca5a5" strokeWidth={1} />
+                <Circle cx={0} cy={0} r={22} fill="none" stroke="#ffffff" strokeWidth={0.5} strokeDasharray="2 2" />
+              </G>
+            );
+          }
+
+          return (
+            <G key="training-decal-crest" opacity={activeDecalOpacity} transform={`translate(${centerX}, ${centerY})`}>
+              <Circle cx={0} cy={0} r={18} fill="none" stroke="#ffffff" strokeWidth={0.7} />
+              <Circle cx={0} cy={0} r={16.5} fill="none" stroke="#ffffff" strokeWidth={0.4} strokeDasharray="2 2" />
+              <Line x1={-12} y1={-12} x2={12} y2={12} stroke="#ffffff" strokeWidth={0.8} />
+              <Line x1={-12} y1={12} x2={12} y2={-12} stroke="#ffffff" strokeWidth={0.8} />
+              <Circle cx={0} cy={-5} r={2.2} fill="#ffffff" />
+              <Circle cx={-4.5} cy={4} r={2.2} fill="#ffffff" />
+              <Circle cx={4.5} cy={4} r={2.2} fill="#ffffff" />
+            </G>
+          );
+        })()}
 
         {/* 8x4 Carom Diamond Aiming Grid (Module of 35.5cm squares) */}
         {activeShowGrid && (

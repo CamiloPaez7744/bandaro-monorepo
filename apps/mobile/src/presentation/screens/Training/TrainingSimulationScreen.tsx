@@ -3,7 +3,21 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { IconPencil, IconTarget, IconRefresh, IconX, IconCircle, IconBolt, IconTargetArrow, IconRuler2, IconNumbers, IconPlayerPlay, IconLoader2 } from '@tabler/icons-react-native';
+import {
+    IconPencil,
+    IconTarget,
+    IconRefresh,
+    IconX,
+    IconCircle,
+    IconBolt,
+    IconTargetArrow,
+    IconRuler2,
+    IconNumbers,
+    IconPlayerPlay,
+    IconLoader2,
+    IconPalette,
+    IconTrash,
+} from '@/src/presentation/components/icons';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { useI18n } from '@/components/useLanguage';
@@ -11,6 +25,16 @@ import { getPalette, theme } from '@/constants/theme';
 import { EffectBallSelector } from '@/src/presentation/components/Training/EffectBallSelector';
 import { InteractiveBilliardsTable } from '@/src/presentation/components/Training/InteractiveBilliardsTable';
 import { SystemNumberingControl, NumberAnchor, Formula } from '@/src/presentation/components/Training/SystemNumberingControl';
+import { TableCustomizerModal } from '@/src/presentation/components/Training/TableCustomizerModal';
+import { CaromRefereeBanner } from '@/src/presentation/components/Training/CaromRefereeBanner';
+import { CaromPowerMeter } from '@/src/presentation/components/Training/CaromPowerMeter';
+import { CaromAimFineTuner } from '@/src/presentation/components/Training/CaromAimFineTuner';
+import {
+    DEFAULT_TABLE_PREFERENCES,
+    loadTablePreferences,
+    saveTablePreferences,
+    type TablePreferences,
+} from '@/src/presentation/components/Training/tablePreferences';
 import { useTrainingSimulation } from '@/src/presentation/hooks/useTrainingSimulation';
 import { getTrainingSystemById } from '@/src/presentation/screens/Training/trainingData';
 import { container } from '@/src/presentation/container';
@@ -83,7 +107,17 @@ const sidebarStyles = StyleSheet.create({
 // eslint-disable-next-line sonarjs/cognitive-complexity
 export function TrainingSimulationScreen() {
     const router = useRouter();
-    const params = useLocalSearchParams<{ systemId: string; snapshotId: string }>();
+    const params = useLocalSearchParams<{
+        systemId?: string;
+        snapshotId?: string;
+        customName?: string;
+        whiteX?: string;
+        whiteY?: string;
+        yellowX?: string;
+        yellowY?: string;
+        redX?: string;
+        redY?: string;
+    }>();
     const insets = useSafeAreaInsets();
     const { width } = useWindowDimensions();
     const { t } = useI18n();
@@ -109,6 +143,14 @@ export function TrainingSimulationScreen() {
     }, [params.snapshotId]);
 
     const initialPositions = useMemo(() => {
+        if (params.whiteX && params.whiteY) {
+            return {
+                white: vec2(Number(params.whiteX) || 50, Number(params.whiteY) || 71),
+                yellow: vec2(Number(params.yellowX) || 142, Number(params.yellowY) || 71),
+                red: vec2(Number(params.redX) || 220, Number(params.redY) || 71),
+            };
+        }
+
         if (snapshotBalls && snapshotBalls.length > 0) {
             const balls = snapshotToBalls(snapshotBalls);
             const result: { white: Vec2; yellow: Vec2; red: Vec2 } = {
@@ -135,7 +177,7 @@ export function TrainingSimulationScreen() {
             yellow: vec2(pos.yellow.x, pos.yellow.y),
             red: vec2(pos.red.x, pos.red.y),
         };
-    }, [system, snapshotBalls]);
+    }, [system, snapshotBalls, params.whiteX, params.whiteY, params.yellowX, params.yellowY, params.redX, params.redY]);
 
     const {
         state,
@@ -143,11 +185,25 @@ export function TrainingSimulationScreen() {
         setCueBall,
         setSpin,
         setPowerLevel,
+        setPowerPercentage,
         setAimDirection,
         updateTrajectory,
         executeShot,
         resetBalls,
+        clearTrails,
     } = useTrainingSimulation(initialPositions);
+
+    const [tablePreferences, setTablePreferences] = useState<TablePreferences>(DEFAULT_TABLE_PREFERENCES);
+    const [showCustomizer, setShowCustomizer] = useState(false);
+
+    useEffect(() => {
+        loadTablePreferences().then(setTablePreferences).catch(() => {});
+    }, []);
+
+    const handlePreferencesChange = useCallback((newPrefs: TablePreferences) => {
+        setTablePreferences(newPrefs);
+        saveTablePreferences(newPrefs).catch(() => {});
+    }, []);
 
     // Reset balls when snapshot loads asynchronously
     useEffect(() => {
@@ -159,7 +215,7 @@ export function TrainingSimulationScreen() {
     const [tableOrientation, setTableOrientation] = useState<Orientation>(
         width >= 900 ? 'horizontal' : 'vertical'
     );
-    const [isEditMode, setIsEditMode] = useState(false);
+    const [isEditMode, setIsEditMode] = useState(!params.systemId);
     const [showGuides, setShowGuides] = useState(true);
     const [showRuler, setShowRuler] = useState(false);
     const [activePanel, setActivePanel] = useState<ActivePanel>('none');
@@ -243,7 +299,7 @@ export function TrainingSimulationScreen() {
         outputRange: [0.95, 1],
     });
 
-    if (!system && !params.snapshotId) {
+    if (params.systemId && !system) {
         return (
             <View style={[styles.notFound, { paddingTop: insets.top + theme.spacing.lg }]}>
                 <Text style={styles.notFoundTitle}>Sistema no encontrado</Text>
@@ -266,7 +322,9 @@ export function TrainingSimulationScreen() {
                 ]}>
                 
                 <View style={styles.headerRow}>
-                    <Text style={styles.title}>{system?.name ?? 'Snapshot'}</Text>
+                    <Text style={styles.title}>
+                        {system?.name ?? params.customName ?? (params.snapshotId ? 'Snapshot' : 'Simulador Libre de Carambola')}
+                    </Text>
                     <View style={styles.headerButtonsRow}>
                         <TouchableOpacity
                             style={[
@@ -310,6 +368,12 @@ export function TrainingSimulationScreen() {
                             ) : (
                                 <IconTarget size={18} color={palette.primary} strokeWidth={2} />
                             )}
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.iconButton, { backgroundColor: `${palette.primary}22` }]}
+                            onPress={() => setShowCustomizer(true)}
+                            disabled={state.isSimulating}>
+                            <IconPalette size={18} color={palette.primary} strokeWidth={2} />
                         </TouchableOpacity>
                         <TouchableOpacity
                             style={[styles.iconButton, { backgroundColor: `${palette.primary}22` }]}
@@ -365,75 +429,113 @@ export function TrainingSimulationScreen() {
                     </View>
 
                     <View style={styles.tablePane}>
-                        <View style={styles.tableWrap}>
-                            <InteractiveBilliardsTable
-                                orientation={tableOrientation}
-                                style={styles.tableStage}
-                                balls={state.balls}
-                                cueBallId={state.cueBallId}
-                                trajectory={state.trajectory}
-                                onBallMove={handleBallMove}
-                                onAimChange={handleAimChange}
-                                isSimulating={state.isSimulating}
-                                isEditMode={isEditMode}
-                                showGuides={showGuides}
-                                showRuler={showRuler}
-                                numberingAnchors={numberingAnchors}
-                                numberingFormula={numberingFormula}
-                                showNumbering={showNumbering}
-                                onNumberingAnchorsChange={setNumberingAnchors}
-                            />
+                        {/* HUD Oficial de Torneo UMB y Árbitro de 3 Bandas */}
+                        <CaromRefereeBanner
+                            validation={state.validation}
+                            isSimulating={state.isSimulating}
+                            cushionCountLive={state.liveCushionCount}
+                            ballHitsLive={state.liveBallHits}
+                            onDismiss={clearTrails}
+                        />
+
+                        {/* Escenario de Mesa y Medidor de Potencia Dockeado */}
+                        <View style={styles.tableWithPowerRow}>
+                            <View style={styles.tableWrap}>
+                                <InteractiveBilliardsTable
+                                    orientation={tableOrientation}
+                                    style={styles.tableStage}
+                                    balls={state.balls}
+                                    cueBallId={state.cueBallId}
+                                    trajectory={state.trajectory}
+                                    dynamicTrails={state.dynamicTrails ?? undefined}
+                                    aimDirection={state.aimDirection}
+                                    powerLevel={state.powerPercentage}
+                                    tablePreferences={tablePreferences}
+                                    showCueStick={true}
+                                    showGhostBall={true}
+                                    onBallMove={handleBallMove}
+                                    onAimChange={handleAimChange}
+                                    onPowerChange={setPowerPercentage}
+                                    onShoot={(power) => executeShot(power)}
+                                    isSimulating={state.isSimulating}
+                                    isEditMode={isEditMode}
+                                    showGuides={showGuides}
+                                    showRuler={showRuler}
+                                    numberingAnchors={numberingAnchors}
+                                    numberingFormula={numberingFormula}
+                                    showNumbering={showNumbering}
+                                    onNumberingAnchorsChange={setNumberingAnchors}
+                                />
+                            </View>
+
+                            <View style={styles.powerMeterContainer}>
+                                <CaromPowerMeter
+                                    powerLevel={state.powerPercentage}
+                                    onPowerChange={setPowerPercentage}
+                                    onShoot={(power) => executeShot(power)}
+                                    disabled={state.isSimulating}
+                                />
+                            </View>
                         </View>
 
-                        {state.validation ? (
-                            <View
-                                style={[
-                                    styles.validationCard,
-                                    {
-                                        backgroundColor: state.validation.isValid ? `${palette.primary}15` : '#fef2f2',
-                                        borderColor: state.validation.isValid ? palette.primary : '#ef4444',
-                                    },
-                                ]}>
-                                <Text
-                                    style={[
-                                        styles.validationText,
-                                        {
-                                            color: state.validation.isValid ? palette.primary : '#991b1b',
-                                        },
-                                    ]}>
-                                    {state.validation.reason}
-                                </Text>
-                            </View>
-                        ) : null}
-
                         <View style={styles.actionBar}>
-                            <TouchableOpacity
-                                style={[
-                                    styles.guideToggle,
-                                    {
-                                        backgroundColor: showGuides ? palette.primary : `${palette.primary}22`,
-                                    },
-                                ]}
-                                onPress={() => setShowGuides((prev) => !prev)}>
-                                <Text style={{ fontSize: 11, color: showGuides ? '#fff' : palette.primary, fontWeight: '700' }}>
-                                    {showGuides ? 'Guías ON' : 'Guías OFF'}
-                                </Text>
-                            </TouchableOpacity>
+                            {/* Dial milimétrico de puntería */}
+                            <CaromAimFineTuner
+                                aimDirection={state.aimDirection}
+                                onAimChange={handleAimChange}
+                                disabled={state.isSimulating}
+                            />
 
-                            <TouchableOpacity
-                                style={[
-                                    styles.executeButton,
-                                    state.isSimulating && styles.executeButtonDisabled,
-                                    { backgroundColor: palette.primary },
-                                ]}
-                                onPress={executeShot}
-                                disabled={state.isSimulating}>
-                                {state.isSimulating ? (
-                                    <IconLoader2 size={16} color="#fff" strokeWidth={2.5} />
-                                ) : (
-                                    <IconPlayerPlay size={16} color="#fff" strokeWidth={2.5} />
+                            <View style={styles.actionButtonsRight}>
+                                {state.dynamicTrails && (
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.guideToggle,
+                                            {
+                                                backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                                                borderWidth: 1,
+                                                borderColor: 'rgba(239, 68, 68, 0.35)',
+                                                flexDirection: 'row',
+                                                alignItems: 'center',
+                                                gap: 4,
+                                            },
+                                        ]}
+                                        onPress={clearTrails}>
+                                        <IconTrash size={14} color="#ef4444" strokeWidth={2} />
+                                        <Text style={{ fontSize: 11, color: '#ef4444', fontWeight: '700' }}>
+                                            Trazas
+                                        </Text>
+                                    </TouchableOpacity>
                                 )}
-                            </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={[
+                                        styles.guideToggle,
+                                        {
+                                            backgroundColor: showGuides ? palette.primary : `${palette.primary}22`,
+                                        },
+                                    ]}
+                                    onPress={() => setShowGuides((prev) => !prev)}>
+                                    <Text style={{ fontSize: 11, color: showGuides ? '#fff' : palette.primary, fontWeight: '700' }}>
+                                        {showGuides ? 'Guías ON' : 'Guías OFF'}
+                                    </Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={[
+                                        styles.executeButton,
+                                        state.isSimulating && styles.executeButtonDisabled,
+                                        { backgroundColor: palette.primary },
+                                    ]}
+                                    onPress={() => executeShot()}
+                                    disabled={state.isSimulating}>
+                                    {state.isSimulating ? (
+                                        <IconLoader2 size={16} color="#fff" strokeWidth={2.5} />
+                                    ) : (
+                                        <IconPlayerPlay size={16} color="#fff" strokeWidth={2.5} />
+                                    )}
+                                </TouchableOpacity>
+                            </View>
                         </View>
                     </View>
 
@@ -603,6 +705,14 @@ export function TrainingSimulationScreen() {
                         </Animated.View>
                     )}
                 </View>
+
+                {/* Modal de Personalización de Mesa y Skins */}
+                <TableCustomizerModal
+                    visible={showCustomizer}
+                    preferences={tablePreferences}
+                    onClose={() => setShowCustomizer(false)}
+                    onChangePreferences={handlePreferencesChange}
+                />
             </View>
         </GestureHandlerRootView>
     );
@@ -688,10 +798,23 @@ const getStyles = (palette: ReturnType<typeof getPalette>) =>
             flex: 1,
             gap: 8,
         },
+        tableWithPowerRow: {
+            flex: 1,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+            overflow: 'visible',
+        },
         tableWrap: {
             borderRadius: 18,
-            overflow: 'hidden',
+            overflow: 'visible',
             flex: 1,
+            height: '100%',
+        },
+        powerMeterContainer: {
+            justifyContent: 'center',
+            alignItems: 'center',
+            paddingVertical: 4,
         },
         tableStage: {
             width: '100%',
@@ -711,6 +834,14 @@ const getStyles = (palette: ReturnType<typeof getPalette>) =>
             flexDirection: 'row',
             gap: 8,
             alignItems: 'center',
+            justifyContent: 'space-between',
+        },
+        actionButtonsRight: {
+            flexDirection: 'row',
+            gap: 8,
+            alignItems: 'center',
+            flex: 1,
+            justifyContent: 'flex-end',
         },
         guideToggle: {
             borderRadius: 999,

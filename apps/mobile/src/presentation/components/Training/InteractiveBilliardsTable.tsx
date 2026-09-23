@@ -1,7 +1,8 @@
 import { memo, useCallback, useMemo, useRef, useState, useEffect } from 'react';
-import { StyleSheet, View, Text, type StyleProp, type ViewStyle, PanResponder, GestureResponderEvent } from 'react-native';
-import Svg, { Circle, Defs, G, Line, LinearGradient, Polygon, Polyline, RadialGradient, Rect, Stop } from 'react-native-svg';
-import { IconHandClick, IconTarget } from '@tabler/icons-react-native';
+import { StyleSheet, View, Text, type StyleProp, type ViewStyle, PanResponder, GestureResponderEvent, Platform } from 'react-native';
+import Svg, { Circle, Defs, G, Line, LinearGradient, Polygon, Polyline, RadialGradient, Rect, Stop, Path, Image as SvgImage } from 'react-native-svg';
+import { IconHandClick, IconTarget } from '@/src/presentation/components/icons';
+import { SKULL_DECAL_SOURCE } from './tableDecals';
 
 import {
     Ball,
@@ -15,6 +16,14 @@ import {
 } from '@bandaro/core';
 import { CushionRuler } from './CushionRuler';
 import { SystemNumberingOverlay, NumberAnchor, Formula } from './SystemNumberingOverlay';
+import {
+    DEFAULT_TABLE_PREFERENCES,
+    resolveClothPalette,
+    resolveWoodPalette,
+    resolveCornerMetalPalette,
+    type TablePreferences,
+} from './tablePreferences';
+import { CaromCueGadget } from './CaromCueGadget';
 
 type Orientation = 'horizontal' | 'vertical';
 
@@ -24,6 +33,12 @@ interface InteractiveBilliardsTableProps {
     balls: Ball[];
     cueBallId: BallId;
     trajectory: TrajectoryPrediction | null;
+    dynamicTrails?: Record<BallId, { pos: Vec2; timestamp?: number }[]>;
+    aimDirection?: Vec2;
+    powerLevel?: number;
+    tablePreferences?: TablePreferences;
+    showCueStick?: boolean;
+    showGhostBall?: boolean;
     onBallMove?: (ballId: BallId, position: Vec2) => void;
     onAimChange?: (direction: Vec2) => void;
     isSimulating?: boolean;
@@ -34,6 +49,8 @@ interface InteractiveBilliardsTableProps {
     numberingFormula?: Formula | null;
     showNumbering?: boolean;
     onNumberingAnchorsChange?: (anchors: NumberAnchor[]) => void;
+    onPowerChange?: (powerPercentage: number) => void;
+    onShoot?: (powerPercentage: number) => void;
 }
 
 const TABLE_W = DEFAULT_TABLE.width;
@@ -42,28 +59,32 @@ const TABLE_H = DEFAULT_TABLE.height;
 const longRailRatios = Array.from({ length: 7 }, (_, index) => (index + 1) / 8);
 const shortRailRatios = Array.from({ length: 3 }, (_, index) => (index + 1) / 4);
 const outerMargin = 0;
-const railThickness = DEFAULT_TABLE.railThickness;
-const cushionThickness = DEFAULT_TABLE.cushionThickness;
 const longGridLines = 7;
 const shortGridLines = 3;
 
 function getLayout(orientation: Orientation) {
-    const aspect = orientation === 'horizontal' ? 2 : 0.5;
+    const isVertical = orientation === 'vertical';
+    const aspect = isVertical ? 0.5 : 2;
+    // En orientación vertical (modo móvil / smartphone): pasamanos y bandas robustas y gruesas estilo 8 Ball Pool.
+    // En orientación horizontal (modo web / desktop panorámico): pasamanos y bandas delgadas y elegantes originales (8.27 y 3.5).
+    const railT = isVertical ? 22.0 : DEFAULT_TABLE.railThickness; // 8.27
+    const cushionT = isVertical ? 8.5 : DEFAULT_TABLE.cushionThickness; // 3.5
+
     const basePlayW = TABLE_W;
     const basePlayH = basePlayW / aspect;
-    const cushionX = basePlayW + cushionThickness * 2;
-    const cushionY = basePlayH + cushionThickness * 2;
-    const railW = cushionX + railThickness * 2;
-    const railH = cushionY + railThickness * 2;
+    const cushionX = basePlayW + cushionT * 2;
+    const cushionY = basePlayH + cushionT * 2;
+    const railW = cushionX + railT * 2;
+    const railH = cushionY + railT * 2;
     const viewBoxW = railW + outerMargin * 2;
     const viewBoxH = railH + outerMargin * 2;
 
     const railX = outerMargin;
     const railY = outerMargin;
-    const cx = outerMargin + railThickness;
-    const cy = outerMargin + railThickness;
-    const playX = cx + cushionThickness;
-    const playY = cy + cushionThickness;
+    const cx = outerMargin + railT;
+    const cy = outerMargin + railT;
+    const playX = cx + cushionT;
+    const playY = cy + cushionT;
 
     return {
         viewBox: { width: viewBoxW, height: viewBoxH },
@@ -83,6 +104,8 @@ function getLayout(orientation: Orientation) {
         cushionY: cy,
         cushionW: cushionX,
         cushionH: cushionY,
+        railThickness: railT,
+        cushionThickness: cushionT,
     };
 }
 
@@ -115,10 +138,11 @@ function mapSvgToPoint(svgX: number, svgY: number, orientation: Orientation, lay
 }
 
 function getDiamondPoints(orientation: Orientation, layout: ReturnType<typeof getLayout>) {
-    const railCenterTop = layout.railY + railThickness / 2;
-    const railCenterBottom = layout.railY + layout.railH - railThickness / 2;
-    const railCenterLeft = layout.railX + railThickness / 2;
-    const railCenterRight = layout.railX + layout.railW - railThickness / 2;
+    const railT = layout.railThickness;
+    const railCenterTop = layout.railY + railT / 2;
+    const railCenterBottom = layout.railY + layout.railH - railT / 2;
+    const railCenterLeft = layout.railX + railT / 2;
+    const railCenterRight = layout.railX + layout.railW - railT / 2;
 
     const playLeft = layout.playX;
     const playRight = layout.playX + layout.playW;
@@ -176,35 +200,203 @@ function getDiamondSvgPosition(
     orientation: Orientation,
     layout: ReturnType<typeof getLayout>
 ): { x: number; y: number } | null {
-    const labelOffset = railThickness * 1.2;
-    const railCenterTop = layout.railY + railThickness / 2;
-    const railCenterBottom = layout.railY + layout.railH - railThickness / 2;
-    const railCenterLeft = layout.railX + railThickness / 2;
-    const railCenterRight = layout.railX + layout.railW - railThickness / 2;
+    const railT = layout.railThickness;
+    const labelOffset = railT * 1.15;
+    const railCenterTop = layout.railY + railT / 2;
+    const railCenterBottom = layout.railY + layout.railH - railT / 2;
+    const railCenterLeft = layout.railX + railT / 2;
+    const railCenterRight = layout.railX + layout.railW - railT / 2;
 
     let baseX: number;
     let baseY: number;
 
     switch (side) {
         case 'top':
-            baseX = layout.playX + (layout.playW * index) / 8;
+            baseX = layout.playX + (layout.playW * index) / (orientation === 'horizontal' ? 8 : 4);
             baseY = railCenterTop;
             return { x: baseX, y: baseY - labelOffset };
         case 'bottom':
-            baseX = layout.playX + (layout.playW * index) / 8;
+            baseX = layout.playX + (layout.playW * index) / (orientation === 'horizontal' ? 8 : 4);
             baseY = railCenterBottom;
             return { x: baseX, y: baseY + labelOffset };
         case 'left':
             baseX = railCenterLeft;
-            baseY = layout.playY + (layout.playH * index) / 4;
+            baseY = layout.playY + (layout.playH * index) / (orientation === 'horizontal' ? 4 : 8);
             return { x: baseX - labelOffset, y: baseY };
         case 'right':
             baseX = railCenterRight;
-            baseY = layout.playY + (layout.playH * index) / 4;
+            baseY = layout.playY + (layout.playH * index) / (orientation === 'horizontal' ? 4 : 8);
             return { x: baseX + labelOffset, y: baseY };
         default:
             return null;
     }
+}
+
+interface AimGuideData {
+    cueRayEnd: Vec2;
+    ghostBallPos: Vec2 | null;
+    targetBallGuide: {
+        ballId: BallId;
+        start: Vec2;
+        end: Vec2;
+        color: string;
+    } | null;
+    cueDeflectionGuide: {
+        start: Vec2;
+        end: Vec2;
+    } | null;
+    cushionHit: {
+        point: Vec2;
+        reflectedEnd: Vec2;
+        reboundGhostPos?: Vec2;
+        reboundTargetBall?: Ball;
+    } | null;
+}
+
+function compute8BallAimGuide(
+    balls: Ball[],
+    cueBallId: BallId,
+    aimDirection: Vec2
+): AimGuideData | null {
+    const cueBall = balls.find((b) => b.id === cueBallId);
+    if (!cueBall) return null;
+
+    const cuePos = cueBall.pos;
+    const dir = vec2Normalize(aimDirection);
+    const BALL_R = 3.075;
+    const HIT_DIST = BALL_R * 2; // 6.15 cm
+
+    // 1. Ray intersection with object balls
+    let closestBallHit: { dist: number; ghostPos: Vec2; targetBall: Ball } | null = null;
+
+    for (const ball of balls) {
+        if (ball.id === cueBallId) continue;
+        const toBall = vec2Sub(ball.pos, cuePos);
+        const proj = toBall.x * dir.x + toBall.y * dir.y;
+        if (proj <= 0) continue;
+
+        const perpSq = (toBall.x * toBall.x + toBall.y * toBall.y) - proj * proj;
+        if (perpSq >= HIT_DIST * HIT_DIST) continue;
+
+        const halfChord = Math.sqrt(HIT_DIST * HIT_DIST - perpSq);
+        const dist = proj - halfChord;
+        if (dist <= 0) continue;
+
+        if (!closestBallHit || dist < closestBallHit.dist) {
+            closestBallHit = {
+                dist,
+                ghostPos: vec2(cuePos.x + dir.x * dist, cuePos.y + dir.y * dist),
+                targetBall: ball,
+            };
+        }
+    }
+
+    // 2. Ray intersection with cushions
+    const X_MIN = BALL_R;
+    const X_MAX = TABLE_W - BALL_R;
+    const Y_MIN = BALL_R;
+    const Y_MAX = TABLE_H - BALL_R;
+
+    let tX = Infinity;
+    let normX = vec2(0, 0);
+    if (dir.x > 0.0001) {
+        tX = (X_MAX - cuePos.x) / dir.x;
+        normX = vec2(-1, 0);
+    } else if (dir.x < -0.0001) {
+        tX = (X_MIN - cuePos.x) / dir.x;
+        normX = vec2(1, 0);
+    }
+
+    let tY = Infinity;
+    let normY = vec2(0, 0);
+    if (dir.y > 0.0001) {
+        tY = (Y_MAX - cuePos.y) / dir.y;
+        normY = vec2(0, -1);
+    } else if (dir.y < -0.0001) {
+        tY = (Y_MIN - cuePos.y) / dir.y;
+        normY = vec2(0, 1);
+    }
+
+    const cushionDist = Math.min(tX, tY);
+    const cushionNormal = tX < tY ? normX : normY;
+
+    // Hits an object ball first:
+    if (closestBallHit && closestBallHit.dist < cushionDist) {
+        const { ghostPos, targetBall } = closestBallHit;
+        const norm = vec2Normalize(vec2Sub(targetBall.pos, ghostPos));
+        const targetGuideLen = 28;
+        const targetEnd = vec2(targetBall.pos.x + norm.x * targetGuideLen, targetBall.pos.y + norm.y * targetGuideLen);
+
+        const dot = dir.x * norm.x + dir.y * norm.y;
+        const tangent = vec2(dir.x - norm.x * dot, dir.y - norm.y * dot);
+        const tanLen = Math.sqrt(tangent.x * tangent.x + tangent.y * tangent.y);
+
+        let cueDeflectionGuide: { start: Vec2; end: Vec2 } | null = null;
+        if (tanLen > 0.05) {
+            const uTan = vec2(tangent.x / tanLen, tangent.y / tanLen);
+            const defLen = 18;
+            cueDeflectionGuide = {
+                start: ghostPos,
+                end: vec2(ghostPos.x + uTan.x * defLen, ghostPos.y + uTan.y * defLen),
+            };
+        }
+
+        const color = targetBall.id === 'yellow' ? '#facc15' : '#ef4444';
+
+        return {
+            cueRayEnd: ghostPos,
+            ghostBallPos: ghostPos,
+            targetBallGuide: {
+                ballId: targetBall.id,
+                start: targetBall.pos,
+                end: targetEnd,
+                color,
+            },
+            cueDeflectionGuide,
+            cushionHit: null,
+        };
+    }
+
+    // Hits cushion first (Bricole / Antes de banda):
+    const cushionPoint = vec2(cuePos.x + dir.x * cushionDist, cuePos.y + dir.y * cushionDist);
+    const dotCN = dir.x * cushionNormal.x + dir.y * cushionNormal.y;
+    const reflDir = vec2Normalize(vec2(dir.x - 2 * dotCN * cushionNormal.x, dir.y - 2 * dotCN * cushionNormal.y));
+    const reflLen = 42;
+    let reflectedEnd = vec2(cushionPoint.x + reflDir.x * reflLen, cushionPoint.y + reflDir.y * reflLen);
+
+    // Check if cushion reflection hits an object ball
+    let reboundGhostPos: Vec2 | undefined = undefined;
+    let reboundTargetBall: Ball | undefined = undefined;
+
+    for (const ball of balls) {
+        if (ball.id === cueBallId) continue;
+        const toBall = vec2Sub(ball.pos, cushionPoint);
+        const proj = toBall.x * reflDir.x + toBall.y * reflDir.y;
+        if (proj <= 0) continue;
+        const perpSq = (toBall.x * toBall.x + toBall.y * toBall.y) - proj * proj;
+        if (perpSq >= HIT_DIST * HIT_DIST) continue;
+        const halfChord = Math.sqrt(HIT_DIST * HIT_DIST - perpSq);
+        const dist = proj - halfChord;
+        if (dist > 0 && dist < reflLen) {
+            reflectedEnd = vec2(cushionPoint.x + reflDir.x * dist, cushionPoint.y + reflDir.y * dist);
+            reboundGhostPos = reflectedEnd;
+            reboundTargetBall = ball;
+            break;
+        }
+    }
+
+    return {
+        cueRayEnd: cushionPoint,
+        ghostBallPos: null,
+        targetBallGuide: null,
+        cueDeflectionGuide: null,
+        cushionHit: {
+            point: cushionPoint,
+            reflectedEnd,
+            reboundGhostPos,
+            reboundTargetBall,
+        },
+    };
 }
 
 function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTableProps>) {
@@ -214,6 +406,12 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
         balls,
         cueBallId,
         trajectory,
+        dynamicTrails,
+        aimDirection = vec2(1, 0),
+        powerLevel = 0,
+        tablePreferences = DEFAULT_TABLE_PREFERENCES,
+        showCueStick = true,
+        showGhostBall = true,
         onBallMove,
         onAimChange,
         isSimulating = false,
@@ -224,9 +422,25 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
         numberingFormula = null,
         showNumbering = false,
         onNumberingAnchorsChange,
+        onPowerChange,
+        onShoot,
     } = props;
 
+    const clothPalette = useMemo(
+        () => resolveClothPalette(tablePreferences.clothColor),
+        [tablePreferences.clothColor]
+    );
+    const woodPalette = useMemo(
+        () => resolveWoodPalette(tablePreferences.woodFinish),
+        [tablePreferences.woodFinish]
+    );
+    const metalPalette = useMemo(
+        () => resolveCornerMetalPalette(tablePreferences.cornerMetal),
+        [tablePreferences.cornerMetal]
+    );
+
     const layout = getLayout(orientation);
+    const diamonds = useMemo(() => getDiamondPoints(orientation, layout), [orientation, layout]);
     const containerRef = useRef<View>(null);
     const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
     const [draggingBallId, setDraggingBallId] = useState<BallId | null>(null);
@@ -245,6 +459,14 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
     const showNumberingRef = useRef(showNumbering);
     const draggingBallIdRef = useRef<BallId | null>(null);
     const draggingNumberIdRef = useRef<string | null>(null);
+    const onPowerChangeRef = useRef(onPowerChange);
+    const onShootRef = useRef(onShoot);
+    const aimDirectionRef = useRef(aimDirection);
+    aimDirectionRef.current = aimDirection;
+    const isDraggingCueRef = useRef(false);
+    const cueDragStartProjRef = useRef(0);
+    const cueDragStartPowerRef = useRef(0);
+    const currentPowerRef = useRef(powerLevel);
 
     useEffect(() => { isEditModeRef.current = isEditMode; }, [isEditMode]);
     useEffect(() => { isSimulatingRef.current = isSimulating; }, [isSimulating]);
@@ -256,6 +478,9 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
     useEffect(() => { onBallMoveRef.current = onBallMove; }, [onBallMove]);
     useEffect(() => { onAimChangeRef.current = onAimChange; }, [onAimChange]);
     useEffect(() => { onNumberingAnchorsChangeRef.current = onNumberingAnchorsChange; }, [onNumberingAnchorsChange]);
+    useEffect(() => { onPowerChangeRef.current = onPowerChange; }, [onPowerChange]);
+    useEffect(() => { onShootRef.current = onShoot; }, [onShoot]);
+    useEffect(() => { currentPowerRef.current = powerLevel; }, [powerLevel]);
     useEffect(() => { numberingAnchorsRef.current = numberingAnchors; }, [numberingAnchors]);
     useEffect(() => { showNumberingRef.current = showNumbering; }, [showNumbering]);
     useEffect(() => { draggingBallIdRef.current = draggingBallId; }, [draggingBallId]);
@@ -308,7 +533,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
             const lay = layoutRef.current;
             const orient = orientationRef.current;
             const anchors = numberingAnchorsRef.current;
-            const hitRadius = railThickness * 0.8;
+            const hitRadius = lay.railThickness * 0.8;
 
             for (const anchor of anchors) {
                 let ax: number;
@@ -373,8 +598,26 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                 } else {
                     const tablePos = screenToTableRef(locationX, locationY);
                     const cueBall = ballsRef.current.find((b) => b.id === cueBallIdRef.current);
-                    if (cueBall && onAimChangeRef.current) {
-                        const direction = vec2Normalize(vec2Sub(tablePos, cueBall.pos));
+                    if (!cueBall) return;
+
+                    const aimDir = vec2Normalize(aimDirectionRef.current);
+                    const toTouch = vec2Sub(tablePos, cueBall.pos);
+                    // Projection along reverse aim vector (where the cue stick body extends):
+                    const projBack = toTouch.x * (-aimDir.x) + toTouch.y * (-aimDir.y);
+                    const perpDist = Math.abs(toTouch.x * aimDir.y - toTouch.y * aimDir.x);
+
+                    // If user touches along the cue stick body:
+                    if (projBack > 4 && projBack < 280 && perpDist < 26) {
+                        isDraggingCueRef.current = true;
+                        cueDragStartProjRef.current = projBack;
+                        cueDragStartPowerRef.current = currentPowerRef.current;
+                        return;
+                    }
+
+                    // Otherwise user touched on table to aim:
+                    isDraggingCueRef.current = false;
+                    if (onAimChangeRef.current) {
+                        const direction = vec2Normalize(toTouch);
                         onAimChangeRef.current(direction);
                     }
                 }
@@ -437,19 +680,45 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                     }
 
                     onBallMoveRef.current(currentDraggingBall, vec2(clampedX, clampedY));
-                } else if (!isEditModeRef.current && onAimChangeRef.current) {
+                } else if (!isEditModeRef.current) {
                     const cueBall = ballsRef.current.find((b) => b.id === cueBallIdRef.current);
-                    if (cueBall) {
-                        const direction = vec2Normalize(vec2Sub(tablePos, cueBall.pos));
+                    if (!cueBall) return;
+
+                    if (isDraggingCueRef.current) {
+                        const aimDir = vec2Normalize(aimDirectionRef.current);
+                        const toTouch = vec2Sub(tablePos, cueBall.pos);
+                        const currentProj = toTouch.x * (-aimDir.x) + toTouch.y * (-aimDir.y);
+                        const delta = currentProj - cueDragStartProjRef.current;
+                        // 45 units pull = 100% power
+                        const newPower = Math.max(0, Math.min(100, Math.round(cueDragStartPowerRef.current + (delta / 45) * 100)));
+                        currentPowerRef.current = newPower;
+                        onPowerChangeRef.current?.(newPower);
+                    } else if (onAimChangeRef.current) {
+                        const toTouch = vec2Sub(tablePos, cueBall.pos);
+                        const direction = vec2Normalize(toTouch);
                         onAimChangeRef.current(direction);
                     }
                 }
             },
             onPanResponderRelease: () => {
+                if (isDraggingCueRef.current) {
+                    const shotPower = currentPowerRef.current;
+                    if (shotPower >= 8 && onShootRef.current) {
+                        onShootRef.current(shotPower);
+                    }
+                    currentPowerRef.current = 0;
+                    onPowerChangeRef.current?.(0);
+                    isDraggingCueRef.current = false;
+                }
                 setDraggingBallId(null);
                 draggingNumberIdRef.current = null;
             },
             onPanResponderTerminate: () => {
+                if (isDraggingCueRef.current) {
+                    currentPowerRef.current = 0;
+                    onPowerChangeRef.current?.(0);
+                }
+                isDraggingCueRef.current = false;
                 setDraggingBallId(null);
                 draggingNumberIdRef.current = null;
             },
@@ -542,8 +811,6 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
         });
     }, [trajectory, orientation, layout, balls, cueBallId, showGuides, isSimulating]);
 
-    const diamonds = getDiamondPoints(orientation, layout);
-
     return (
         <View
             ref={containerRef}
@@ -555,121 +822,589 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                 });
             }}
             {...panResponder.panHandlers}>
-            <Svg width="100%" height="100%" viewBox={`0 0 ${layout.viewBox.width} ${layout.viewBox.height}`}>                <Defs>
+            <Svg width="100%" height="100%" viewBox={`0 0 ${layout.viewBox.width} ${layout.viewBox.height}`} style={{ overflow: 'visible' }}>
+                <Defs>
+                    {/* Gradiente del marco de madera noble */}
                     <LinearGradient id="frameGradient" x1="0" y1="0" x2="1" y2="1">
-                        <Stop offset="0%" stopColor="#8b5a2b" />
-                        <Stop offset="25%" stopColor="#a0692f" />
-                        <Stop offset="50%" stopColor="#6d4423" />
-                        <Stop offset="75%" stopColor="#8b5a2b" />
-                        <Stop offset="100%" stopColor="#5d3a1f" />
+                        <Stop offset="0%" stopColor={woodPalette.start} />
+                        <Stop offset="30%" stopColor={woodPalette.mid} />
+                        <Stop offset="70%" stopColor={woodPalette.bevel} />
+                        <Stop offset="100%" stopColor={woodPalette.end} />
                     </LinearGradient>
-                    <LinearGradient id="cushionGradient" x1="0" y1="0" x2="1" y2="1">
-                        <Stop offset="0%" stopColor="#2f5647" />
-                        <Stop offset="100%" stopColor="#1f382f" />
+
+                    {/* Gradiente de las bandas de caucho */}
+                    <LinearGradient id="cushionGradient" x1="0" y1="0" x2="0" y2="1">
+                        <Stop offset="0%" stopColor={clothPalette.cushionTop} />
+                        <Stop offset="100%" stopColor={clothPalette.cushionBottom} />
                     </LinearGradient>
-                    <LinearGradient id="feltGradient" x1="0" y1="0" x2="0" y2="1">
-                        <Stop offset="0%" stopColor="#2c8f68" />
-                        <Stop offset="100%" stopColor="#226e51" />
+
+                    {/* Gradiente base del paño Simonis */}
+                    <RadialGradient id="feltGradient" cx="50%" cy="50%" r="65%">
+                        <Stop offset="0%" stopColor={clothPalette.highlight} />
+                        <Stop offset="65%" stopColor={clothPalette.base} />
+                        <Stop offset="100%" stopColor={clothPalette.edge} />
+                    </RadialGradient>
+
+                    {/* Viñeta de iluminación cenital estilo 8 Ball Pool */}
+                    <RadialGradient id="arenaSpotlight" cx="50%" cy="50%" r="55%">
+                        <Stop offset="0%" stopColor="#ffffff" stopOpacity={0.16} />
+                        <Stop offset="40%" stopColor={clothPalette.highlight} stopOpacity={0.08} />
+                        <Stop offset="75%" stopColor="#000000" stopOpacity={0.20} />
+                        <Stop offset="100%" stopColor="#000000" stopOpacity={0.46} />
+                    </RadialGradient>
+
+                    {/* Gradiente de cantoneras metálicas esquineras */}
+                    <LinearGradient id="cornerMetalGrad" x1="0" y1="0" x2="1" y2="1">
+                        <Stop offset="0%" stopColor={metalPalette.highlight} />
+                        <Stop offset="30%" stopColor={metalPalette.mid} />
+                        <Stop offset="70%" stopColor={metalPalette.base} />
+                        <Stop offset="100%" stopColor={metalPalette.dark} />
                     </LinearGradient>
-                    <LinearGradient id="shadowGradient" x1="0" y1="0" x2="0" y2="1">
-                        <Stop offset="0%" stopColor="rgba(31, 20, 13, 0.24)" />
-                        <Stop offset="100%" stopColor="rgba(31, 20, 13, 0.04)" />
+
+                    {/* Sombras de oclusión ambiental bajo la nariz de las bandas */}
+                    <LinearGradient id="topCushionShadow" x1="0" y1="0" x2="0" y2="1">
+                        <Stop offset="0%" stopColor="#000000" stopOpacity={0.48} />
+                        <Stop offset="100%" stopColor="#000000" stopOpacity={0.0} />
                     </LinearGradient>
-                    <RadialGradient id="ballWhite" cx="35%" cy="35%" r="65%">
+                    <LinearGradient id="bottomCushionShadow" x1="0" y1="1" x2="0" y2="0">
+                        <Stop offset="0%" stopColor="#000000" stopOpacity={0.48} />
+                        <Stop offset="100%" stopColor="#000000" stopOpacity={0.0} />
+                    </LinearGradient>
+                    <LinearGradient id="leftCushionShadow" x1="0" y1="0" x2="1" y2="0">
+                        <Stop offset="0%" stopColor="#000000" stopOpacity={0.48} />
+                        <Stop offset="100%" stopColor="#000000" stopOpacity={0.0} />
+                    </LinearGradient>
+                    <LinearGradient id="rightCushionShadow" x1="1" y1="0" x2="0" y2="0">
+                        <Stop offset="0%" stopColor="#000000" stopOpacity={0.48} />
+                        <Stop offset="100%" stopColor="#000000" stopOpacity={0.0} />
+                    </LinearGradient>
+
+                    {/* Esferas 3D de bolas de billar con destello y sombra */}
+                    <RadialGradient id="ballWhite" cx="30%" cy="30%" r="70%">
                         <Stop offset="0%" stopColor="#ffffff" />
-                        <Stop offset="70%" stopColor="#e8e8e8" />
-                        <Stop offset="100%" stopColor="#c8c8c8" />
+                        <Stop offset="45%" stopColor="#f8fafc" />
+                        <Stop offset="80%" stopColor="#cbd5e1" />
+                        <Stop offset="100%" stopColor="#94a3b8" />
                     </RadialGradient>
-                    <RadialGradient id="ballYellow" cx="35%" cy="35%" r="65%">
-                        <Stop offset="0%" stopColor="#ffe066" />
-                        <Stop offset="70%" stopColor="#facc15" />
-                        <Stop offset="100%" stopColor="#ca8a04" />
+                    <RadialGradient id="ballYellow" cx="30%" cy="30%" r="70%">
+                        <Stop offset="0%" stopColor="#fef08a" />
+                        <Stop offset="45%" stopColor="#facc15" />
+                        <Stop offset="80%" stopColor="#eab308" />
+                        <Stop offset="100%" stopColor="#a16207" />
                     </RadialGradient>
-                    <RadialGradient id="ballRed" cx="35%" cy="35%" r="65%">
-                        <Stop offset="0%" stopColor="#f87171" />
-                        <Stop offset="70%" stopColor="#dc2626" />
-                        <Stop offset="100%" stopColor="#991b1b" />
+                    <RadialGradient id="ballRed" cx="30%" cy="30%" r="70%">
+                        <Stop offset="0%" stopColor="#fca5a5" />
+                        <Stop offset="45%" stopColor="#ef4444" />
+                        <Stop offset="80%" stopColor="#dc2626" />
+                        <Stop offset="100%" stopColor="#7f1d1d" />
                     </RadialGradient>
                 </Defs>
 
-                <Rect x={layout.railX} y={layout.railY} width={layout.railW} height={layout.railH} rx={10} fill="url(#frameGradient)" />
-                <Rect x={layout.cushionX} y={layout.cushionY} width={layout.cushionW} height={layout.cushionH} rx={5} fill="url(#cushionGradient)" />
-                <Rect x={layout.playX} y={layout.playY} width={layout.playW} height={layout.playH} rx={3} fill="url(#feltGradient)" />
-                <Rect x={layout.playX} y={layout.playY} width={layout.playW} height={layout.playH} rx={3} fill="url(#shadowGradient)" opacity={0.28} />
-                <Rect x={layout.playX + 1} y={layout.playY + 1} width={layout.playW - 2} height={layout.playH - 2} rx={2} fill="none" stroke="rgba(255,255,255,0.10)" strokeWidth={0.5} opacity={0.6} />
+                {/* 1. Marco exterior de madera noble con bisel */}
+                <Rect
+                    x={layout.railX}
+                    y={layout.railY}
+                    width={layout.railW}
+                    height={layout.railH}
+                    rx={12}
+                    fill="url(#frameGradient)"
+                    stroke={woodPalette.bevel}
+                    strokeWidth={1.2}
+                />
 
-                {Array.from({ length: orientation === 'horizontal' ? longGridLines : shortGridLines }, (_, index) => {
-                    const ratio = (index + 1) / ((orientation === 'horizontal' ? longGridLines : shortGridLines) + 1);
+                {/* 2. Cantoneras metálicas esquineras pulidas estilo 8 Ball Pool */}
+                {(() => {
+                    const railT = layout.railThickness;
+                    const cornerSize = railT * 1.5;
+                    const cornerR = railT * 0.4;
+                    const rivetR = Math.max(1.0, railT * 0.08);
                     return (
-                        <Line
-                            key={`long-grid-${index}`}
-                            x1={layout.playX + layout.playW * ratio}
-                            y1={layout.playY}
-                            x2={layout.playX + layout.playW * ratio}
-                            y2={layout.playY + layout.playH}
-                            stroke="rgba(255,255,255,0.035)"
-                            strokeWidth={0.7}
-                        />
-                    );
-                })}
-                {Array.from({ length: orientation === 'horizontal' ? shortGridLines : longGridLines }, (_, index) => {
-                    const ratio = (index + 1) / ((orientation === 'horizontal' ? shortGridLines : longGridLines) + 1);
-                    return (
-                        <Line
-                            key={`short-grid-${index}`}
-                            x1={layout.playX}
-                            y1={layout.playY + layout.playH * ratio}
-                            x2={layout.playX + layout.playW}
-                            y2={layout.playY + layout.playH * ratio}
-                            stroke="rgba(255,255,255,0.035)"
-                            strokeWidth={0.7}
-                        />
-                    );
-                })}
+                        <G>
+                            {/* Esquina Superior Izquierda */}
+                            <Path
+                                d={`M ${layout.railX} ${layout.railY + cornerSize} L ${layout.railX} ${layout.railY + cornerR} Q ${layout.railX} ${layout.railY} ${layout.railX + cornerR} ${layout.railY} L ${layout.railX + cornerSize} ${layout.railY} L ${layout.railX + cornerSize} ${layout.railY + railT} L ${layout.railX + railT} ${layout.railY + cornerSize} Z`}
+                                fill="url(#cornerMetalGrad)"
+                                stroke={metalPalette.border}
+                                strokeWidth={0.6}
+                            />
+                            <Circle cx={layout.railX + cornerSize * 0.55} cy={layout.railY + railT * 0.5} r={rivetR} fill={metalPalette.rivet} />
+                            <Circle cx={layout.railX + railT * 0.5} cy={layout.railY + cornerSize * 0.55} r={rivetR} fill={metalPalette.rivet} />
 
+                            {/* Esquina Superior Derecha */}
+                            <Path
+                                d={`M ${layout.railX + layout.railW - cornerSize} ${layout.railY} L ${layout.railX + layout.railW - cornerR} ${layout.railY} Q ${layout.railX + layout.railW} ${layout.railY} ${layout.railX + layout.railW} ${layout.railY + cornerR} L ${layout.railX + layout.railW} ${layout.railY + cornerSize} L ${layout.railX + layout.railW - railT} ${layout.railY + cornerSize} L ${layout.railX + layout.railW - cornerSize} ${layout.railY + railT} Z`}
+                                fill="url(#cornerMetalGrad)"
+                                stroke={metalPalette.border}
+                                strokeWidth={0.6}
+                            />
+                            <Circle cx={layout.railX + layout.railW - cornerSize * 0.55} cy={layout.railY + railT * 0.5} r={rivetR} fill={metalPalette.rivet} />
+                            <Circle cx={layout.railX + layout.railW - railT * 0.5} cy={layout.railY + cornerSize * 0.55} r={rivetR} fill={metalPalette.rivet} />
+
+                            {/* Esquina Inferior Izquierda */}
+                            <Path
+                                d={`M ${layout.railX} ${layout.railY + layout.railH - cornerSize} L ${layout.railX + railT} ${layout.railY + layout.railH - cornerSize} L ${layout.railX + cornerSize} ${layout.railY + layout.railH - railT} L ${layout.railX + cornerSize} ${layout.railY + layout.railH} L ${layout.railX + cornerR} ${layout.railY + layout.railH} Q ${layout.railX} ${layout.railY + layout.railH} ${layout.railX} ${layout.railY + layout.railH - cornerR} Z`}
+                                fill="url(#cornerMetalGrad)"
+                                stroke={metalPalette.border}
+                                strokeWidth={0.6}
+                            />
+                            <Circle cx={layout.railX + cornerSize * 0.55} cy={layout.railY + layout.railH - railT * 0.5} r={rivetR} fill={metalPalette.rivet} />
+                            <Circle cx={layout.railX + railT * 0.5} cy={layout.railY + layout.railH - cornerSize * 0.55} r={rivetR} fill={metalPalette.rivet} />
+
+                            {/* Esquina Inferior Derecha */}
+                            <Path
+                                d={`M ${layout.railX + layout.railW - cornerSize} ${layout.railY + layout.railH} L ${layout.railX + layout.railW - cornerSize} ${layout.railY + layout.railH - railT} L ${layout.railX + layout.railW - railT} ${layout.railY + layout.railH - cornerSize} L ${layout.railX + layout.railW} ${layout.railY + layout.railH - cornerSize} L ${layout.railX + layout.railW} ${layout.railY + layout.railH - cornerR} Q ${layout.railX + layout.railW} ${layout.railY + layout.railH} ${layout.railX + layout.railW - cornerR} ${layout.railY + layout.railH} Z`}
+                                fill="url(#cornerMetalGrad)"
+                                stroke={metalPalette.border}
+                                strokeWidth={0.6}
+                            />
+                            <Circle cx={layout.railX + layout.railW - cornerSize * 0.55} cy={layout.railY + layout.railH - railT * 0.5} r={rivetR} fill={metalPalette.rivet} />
+                            <Circle cx={layout.railX + layout.railW - railT * 0.5} cy={layout.railY + layout.railH - cornerSize * 0.55} r={rivetR} fill={metalPalette.rivet} />
+                        </G>
+                    );
+                })()}
+
+                {/* 3. Bandas de caucho continuas de carambola (sin troneras) */}
+                <Rect
+                    x={layout.cushionX}
+                    y={layout.cushionY}
+                    width={layout.cushionW}
+                    height={layout.cushionH}
+                    rx={4}
+                    fill="url(#cushionGradient)"
+                    stroke="rgba(0,0,0,0.35)"
+                    strokeWidth={0.8}
+                />
+
+                {/* 4. Paño de juego Simonis */}
+                <Rect
+                    x={layout.playX}
+                    y={layout.playY}
+                    width={layout.playW}
+                    height={layout.playH}
+                    rx={2}
+                    fill="url(#feltGradient)"
+                />
+
+                {/* 5. Iluminación cenital de torneo estilo 8 Ball Pool */}
+                {tablePreferences.showSpotlight && (
+                    <Rect
+                        x={layout.playX}
+                        y={layout.playY}
+                        width={layout.playW}
+                        height={layout.playH}
+                        rx={2}
+                        fill="url(#arenaSpotlight)"
+                        opacity={0.65}
+                    />
+                )}
+
+                {/* 6. Sombras 3D bajo la nariz del caucho */}
+                <Rect x={layout.playX} y={layout.playY} width={layout.playW} height={4.0} fill="url(#topCushionShadow)" />
+                <Rect x={layout.playX} y={layout.playY + layout.playH - 4.0} width={layout.playW} height={4.0} fill="url(#bottomCushionShadow)" />
+                <Rect x={layout.playX} y={layout.playY} width={4.0} height={layout.playH} fill="url(#leftCushionShadow)" />
+                <Rect x={layout.playX + layout.playW - 4.0} y={layout.playY} width={4.0} height={layout.playH} fill="url(#rightCushionShadow)" />
+
+                {/* Línea de brillo superior en el filo de la banda */}
+                <Rect
+                    x={layout.playX}
+                    y={layout.playY}
+                    width={layout.playW}
+                    height={layout.playH}
+                    fill="none"
+                    stroke="rgba(255,255,255,0.22)"
+                    strokeWidth={0.7}
+                />
+
+                {/* 7. Marca de agua / Calcomanía central de paño (Sticker / Decal) */}
+                {tablePreferences.showTableDecal && tablePreferences.tableDecal !== 'none' && (() => {
+                    const decalOpacity = tablePreferences.decalOpacity ?? 0.18;
+                    const centerX = layout.playX + layout.playW / 2;
+                    const centerY = layout.playY + layout.playH / 2;
+                    const minDim = Math.min(layout.playW, layout.playH);
+
+                    if (tablePreferences.tableDecal === 'skull') {
+                        const decalSize = minDim * 0.78;
+                        return (
+                            <SvgImage
+                                key="decal-skull"
+                                href={SKULL_DECAL_SOURCE}
+                                x={centerX - decalSize / 2}
+                                y={centerY - decalSize / 2}
+                                width={decalSize}
+                                height={decalSize}
+                                opacity={decalOpacity}
+                                preserveAspectRatio="xMidYMid meet"
+                            />
+                        );
+                    }
+
+                    if (tablePreferences.tableDecal === 'crown_filigree') {
+                        return (
+                            <G key="decal-crown" opacity={decalOpacity} transform={`translate(${centerX}, ${centerY}) scale(${minDim / 142})`}>
+                                <Path
+                                    d="M -22 10 L 22 10 L 25 -8 L 12 0 L 0 -16 L -12 0 L -25 -8 Z"
+                                    fill="none"
+                                    stroke="#fbbf24"
+                                    strokeWidth={1.2}
+                                />
+                                <Circle cx={0} cy={-16} r={2} fill="#fbbf24" />
+                                <Circle cx={-25} cy={-8} r={1.6} fill="#fbbf24" />
+                                <Circle cx={25} cy={-8} r={1.6} fill="#fbbf24" />
+                                <Circle cx={0} cy={2} r={3} fill="#fbbf24" opacity={0.6} />
+                                <Circle cx={0} cy={0} r={28} fill="none" stroke="#fbbf24" strokeWidth={0.6} strokeDasharray="3 3" />
+                            </G>
+                        );
+                    }
+
+                    if (tablePreferences.tableDecal === 'cyber_rings') {
+                        return (
+                            <G key="decal-cyber" opacity={decalOpacity} transform={`translate(${centerX}, ${centerY}) scale(${minDim / 142})`}>
+                                <Circle cx={0} cy={0} r={32} fill="none" stroke="#22d3ee" strokeWidth={0.8} />
+                                <Circle cx={0} cy={0} r={28} fill="none" stroke="#06b6d4" strokeWidth={0.5} strokeDasharray="4 2" />
+                                <Circle cx={0} cy={0} r={20} fill="none" stroke="#22d3ee" strokeWidth={0.6} />
+                                <Line x1={-36} y1={0} x2={36} y2={0} stroke="#22d3ee" strokeWidth={0.6} />
+                                <Line x1={0} y1={-36} x2={0} y2={36} stroke="#22d3ee" strokeWidth={0.6} />
+                            </G>
+                        );
+                    }
+
+                    if (tablePreferences.tableDecal === 'classic_carom') {
+                        return (
+                            <G key="decal-classic" opacity={decalOpacity} transform={`translate(${centerX}, ${centerY}) scale(${minDim / 142})`}>
+                                <Circle cx={0} cy={-8} r={6} fill="none" stroke="#ffffff" strokeWidth={1} />
+                                <Circle cx={-8} cy={6} r={6} fill="none" stroke="#fef08a" strokeWidth={1} />
+                                <Circle cx={8} cy={6} r={6} fill="none" stroke="#fca5a5" strokeWidth={1} />
+                                <Circle cx={0} cy={0} r={22} fill="none" stroke="#ffffff" strokeWidth={0.5} strokeDasharray="2 2" />
+                            </G>
+                        );
+                    }
+
+                    // Default: tournament_crest
+                    return (
+                        <G key="decal-crest" opacity={decalOpacity} transform={`translate(${centerX}, ${centerY}) scale(${minDim / 142})`}>
+                            <Circle cx={0} cy={0} r={18} fill="none" stroke="#ffffff" strokeWidth={0.7} />
+                            <Circle cx={0} cy={0} r={16.5} fill="none" stroke="#ffffff" strokeWidth={0.4} strokeDasharray="2 2" />
+                            <Line x1={-12} y1={-12} x2={12} y2={12} stroke="#ffffff" strokeWidth={0.8} />
+                            <Line x1={-12} y1={12} x2={12} y2={-12} stroke="#ffffff" strokeWidth={0.8} />
+                            <Circle cx={0} cy={-5} r={2.2} fill="#ffffff" />
+                            <Circle cx={-4.5} cy={4} r={2.2} fill="#ffffff" />
+                            <Circle cx={4.5} cy={4} r={2.2} fill="#ffffff" />
+                        </G>
+                    );
+                })()}
+
+                {/* 8. Cuadrícula táctica 8x4 */}
+                {tablePreferences.showGrid && (
+                    <>
+                        {Array.from({ length: orientation === 'horizontal' ? longGridLines : shortGridLines }, (_, index) => {
+                            const ratio = (index + 1) / ((orientation === 'horizontal' ? longGridLines : shortGridLines) + 1);
+                            return (
+                                <Line
+                                    key={`long-grid-${index}`}
+                                    x1={layout.playX + layout.playW * ratio}
+                                    y1={layout.playY}
+                                    x2={layout.playX + layout.playW * ratio}
+                                    y2={layout.playY + layout.playH}
+                                    stroke="rgba(255,255,255,0.04)"
+                                    strokeWidth={0.7}
+                                />
+                            );
+                        })}
+                        {Array.from({ length: orientation === 'horizontal' ? shortGridLines : longGridLines }, (_, index) => {
+                            const ratio = (index + 1) / ((orientation === 'horizontal' ? shortGridLines : longGridLines) + 1);
+                            return (
+                                <Line
+                                    key={`short-grid-${index}`}
+                                    x1={layout.playX}
+                                    y1={layout.playY + layout.playH * ratio}
+                                    x2={layout.playX + layout.playW}
+                                    y2={layout.playY + layout.playH * ratio}
+                                    stroke="rgba(255,255,255,0.04)"
+                                    strokeWidth={0.7}
+                                />
+                            );
+                        })}
+                    </>
+                )}
+
+                {/* 9. Diamantes incrustados (rombos o círculos pulidos) */}
                 {diamonds.longSide.map((point, idx) => {
-                    // Long rails: horizontal when table is horizontal -> point vertically toward center (dy > dx)
-                    const dx = orientation === 'horizontal' ? 0.8 : 1.6;
-                    const dy = orientation === 'horizontal' ? 1.6 : 0.8;
+                    const isThick = orientation === 'vertical';
+                    const dx = isThick ? 1.4 : (orientation === 'horizontal' ? 0.9 : 1.7);
+                    const dy = isThick ? 2.4 : (orientation === 'horizontal' ? 1.7 : 0.9);
+                    const circleR = isThick ? 1.8 : 1.1;
+                    if (tablePreferences.diamondShape === 'circle') {
+                        return (
+                            <Circle
+                                key={`long-diamond-${idx}`}
+                                cx={point.x}
+                                cy={point.y}
+                                r={circleR}
+                                fill="#f8fafc"
+                                stroke="rgba(0,0,0,0.3)"
+                                strokeWidth={0.2}
+                                opacity={0.95}
+                            />
+                        );
+                    }
                     return (
                         <Polygon
                             key={`long-diamond-${idx}`}
                             points={`${point.x},${point.y - dy} ${point.x + dx},${point.y} ${point.x},${point.y + dy} ${point.x - dx},${point.y}`}
                             fill="#f8fafc"
-                            opacity={0.94}
+                            stroke="rgba(0,0,0,0.25)"
+                            strokeWidth={0.2}
+                            opacity={0.95}
                         />
                     );
                 })}
                 {diamonds.shortSide.map((point, idx) => {
-                    // Short rails: vertical when table is horizontal -> point horizontally toward center (dx > dy)
-                    const dx = orientation === 'horizontal' ? 1.6 : 0.8;
-                    const dy = orientation === 'horizontal' ? 0.8 : 1.6;
+                    const isThick = orientation === 'vertical';
+                    const dx = isThick ? 2.4 : (orientation === 'horizontal' ? 1.7 : 0.9);
+                    const dy = isThick ? 1.4 : (orientation === 'horizontal' ? 0.9 : 1.7);
+                    const circleR = isThick ? 1.8 : 1.1;
+                    if (tablePreferences.diamondShape === 'circle') {
+                        return (
+                            <Circle
+                                key={`short-diamond-${idx}`}
+                                cx={point.x}
+                                cy={point.y}
+                                r={circleR}
+                                fill="#f8fafc"
+                                stroke="rgba(0,0,0,0.3)"
+                                strokeWidth={0.2}
+                                opacity={0.95}
+                            />
+                        );
+                    }
                     return (
                         <Polygon
                             key={`short-diamond-${idx}`}
                             points={`${point.x - dx},${point.y} ${point.x},${point.y - dy} ${point.x + dx},${point.y} ${point.x},${point.y + dy}`}
                             fill="#f8fafc"
-                            opacity={0.94}
+                            stroke="rgba(0,0,0,0.25)"
+                            strokeWidth={0.2}
+                            opacity={0.95}
                         />
                     );
                 })}
-                {diamonds.corners.map((point, idx) => {
-                    // Corner diamonds: even index on horizontal rails (dy > dx), odd index on vertical rails (dx > dy)
+                {tablePreferences.showCornerDiamonds && diamonds.corners.map((point, idx) => {
                     const isHorizontalRail = orientation === 'horizontal' ? idx % 2 === 0 : idx % 2 !== 0;
-                    const dx = isHorizontalRail ? 0.8 : 1.6;
-                    const dy = isHorizontalRail ? 1.6 : 0.8;
+                    const isThick = orientation === 'vertical';
+                    const dx = isHorizontalRail ? (isThick ? 2.4 : 0.9) : (isThick ? 1.4 : 1.7);
+                    const dy = isHorizontalRail ? (isThick ? 1.4 : 1.7) : (isThick ? 2.4 : 0.9);
+                    const circleR = isThick ? 1.6 : 1.0;
+                    if (tablePreferences.diamondShape === 'circle') {
+                        return (
+                            <Circle
+                                key={`corner-diamond-${idx}`}
+                                cx={point.x}
+                                cy={point.y}
+                                r={circleR}
+                                fill="#f8fafc"
+                                stroke="rgba(0,0,0,0.3)"
+                                strokeWidth={0.2}
+                                opacity={0.95}
+                            />
+                        );
+                    }
                     return (
                         <Polygon
                             key={`corner-diamond-${idx}`}
                             points={`${point.x},${point.y - dy} ${point.x + dx},${point.y} ${point.x},${point.y + dy} ${point.x - dx},${point.y}`}
                             fill="#f8fafc"
-                            opacity={0.94}
+                            stroke="rgba(0,0,0,0.25)"
+                            strokeWidth={0.2}
+                            opacity={0.95}
                         />
                     );
                 })}
 
-                {renderTrajectory}
+                {/* 10. Trazas dinámicas continuas estilo Billiard-Bible (⚪ 🟡 🔴) */}
+                {dynamicTrails && (
+                    <G>
+                        {(['white', 'yellow', 'red'] as BallId[]).map((ballId) => {
+                            const trail = dynamicTrails[ballId];
+                            if (!trail || trail.length < 2) return null;
+                            const strokeColor = ballId === 'white' ? '#ffffff' : ballId === 'yellow' ? '#facc15' : '#ef4444';
+                            const glowColor = ballId === 'white' ? 'rgba(255,255,255,0.32)' : ballId === 'yellow' ? 'rgba(250,204,21,0.32)' : 'rgba(239,68,68,0.32)';
+                            const pointsStr = trail
+                                .map((p) => {
+                                    const svgPos = mapPointToSvg(p.pos, orientation, layout);
+                                    return `${svgPos.x.toFixed(1)},${svgPos.y.toFixed(1)}`;
+                                })
+                                .join(' ');
 
+                            return (
+                                <G key={`dynamic-trail-${ballId}`}>
+                                    {/* Resplandor exterior */}
+                                    <Polyline
+                                        points={pointsStr}
+                                        fill="none"
+                                        stroke={glowColor}
+                                        strokeWidth={2.4}
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                    />
+                                    {/* Línea viva interior */}
+                                    <Polyline
+                                        points={pointsStr}
+                                        fill="none"
+                                        stroke={strokeColor}
+                                        strokeWidth={1.1}
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                    />
+                                </G>
+                            );
+                        })}
+                    </G>
+                )}
+
+                {/* 11. Guía láser de puntería limpia y profesional estilo 8 Ball Pool */}
+                {showGuides && !isSimulating && (() => {
+                    const guideData = compute8BallAimGuide(balls, cueBallId, aimDirection);
+                    if (!guideData) return null;
+
+                    const cueBall = balls.find((b) => b.id === cueBallId);
+                    if (!cueBall) return null;
+
+                    const cueSvg = mapPointToSvg(cueBall.pos, orientation, layout);
+                    const rayEndSvg = mapPointToSvg(guideData.cueRayEnd, orientation, layout);
+                    const ghostSvg = guideData.ghostBallPos ? mapPointToSvg(guideData.ghostBallPos, orientation, layout) : null;
+
+                    return (
+                        <G pointerEvents="none">
+                            {/* Resplandor suave del rayo primario */}
+                            <Line
+                                x1={cueSvg.x}
+                                y1={cueSvg.y}
+                                x2={rayEndSvg.x}
+                                y2={rayEndSvg.y}
+                                stroke="rgba(56, 189, 248, 0.35)"
+                                strokeWidth={2.4}
+                                strokeLinecap="round"
+                            />
+                            {/* Núcleo punteado de precisión del rayo */}
+                            <Line
+                                x1={cueSvg.x}
+                                y1={cueSvg.y}
+                                x2={rayEndSvg.x}
+                                y2={rayEndSvg.y}
+                                stroke="#ffffff"
+                                strokeWidth={0.9}
+                                strokeDasharray="3 3"
+                                strokeLinecap="round"
+                            />
+
+                            {/* Impacto en bola: Bola Fantasma + Guía de Bola Objetivo + Deflexión */}
+                            {ghostSvg && (
+                                <G>
+                                    {/* Bola Fantasma translúcida */}
+                                    <Circle
+                                        cx={ghostSvg.x}
+                                        cy={ghostSvg.y}
+                                        r={3.075}
+                                        fill="rgba(56, 189, 248, 0.16)"
+                                        stroke="#ffffff"
+                                        strokeWidth={0.8}
+                                    />
+                                    <Circle
+                                        cx={ghostSvg.x}
+                                        cy={ghostSvg.y}
+                                        r={3.075}
+                                        fill="none"
+                                        stroke="#38bdf8"
+                                        strokeWidth={0.5}
+                                        strokeDasharray="2 2"
+                                    />
+                                    <Circle cx={ghostSvg.x} cy={ghostSvg.y} r={0.8} fill="#38bdf8" />
+
+                                    {/* Guía corta y nítida de la bola objetivo */}
+                                    {guideData.targetBallGuide && (() => {
+                                        const tStart = mapPointToSvg(guideData.targetBallGuide.start, orientation, layout);
+                                        const tEnd = mapPointToSvg(guideData.targetBallGuide.end, orientation, layout);
+                                        return (
+                                            <G>
+                                                <Line
+                                                    x1={tStart.x}
+                                                    y1={tStart.y}
+                                                    x2={tEnd.x}
+                                                    y2={tEnd.y}
+                                                    stroke={guideData.targetBallGuide.color}
+                                                    strokeWidth={1.4}
+                                                    strokeDasharray="3 2"
+                                                    strokeLinecap="round"
+                                                    opacity={0.95}
+                                                />
+                                                <Circle cx={tEnd.x} cy={tEnd.y} r={1.2} fill={guideData.targetBallGuide.color} />
+                                            </G>
+                                        );
+                                    })()}
+
+                                    {/* Guía corta de deflexión / tangente de la bola blanca */}
+                                    {guideData.cueDeflectionGuide && (() => {
+                                        const cStart = mapPointToSvg(guideData.cueDeflectionGuide.start, orientation, layout);
+                                        const cEnd = mapPointToSvg(guideData.cueDeflectionGuide.end, orientation, layout);
+                                        return (
+                                            <Line
+                                                x1={cStart.x}
+                                                y1={cStart.y}
+                                                x2={cEnd.x}
+                                                y2={cEnd.y}
+                                                stroke="rgba(255,255,255,0.7)"
+                                                strokeWidth={0.8}
+                                                strokeDasharray="2.5 2.5"
+                                                strokeLinecap="round"
+                                            />
+                                        );
+                                    })()}
+                                </G>
+                            )}
+
+                            {/* Impacto en banda (Bricole): Punto de rebote + Línea reflejada única */}
+                            {guideData.cushionHit && (() => {
+                                const cPoint = mapPointToSvg(guideData.cushionHit.point, orientation, layout);
+                                const rEnd = mapPointToSvg(guideData.cushionHit.reflectedEnd, orientation, layout);
+                                const rGhostSvg = guideData.cushionHit.reboundGhostPos
+                                    ? mapPointToSvg(guideData.cushionHit.reboundGhostPos, orientation, layout)
+                                    : null;
+                                return (
+                                    <G>
+                                        <Circle cx={cPoint.x} cy={cPoint.y} r={2.8} fill="rgba(56, 189, 248, 0.3)" />
+                                        <Circle cx={cPoint.x} cy={cPoint.y} r={1.4} fill="#38bdf8" />
+                                        <Line
+                                            x1={cPoint.x}
+                                            y1={cPoint.y}
+                                            x2={rEnd.x}
+                                            y2={rEnd.y}
+                                            stroke="#38bdf8"
+                                            strokeWidth={0.9}
+                                            strokeDasharray="3 3"
+                                            strokeLinecap="round"
+                                            opacity={0.85}
+                                        />
+                                        {rGhostSvg && (
+                                            <G>
+                                                <Circle
+                                                    cx={rGhostSvg.x}
+                                                    cy={rGhostSvg.y}
+                                                    r={3.075}
+                                                    fill="rgba(56, 189, 248, 0.16)"
+                                                    stroke="#ffffff"
+                                                    strokeWidth={0.8}
+                                                />
+                                                <Circle cx={rGhostSvg.x} cy={rGhostSvg.y} r={0.8} fill="#38bdf8" />
+                                            </G>
+                                        )}
+                                    </G>
+                                );
+                            })()}
+                        </G>
+                    );
+                })()}
+
+                {/* 13. Bolas de Carambola en 3D con sombras suaves */}
                 {balls.map((ball) => {
                     const mapped = mapPointToSvg(ball.pos, orientation, layout);
                     const ballStyle = ballColors[ball.id];
@@ -677,32 +1412,57 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
 
                     return (
                         <G key={ball.id}>
-                            <Circle cx={mapped.x + 0.4} cy={mapped.y + 0.4} r={3.075} fill="rgba(0,0,0,0.25)" />
+                            {/* Sombra de oclusión en el paño */}
+                            <Circle cx={mapped.x + 0.6} cy={mapped.y + 0.6} r={3.2} fill="rgba(0,0,0,0.30)" />
+                            {/* Cuerpo 3D esférico */}
                             <Circle
                                 cx={mapped.x}
                                 cy={mapped.y}
                                 r={3.075}
                                 fill={`url(#${ballStyle.gradientId})`}
                                 stroke={ballStyle.border}
-                                strokeWidth={0.4}
+                                strokeWidth={0.35}
                             />
-                            <Circle cx={mapped.x - 1} cy={mapped.y - 1} r={1.2} fill="rgba(255,255,255,0.85)" />
-                            <Circle cx={mapped.x - 0.8} cy={mapped.y - 0.8} r={0.7} fill="rgba(255,255,255,0.95)" />
-                            {isCueBall && (
+                            {/* Destellos especulares */}
+                            <Circle cx={mapped.x - 1.0} cy={mapped.y - 1.0} r={1.1} fill="rgba(255,255,255,0.88)" />
+                            <Circle cx={mapped.x - 0.7} cy={mapped.y - 0.7} r={0.6} fill="rgba(255,255,255,0.98)" />
+
+                            {/* Anillo de selección si es bola tiradora */}
+                            {isCueBall && !isSimulating && (
                                 <Circle
                                     cx={mapped.x}
                                     cy={mapped.y}
-                                    r={4.5}
+                                    r={4.6}
                                     fill="none"
-                                    stroke="#fbbf24"
-                                    strokeWidth={0.8}
-                                    strokeDasharray="2 2"
-                                    opacity={0.7}
+                                    stroke="#38bdf8"
+                                    strokeWidth={0.7}
+                                    strokeDasharray="2.5 2.5"
+                                    opacity={0.85}
                                 />
                             )}
                         </G>
                     );
                 })}
+
+                {/* 14. Taco de Billar interactivo sobre la mesa estilo 8 Ball Pool */}
+                {showCueStick && !isSimulating && (
+                    (() => {
+                        const cueBall = balls.find((b) => b.id === cueBallId);
+                        if (!cueBall) return null;
+                        if (isEditMode && draggingBallId === cueBallId) return null;
+                        const mappedCue = mapPointToSvg(cueBall.pos, orientation, layout);
+                        return (
+                            <CaromCueGadget
+                                cueBallSvgPos={mappedCue}
+                                aimDirection={aimDirection}
+                                tableOrientation={orientation}
+                                powerLevel={powerLevel}
+                                isSimulating={isSimulating}
+                                visible={true}
+                            />
+                        );
+                    })()
+                )}
             </Svg>
 
             {showRuler && (
@@ -710,8 +1470,8 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                     orientation={orientation}
                     tableWidth={TABLE_W}
                     tableHeight={TABLE_H}
-                    railThickness={railThickness}
-                    cushionThickness={cushionThickness}
+                    railThickness={layout.railThickness}
+                    cushionThickness={layout.cushionThickness}
                 />
             )}
 
@@ -720,8 +1480,8 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                     orientation={orientation}
                     tableWidth={TABLE_W}
                     tableHeight={TABLE_H}
-                    railThickness={railThickness}
-                    cushionThickness={cushionThickness}
+                    railThickness={layout.railThickness}
+                    cushionThickness={layout.cushionThickness}
                     anchors={numberingAnchors}
                     formula={numberingFormula ?? undefined}
                     isEditMode={isEditMode}
@@ -752,7 +1512,7 @@ export const InteractiveBilliardsTable = memo(InteractiveBilliardsTableBase);
 const styles = StyleSheet.create({
     container: {
         width: '100%',
-        overflow: 'hidden',
+        overflow: 'visible',
     },
     pointerEventsNone: {
         pointerEvents: 'none',

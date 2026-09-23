@@ -53,6 +53,12 @@ import IconSchool from '@tabler/icons-react-native/IconSchool';
 import IconBrain from '@tabler/icons-react-native/IconBrain';
 import IconFlag from '@tabler/icons-react-native/IconFlag';
 import IconTrendingUp from '@tabler/icons-react-native/IconTrendingUp';
+import IconPalette from '@tabler/icons-react-native/IconPalette';
+import IconTrash from '@tabler/icons-react-native/IconTrash';
+import IconCompass from '@tabler/icons-react-native/IconCompass';
+import IconChevronsLeft from '@tabler/icons-react-native/IconChevronsLeft';
+import IconChevronsRight from '@tabler/icons-react-native/IconChevronsRight';
+import IconInfoCircle from '@tabler/icons-react-native/IconInfoCircle';
 
 export {
     IconTrophy,
@@ -110,6 +116,12 @@ export {
     IconBrain,
     IconFlag,
     IconTrendingUp,
+    IconPalette,
+    IconTrash,
+    IconCompass,
+    IconChevronsLeft,
+    IconChevronsRight,
+    IconInfoCircle,
 };
 
 
