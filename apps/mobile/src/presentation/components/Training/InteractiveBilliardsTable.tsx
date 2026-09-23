@@ -1,6 +1,6 @@
 import { memo, useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import { StyleSheet, View, Text, type StyleProp, type ViewStyle, PanResponder, GestureResponderEvent } from 'react-native';
-import Svg, { Circle, Defs, G, Line, LinearGradient, Polyline, RadialGradient, Rect, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, G, Line, LinearGradient, Polygon, Polyline, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { IconHandClick, IconTarget } from '@tabler/icons-react-native';
 
 import {
@@ -627,15 +627,46 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                     );
                 })}
 
-                {diamonds.longSide.map((point, idx) => (
-                    <Circle key={`long-diamond-${idx}`} cx={point.x} cy={point.y} r={1.0} fill="#f8fafc" opacity={0.94} />
-                ))}
-                {diamonds.shortSide.map((point, idx) => (
-                    <Circle key={`short-diamond-${idx}`} cx={point.x} cy={point.y} r={1.0} fill="#f8fafc" opacity={0.94} />
-                ))}
-                {diamonds.corners.map((point, idx) => (
-                    <Circle key={`corner-diamond-${idx}`} cx={point.x} cy={point.y} r={1.0} fill="#f8fafc" opacity={0.94} />
-                ))}
+                {diamonds.longSide.map((point, idx) => {
+                    // Long rails: horizontal when table is horizontal -> point vertically toward center (dy > dx)
+                    const dx = orientation === 'horizontal' ? 0.8 : 1.6;
+                    const dy = orientation === 'horizontal' ? 1.6 : 0.8;
+                    return (
+                        <Polygon
+                            key={`long-diamond-${idx}`}
+                            points={`${point.x},${point.y - dy} ${point.x + dx},${point.y} ${point.x},${point.y + dy} ${point.x - dx},${point.y}`}
+                            fill="#f8fafc"
+                            opacity={0.94}
+                        />
+                    );
+                })}
+                {diamonds.shortSide.map((point, idx) => {
+                    // Short rails: vertical when table is horizontal -> point horizontally toward center (dx > dy)
+                    const dx = orientation === 'horizontal' ? 1.6 : 0.8;
+                    const dy = orientation === 'horizontal' ? 0.8 : 1.6;
+                    return (
+                        <Polygon
+                            key={`short-diamond-${idx}`}
+                            points={`${point.x - dx},${point.y} ${point.x},${point.y - dy} ${point.x + dx},${point.y} ${point.x},${point.y + dy}`}
+                            fill="#f8fafc"
+                            opacity={0.94}
+                        />
+                    );
+                })}
+                {diamonds.corners.map((point, idx) => {
+                    // Corner diamonds: even index on horizontal rails (dy > dx), odd index on vertical rails (dx > dy)
+                    const isHorizontalRail = orientation === 'horizontal' ? idx % 2 === 0 : idx % 2 !== 0;
+                    const dx = isHorizontalRail ? 0.8 : 1.6;
+                    const dy = isHorizontalRail ? 1.6 : 0.8;
+                    return (
+                        <Polygon
+                            key={`corner-diamond-${idx}`}
+                            points={`${point.x},${point.y - dy} ${point.x + dx},${point.y} ${point.x},${point.y + dy} ${point.x - dx},${point.y}`}
+                            fill="#f8fafc"
+                            opacity={0.94}
+                        />
+                    );
+                })}
 
                 {renderTrajectory}
 

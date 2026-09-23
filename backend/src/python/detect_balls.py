@@ -20,6 +20,8 @@ import os
 import sys
 from dataclasses import dataclass
 
+import math
+
 import cv2
 import numpy as np
 from scipy.optimize import linear_sum_assignment
@@ -152,7 +154,7 @@ def evaluate_warp_hypothesis(image: np.ndarray, ordered_pts: np.ndarray, dst_w: 
     return warped, avg_circ
 
 
-def order_corners_perspective(image: np.ndarray, pts: np.ndarray) -> np.ndarray:
+def order_corners_perspective(image: np.ndarray, pts: np.ndarray) -> tuple[np.ndarray, str]:
     """Order corners into 2:1 landscape orientation with metric foreshortening resolution."""
     cw_pts = sort_corners_clockwise(pts)
     hyp_1 = cw_pts.copy()
@@ -168,9 +170,13 @@ def order_corners_perspective(image: np.ndarray, pts: np.ndarray) -> np.ndarray:
     long_ratio_1 = (len_01 + len_23) / max(len_12 + len_30, 1e-3)
 
     if abs(score_1 - score_2) > 0.07:
-        return hyp_1 if score_1 >= score_2 else hyp_2
-    
-    return hyp_1 if long_ratio_1 >= 1.05 else hyp_2
+        is_hyp_1 = score_1 >= score_2
+    else:
+        is_hyp_1 = long_ratio_1 >= 1.05
+
+    chosen_corners = hyp_1 if is_hyp_1 else hyp_2
+    orientation = "horizontal" if is_hyp_1 else "vertical"
+    return chosen_corners, orientation
 
 
 def classify_camera_perspective(corners: np.ndarray, img_shape: tuple) -> str:
@@ -425,15 +431,186 @@ def classify_three_carom_balls(warped: np.ndarray, candidates: list[tuple[float,
                 hsv_sample=b["hsv"],
             ))
 
+    # Enforce cushion bounds and physical non-overlapping between balls (R = 3.1 cm)
+    if assigned_balls:
+        min_d_cm = 6.25
+        pts = [[b.x * 284.0, b.y * 142.0] for b in assigned_balls]
+        fallback_angles = [0.0, (2.0 * math.pi) / 3.0, (4.0 * math.pi) / 3.0]
+
+        for it in range(25):
+            moved = False
+            pair_idx = 0
+            for i in range(len(pts)):
+                for j in range(i + 1, len(pts)):
+                    dx = pts[j][0] - pts[i][0]
+                    dy = pts[j][1] - pts[i][1]
+                    dist = math.hypot(dx, dy)
+                    if dist < min_d_cm:
+                        moved = True
+                        overlap = min_d_cm - dist
+                        if dist < 1e-4:
+                            ang = fallback_angles[pair_idx % len(fallback_angles)]
+                            nx = math.cos(ang)
+                            ny = math.sin(ang)
+                        else:
+                            nx = dx / dist
+                            ny = dy / dist
+                        push = overlap * 0.55
+                        pts[i][0] -= nx * push
+                        pts[i][1] -= ny * push
+                        pts[j][0] += nx * push
+                        pts[j][1] += ny * push
+                        pts[i][0] = max(3.1, min(280.9, pts[i][0]))
+                        pts[i][1] = max(3.1, min(138.9, pts[i][1]))
+                        pts[j][0] = max(3.1, min(280.9, pts[j][0]))
+                        pts[j][1] = max(3.1, min(138.9, pts[j][1]))
+                    pair_idx += 1
+            if not moved:
+                break
+
+        for idx, b in enumerate(assigned_balls):
+            b.x = float(round(pts[idx][0] / 284.0, 4))
+            b.y = float(round(pts[idx][1] / 142.0, 4))
+
     return assigned_balls
 
 
 # ---------------------------------------------------------------------------
-# 4. Main API Entry Point
+# 4. Projective 8x4 Grid & Perspective Depth Analysis
+# ---------------------------------------------------------------------------
+
+def compute_projected_grid(corners: np.ndarray, img_w: int, img_h: int, dst_w: int = 1000, dst_h: int = 500) -> dict:
+    """
+    Project canonical 8x4 diamond grid lines (9 long-rail and 5 short-rail lines)
+    onto the original image plane using inverse homography M^-1.
+    All coordinates returned are normalized [0..1] relative to image dimensions.
+    """
+    dst_pts = np.array([
+        [0, 0],
+        [dst_w - 1, 0],
+        [dst_w - 1, dst_h - 1],
+        [0, dst_h - 1],
+    ], dtype=np.float32)
+
+    M = cv2.getPerspectiveTransform(corners, dst_pts)
+    M_inv = np.linalg.inv(M)
+
+    # 9 vertical lines (8 segments of 35.5 cm across 284 cm)
+    vertical_lines = []
+    for i in range(9):
+        x_can = float(i * (dst_w - 1) / 8.0)
+        pts_can = np.array([[[x_can, 0.0]], [[x_can, float(dst_h - 1)]]], dtype=np.float32)
+        pts_img = cv2.perspectiveTransform(pts_can, M_inv)
+        p1 = pts_img[0][0]
+        p2 = pts_img[1][0]
+        vertical_lines.append({
+            "diamondIndex": i,
+            "x1": round(float(np.clip(p1[0] / img_w, 0.0, 1.0)), 4),
+            "y1": round(float(np.clip(p1[1] / img_h, 0.0, 1.0)), 4),
+            "x2": round(float(np.clip(p2[0] / img_w, 0.0, 1.0)), 4),
+            "y2": round(float(np.clip(p2[1] / img_h, 0.0, 1.0)), 4),
+        })
+
+    # 5 horizontal lines (4 segments of 35.5 cm across 142 cm)
+    horizontal_lines = []
+    for j in range(5):
+        y_can = float(j * (dst_h - 1) / 4.0)
+        pts_can = np.array([[[0.0, y_can]], [[float(dst_w - 1), y_can]]], dtype=np.float32)
+        pts_img = cv2.perspectiveTransform(pts_can, M_inv)
+        p1 = pts_img[0][0]
+        p2 = pts_img[1][0]
+        horizontal_lines.append({
+            "diamondIndex": j,
+            "x1": round(float(np.clip(p1[0] / img_w, 0.0, 1.0)), 4),
+            "y1": round(float(np.clip(p1[1] / img_h, 0.0, 1.0)), 4),
+            "x2": round(float(np.clip(p2[0] / img_w, 0.0, 1.0)), 4),
+            "y2": round(float(np.clip(p2[1] / img_h, 0.0, 1.0)), 4),
+        })
+
+    return {
+        "verticalLines": vertical_lines,
+        "horizontalLines": horizontal_lines,
+    }
+
+
+def compute_ball_depth_telemetry(
+    balls: list[DetectedBall],
+    corners: np.ndarray,
+    img_w: int,
+    img_h: int,
+    dst_w: int = 1000,
+    dst_h: int = 500
+) -> list[dict]:
+    """
+    Compute original image coordinates, apparent pixel radius, depth tiering
+    (closer = larger apparent radius), and true 3D felt contact points.
+    """
+    dst_pts = np.array([
+        [0, 0],
+        [dst_w - 1, 0],
+        [dst_w - 1, dst_h - 1],
+        [0, dst_h - 1],
+    ], dtype=np.float32)
+
+    M = cv2.getPerspectiveTransform(corners, dst_pts)
+    M_inv = np.linalg.inv(M)
+
+    enhanced_balls = []
+    apparent_radii = []
+
+    for b in balls:
+        # Project canonical position back to original image
+        px_can = b.x * (dst_w - 1)
+        py_can = b.y * (dst_h - 1)
+        
+        pt_can = np.array([[[px_can, py_can]]], dtype=np.float32)
+        pt_img = cv2.perspectiveTransform(pt_can, M_inv)[0][0]
+        
+        # Local scale factor in image pixels:
+        delta_x = 15.0
+        pt_neighbor = np.array([[[px_can + delta_x, py_can]]], dtype=np.float32)
+        pt_neighbor_img = cv2.perspectiveTransform(pt_neighbor, M_inv)[0][0]
+        local_scale = np.linalg.norm(pt_neighbor_img - pt_img) / delta_x
+        apparent_r = max(4.0, b.radius * local_scale)
+        apparent_radii.append(apparent_r)
+
+        # 3D contact point parallax: the sphere center is elevated by radius R above the cloth.
+        # Its ground contact point in perspective view is at the bottom tangent towards the viewer.
+        contact_y_px = pt_img[1] + (apparent_r * 0.72)
+        contact_x_px = pt_img[0]
+
+        enhanced_balls.append({
+            "label": b.label,
+            "x": b.x,
+            "y": b.y,
+            "radius": b.radius,
+            "confidence": b.confidence,
+            "imageX": round(float(np.clip(pt_img[0] / img_w, 0.0, 1.0)), 4),
+            "imageY": round(float(np.clip(pt_img[1] / img_h, 0.0, 1.0)), 4),
+            "contactX": round(float(np.clip(contact_x_px / img_w, 0.0, 1.0)), 4),
+            "contactY": round(float(np.clip(contact_y_px / img_h, 0.0, 1.0)), 4),
+            "apparentRadius": round(float(apparent_r), 1),
+        })
+
+    # Sort balls by apparent radius to classify depth tiers
+    # Larger apparent radius = closer to the camera
+    if apparent_radii:
+        sorted_indices = np.argsort(apparent_radii)  # ascending: smallest first
+        tier_labels = ["lejana", "media", "cercana"]
+        for rank, idx in enumerate(sorted_indices):
+            tier = tier_labels[min(rank, len(tier_labels) - 1)]
+            enhanced_balls[idx]["depthTier"] = tier
+            enhanced_balls[idx]["relativeDepth"] = round(1.0 - (rank / max(1, len(balls) - 1)), 2)
+
+    return enhanced_balls
+
+
+# ---------------------------------------------------------------------------
+# 5. Main API Entry Point
 # ---------------------------------------------------------------------------
 
 def detect_from_image(image_path: str, corners_override: list[dict] | None = None) -> dict:
-    """Execute complete multi-angle table detection and ball extraction pipeline."""
+    """Execute complete multi-angle table detection, diamond grid, and ball extraction pipeline."""
     image = cv2.imread(image_path)
     if image is None:
         return {"error": f"No se pudo leer la imagen: {image_path}", "balls": []}
@@ -442,8 +619,8 @@ def detect_from_image(image_path: str, corners_override: list[dict] | None = Non
 
     # 1. Determine corners (manual calibration override vs auto-detection)
     if corners_override and len(corners_override) == 4:
-        # Support normalized (0..1) or pixel coordinates
-        is_normalized = all(c["x"] <= 1.05 and c["y"] <= 1.05 for c in corners_override)
+        # Support normalized (extended bounds) or pixel coordinates
+        is_normalized = all(-1.0 <= c["x"] <= 3.0 and -1.0 <= c["y"] <= 3.0 for c in corners_override)
         if is_normalized:
             corners = np.array(
                 [[c["x"] * img_w, c["y"] * img_h] for c in corners_override],
@@ -454,7 +631,7 @@ def detect_from_image(image_path: str, corners_override: list[dict] | None = Non
                 [[c["x"], c["y"]] for c in corners_override],
                 dtype=np.float32,
             )
-        corners = order_corners_perspective(image, corners)
+        corners, table_orientation = order_corners_perspective(image, corners)
         detection_method = "manual_calibrated"
     else:
         raw_corners = find_table_contour_robust(image)
@@ -464,8 +641,9 @@ def detect_from_image(image_path: str, corners_override: list[dict] | None = Non
                 "balls": [],
                 "topDownImage": "",
                 "detectionMethod": "none",
+                "tableOrientation": "horizontal",
             }
-        corners = order_corners_perspective(image, raw_corners)
+        corners, table_orientation = order_corners_perspective(image, raw_corners)
         detection_method = "auto_multi_space"
 
     camera_angle = classify_camera_perspective(corners, image.shape)
@@ -482,49 +660,47 @@ def detect_from_image(image_path: str, corners_override: list[dict] | None = Non
     M = cv2.getPerspectiveTransform(corners, dst_pts)
     warped = cv2.warpPerspective(image, M, (dst_w, dst_h))
 
-    # 3. Detect diamonds on rails
+    # 3. Compute projective 8x4 diamond grid lines in image space
+    projected_grid = compute_projected_grid(corners, img_w, img_h, dst_w, dst_h)
+
+    # 4. Detect diamonds on rails
     diamonds = detect_diamonds_on_rails(warped)
 
-    # 4. Detect and classify 3 carom balls
+    # 5. Detect and classify 3 carom balls
     candidates = detect_ball_candidates(warped)
     balls = classify_three_carom_balls(warped, candidates)
+    detailed_balls = compute_ball_depth_telemetry(balls, corners, img_w, img_h, dst_w, dst_h)
+
+    cw_corners = sort_corners_clockwise(corners)
 
     if len(balls) < 3:
         return {
             "error": f"Se detectaron {len(balls)} bola(s) pero se necesitan exactamente 3. Ajusta las esquinas manualmente o intenta con otra foto.",
-            "balls": [
-                {"label": b.label, "x": b.x, "y": b.y, "radius": b.radius, "confidence": b.confidence}
-                for b in balls
-            ],
+            "balls": detailed_balls,
             "detectedCorners": [
-                {"x": round(float(c[0]), 1), "y": round(float(c[1]), 1)} for c in corners
+                {"x": round(float(c[0]), 1), "y": round(float(c[1]), 1)} for c in cw_corners
             ],
             "detectedDiamonds": diamonds,
+            "projectedGrid": projected_grid,
             "cameraAngle": camera_angle,
+            "tableOrientation": table_orientation,
             "topDownImage": "",
             "detectionMethod": detection_method,
         }
 
-    # 5. Encode rectified top-down table to JPEG base64
+    # 6. Encode rectified top-down table to JPEG base64
     _, buffer = cv2.imencode('.jpg', warped, [cv2.IMWRITE_JPEG_QUALITY, 85])
     top_down_b64 = base64.b64encode(buffer).decode('utf-8')
 
     return {
-        "balls": [
-            {
-                "label": b.label,
-                "x": b.x,
-                "y": b.y,
-                "radius": b.radius,
-                "confidence": b.confidence,
-            }
-            for b in balls
-        ],
+        "balls": detailed_balls,
         "detectedCorners": [
-            {"x": round(float(c[0]), 1), "y": round(float(c[1]), 1)} for c in corners
+            {"x": round(float(c[0]), 1), "y": round(float(c[1]), 1)} for c in cw_corners
         ],
         "detectedDiamonds": diamonds,
+        "projectedGrid": projected_grid,
         "cameraAngle": camera_angle,
+        "tableOrientation": table_orientation,
         "aspectRatio": TABLE_ASPECT,
         "totalDetected": len(candidates),
         "totalValid": len(balls),
@@ -532,6 +708,7 @@ def detect_from_image(image_path: str, corners_override: list[dict] | None = Non
         "diamondsDetected": len(diamonds),
         "topDownImage": top_down_b64,
     }
+
 
 
 def main():

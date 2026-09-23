@@ -42,16 +42,16 @@ describe('validateCorners', () => {
         expect(validateCorners(corners).valid).toBe(false);
     });
 
-    it('rejects corners outside 0-1 range', () => {
+    it('rejects corners outside expanded canvas range', () => {
         const corners: Point[] = [
-            { x: -0.1, y: 0.1 },
+            { x: -1.2, y: 0.1 },
             { x: 0.9, y: 0.1 },
             { x: 0.9, y: 0.9 },
             { x: 0.1, y: 0.9 },
         ];
         const result = validateCorners(corners);
         expect(result.valid).toBe(false);
-        expect(result.error).toContain('between 0 and 1');
+        expect(result.error).toContain('expanded canvas');
     });
 
     it('rejects concave quadrilateral', () => {

@@ -1,6 +1,17 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import Svg, { Circle, Defs, G, Line, LinearGradient, Path, RadialGradient, Rect, Stop, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, Defs, G, Line, LinearGradient, Path, Polygon, RadialGradient, Rect, Stop, Text as SvgText } from 'react-native-svg';
+
+import { resolveBilliardPhysics } from './billiardPhysics';
+import {
+  type TablePreferences,
+  type DiamondShape,
+  type DiamondCount,
+  type WoodFinish,
+  loadTablePreferences,
+  resolveClothPalette,
+  resolveWoodPalette,
+} from './tablePreferences';
 
 export interface TablePoint {
   x: number; // 0..284
@@ -17,7 +28,12 @@ export interface TrainingPlayTableProps {
   onSimulationEnd?: () => void;
   showGrid?: boolean;
   showDiamondNumbers?: boolean;
-  clothColor?: 'tournament_blue' | 'simonis_green';
+  clothColor?: string;
+  diamondShape?: DiamondShape;
+  diamondCount?: DiamondCount;
+  showCornerDiamonds?: boolean;
+  woodFinish?: WoodFinish;
+  preferences?: Partial<TablePreferences>;
 }
 
 const TABLE_W = 284;
@@ -42,25 +58,52 @@ function TrainingPlayTableBase({
   showGrid = true,
   showDiamondNumbers = false,
   clothColor = 'tournament_blue',
+  diamondShape = 'rhombus',
+  diamondCount = '9_5',
+  showCornerDiamonds = true,
+  woodFinish = 'ebony',
+  preferences,
 }: TrainingPlayTableProps) {
-  // Current animated position of the cue ball
-  const [animBall, setAnimBall] = useState<TablePoint>(whiteBall);
+  const [storedPrefs, setStoredPrefs] = useState<TablePreferences | null>(null);
+
+  useEffect(() => {
+    if (!preferences) {
+      loadTablePreferences().then(setStoredPrefs);
+    }
+  }, [preferences]);
+
+  // Active visual options (merged from preferences prop, stored prefs, or explicit fallback props)
+  const effectivePrefs = preferences ?? storedPrefs ?? undefined;
+  const activeClothColor = effectivePrefs?.clothColor ?? clothColor;
+  const activeDiamondShape = effectivePrefs?.diamondShape ?? diamondShape;
+  const activeDiamondCount = effectivePrefs?.diamondCount ?? diamondCount;
+  const activeShowCorners = effectivePrefs?.showCornerDiamonds ?? showCornerDiamonds;
+  const activeShowGrid = effectivePrefs?.showGrid ?? showGrid;
+  const activeShowNumbers = effectivePrefs?.showDiamondNumbers ?? showDiamondNumbers;
+  const activeWoodFinish = effectivePrefs?.woodFinish ?? woodFinish;
+
+  const clothPalette = useMemo(() => resolveClothPalette(activeClothColor), [activeClothColor]);
+  const woodPalette = useMemo(() => resolveWoodPalette(activeWoodFinish), [activeWoodFinish]);
+
+  // Enforce physical constraints: balls stay on felt (never inside/over cushions) and never overlap
+  const [safeWhite, safeYellow, safeRed] = useMemo(() => {
+    return resolveBilliardPhysics([whiteBall, yellowBall, redBall]);
+  }, [whiteBall, yellowBall, redBall]);
+
+  // Current animated position of the cue ball (only active during trajectory simulation)
+  const [simBallPos, setSimBallPos] = useState<TablePoint | null>(null);
   const animFrameRef = useRef<number | null>(null);
 
-  // Sync initial ball position when not simulating
+  // Smooth simulation animation along trajectory path
   useEffect(() => {
-    if (!isSimulating) {
-      setAnimBall(whiteBall);
+    if (!isSimulating || trajectory.length < 2) {
+      setSimBallPos(null);
       if (animFrameRef.current !== null) {
         cancelAnimationFrame(animFrameRef.current);
         animFrameRef.current = null;
       }
+      return;
     }
-  }, [whiteBall, isSimulating]);
-
-  // Smooth simulation animation along trajectory path
-  useEffect(() => {
-    if (!isSimulating || trajectory.length < 2) return;
 
     let startTime: number | null = null;
     const duration = 2800; // 2.8 seconds full shot execution
@@ -94,7 +137,7 @@ function TrainingPlayTableBase({
       const p0 = trajectory[segIdx];
       const p1 = trajectory[Math.min(segIdx + 1, trajectory.length - 1)];
 
-      setAnimBall({
+      setSimBallPos({
         x: p0.x + (p1.x - p0.x) * segFactor,
         y: p0.y + (p1.y - p0.y) * segFactor,
       });
@@ -111,20 +154,26 @@ function TrainingPlayTableBase({
     return () => {
       if (animFrameRef.current !== null) {
         cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = null;
       }
     };
   }, [isSimulating, trajectory, onSimulationEnd]);
+
+  const activeCueBall = isSimulating && simBallPos ? simBallPos : safeWhite;
 
   // Build SVG path string for trajectory
   const pathD = trajectory.length > 0
     ? trajectory.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x + PLAY_OFFSET_X} ${p.y + PLAY_OFFSET_Y}`).join(' ')
     : '';
 
-  // Diamonds calculation
-  const longDiamonds = Array.from({ length: 7 }, (_, i) => (i + 1) / 8);
-  const shortDiamonds = Array.from({ length: 3 }, (_, i) => (i + 1) / 4);
-
-  const isBlue = clothColor === 'tournament_blue';
+  // Diamonds calculation: 9 on long rails (including corners) or 7, 5 on short rails or 3
+  const hasCorners = activeDiamondCount === '9_5' && activeShowCorners;
+  const longDiamonds = hasCorners
+    ? Array.from({ length: 9 }, (_, i) => i / 8)
+    : Array.from({ length: 7 }, (_, i) => (i + 1) / 8);
+  const shortDiamonds = hasCorners
+    ? Array.from({ length: 5 }, (_, i) => i / 4)
+    : Array.from({ length: 3 }, (_, i) => (i + 1) / 4);
 
   return (
     <View style={[styles.container, style]}>
@@ -135,64 +184,57 @@ function TrainingPlayTableBase({
         style={styles.svg}
       >
         <Defs>
-          {/* Hardwood Rail Gradient (Dark Ebony / Mahogany) */}
-          <LinearGradient id="woodRail" x1="0" y1="0" x2="1" y2="1">
-            <Stop offset="0%" stopColor="#1e130c" />
-            <Stop offset="50%" stopColor="#2c1a12" />
-            <Stop offset="100%" stopColor="#140b07" />
+          {/* Hardwood Rail Gradient based on woodFinish */}
+          <LinearGradient id="railGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <Stop offset="0%" stopColor={woodPalette.start} />
+            <Stop offset="50%" stopColor={woodPalette.mid} />
+            <Stop offset="100%" stopColor={woodPalette.end} />
           </LinearGradient>
 
-          {/* Tournament Simonis Blue Cloth */}
-          <RadialGradient id="clothBlue" cx="50%" cy="50%" r="55%">
-            <Stop offset="0%" stopColor="#13638c" />
-            <Stop offset="65%" stopColor="#0b4566" />
-            <Stop offset="100%" stopColor="#072d42" />
+          {/* Dynamic Cloth Radial Gradient (Preset or Custom Hex) */}
+          <RadialGradient id="clothGrad" cx="50%" cy="50%" rx="80%" ry="75%">
+            <Stop offset="0%" stopColor={clothPalette.highlight} />
+            <Stop offset="55%" stopColor={clothPalette.base} />
+            <Stop offset="100%" stopColor={clothPalette.edge} />
           </RadialGradient>
 
-          {/* Simonis 300 Green Cloth */}
-          <RadialGradient id="clothGreen" cx="50%" cy="50%" r="55%">
-            <Stop offset="0%" stopColor="#16654e" />
-            <Stop offset="65%" stopColor="#11503e" />
-            <Stop offset="100%" stopColor="#0c3d2e" />
-          </RadialGradient>
-
-          {/* Ball Shading Gradients */}
-          <RadialGradient id="whiteBallGrad" cx="32%" cy="32%" r="68%">
+          {/* Realistic 3D Ball Spherical Shading */}
+          <RadialGradient id="whiteBallGrad" cx="35%" cy="35%" rx="65%" ry="65%">
             <Stop offset="0%" stopColor="#ffffff" />
-            <Stop offset="60%" stopColor="#f1f5f9" />
-            <Stop offset="85%" stopColor="#cbd5e1" />
-            <Stop offset="100%" stopColor="#64748b" />
+            <Stop offset="50%" stopColor="#f1f5f9" />
+            <Stop offset="80%" stopColor="#cbd5e1" />
+            <Stop offset="100%" stopColor="#94a3b8" />
           </RadialGradient>
 
-          <RadialGradient id="yellowBallGrad" cx="32%" cy="32%" r="68%">
+          <RadialGradient id="yellowBallGrad" cx="35%" cy="35%" rx="65%" ry="65%">
             <Stop offset="0%" stopColor="#fef08a" />
-            <Stop offset="60%" stopColor="#facc15" />
-            <Stop offset="85%" stopColor="#ca8a04" />
+            <Stop offset="45%" stopColor="#eab308" />
+            <Stop offset="80%" stopColor="#ca8a04" />
             <Stop offset="100%" stopColor="#854d0e" />
           </RadialGradient>
 
-          <RadialGradient id="redBallGrad" cx="32%" cy="32%" r="68%">
-            <Stop offset="0%" stopColor="#fca5a5" />
-            <Stop offset="55%" stopColor="#dc2626" />
-            <Stop offset="85%" stopColor="#991b1b" />
-            <Stop offset="100%" stopColor="#450a0a" />
+          <RadialGradient id="redBallGrad" cx="35%" cy="35%" rx="65%" ry="65%">
+            <Stop offset="0%" stopColor="#f87171" />
+            <Stop offset="45%" stopColor="#dc2626" />
+            <Stop offset="80%" stopColor="#b91c1c" />
+            <Stop offset="100%" stopColor="#7f1d1d" />
           </RadialGradient>
 
-          <RadialGradient id="ballShadow" cx="50%" cy="50%" r="50%">
-            <Stop offset="0%" stopColor="rgba(0,0,0,0.7)" />
-            <Stop offset="60%" stopColor="rgba(0,0,0,0.3)" />
+          <RadialGradient id="ballShadow" cx="50%" cy="50%" rx="50%" ry="50%">
+            <Stop offset="0%" stopColor="rgba(0,0,0,0.55)" />
+            <Stop offset="70%" stopColor="rgba(0,0,0,0.2)" />
             <Stop offset="100%" stopColor="rgba(0,0,0,0)" />
           </RadialGradient>
         </Defs>
 
-        {/* 1. Outer Hardwood Rails */}
+        {/* 1. Outer Hardwood Frame with Beveled Corner Radius */}
         <Rect
           x={0}
           y={0}
           width={TOTAL_W}
           height={TOTAL_H}
           rx={8}
-          fill="url(#woodRail)"
+          fill="url(#railGrad)"
         />
 
         {/* Outer Rail Bevel Inset */}
@@ -203,38 +245,88 @@ function TrainingPlayTableBase({
           height={TOTAL_H - 5}
           rx={6}
           fill="none"
-          stroke="#3d251a"
+          stroke={woodPalette.bevel}
           strokeWidth={1}
         />
 
-        {/* 2. Diamond Inlays on Rails */}
-        {/* Top & Bottom Long Rails (7 diamonds) */}
+        {/* 2. Diamond Inlays on Rails (Rhombus or Circle) */}
+        {/* Top & Bottom Long Rails */}
         {longDiamonds.map((ratio, i) => {
           const x = PLAY_OFFSET_X + ratio * TABLE_W;
+          const yTop = RAIL_T * 0.45;
+          const yBot = TOTAL_H - RAIL_T * 0.45;
+          const dx = 1.3;
+          const dy = 2.6;
           return (
             <G key={`long-diamond-${i}`}>
-              <Circle cx={x} cy={RAIL_T * 0.45} r={1.6} fill="#ffffff" opacity={0.95} />
-              <Circle cx={x} cy={TOTAL_H - RAIL_T * 0.45} r={1.6} fill="#ffffff" opacity={0.95} />
+              {activeDiamondShape === 'rhombus' ? (
+                <>
+                  <Polygon
+                    points={`${x},${yTop - dy} ${x + dx},${yTop} ${x},${yTop + dy} ${x - dx},${yTop}`}
+                    fill="#ffffff"
+                    stroke="#c27803"
+                    strokeWidth={0.45}
+                    opacity={0.95}
+                  />
+                  <Polygon
+                    points={`${x},${yBot - dy} ${x + dx},${yBot} ${x},${yBot + dy} ${x - dx},${yBot}`}
+                    fill="#ffffff"
+                    stroke="#c27803"
+                    strokeWidth={0.45}
+                    opacity={0.95}
+                  />
+                </>
+              ) : (
+                <>
+                  <Circle cx={x} cy={yTop} r={1.6} fill="#ffffff" stroke="#c27803" strokeWidth={0.35} opacity={0.95} />
+                  <Circle cx={x} cy={yBot} r={1.6} fill="#ffffff" stroke="#c27803" strokeWidth={0.35} opacity={0.95} />
+                </>
+              )}
             </G>
           );
         })}
-        {/* Left & Right Short Rails (3 diamonds) */}
+        {/* Left & Right Short Rails */}
         {shortDiamonds.map((ratio, i) => {
           const y = PLAY_OFFSET_Y + ratio * TABLE_H;
+          const xLeft = RAIL_T * 0.45;
+          const xRight = TOTAL_W - RAIL_T * 0.45;
+          const dx = 2.6;
+          const dy = 1.3;
           return (
             <G key={`short-diamond-${i}`}>
-              <Circle cx={RAIL_T * 0.45} cy={y} r={1.6} fill="#ffffff" opacity={0.95} />
-              <Circle cx={TOTAL_W - RAIL_T * 0.45} cy={y} r={1.6} fill="#ffffff" opacity={0.95} />
+              {activeDiamondShape === 'rhombus' ? (
+                <>
+                  <Polygon
+                    points={`${xLeft - dx},${y} ${xLeft},${y - dy} ${xLeft + dx},${y} ${xLeft},${y + dy}`}
+                    fill="#ffffff"
+                    stroke="#c27803"
+                    strokeWidth={0.45}
+                    opacity={0.95}
+                  />
+                  <Polygon
+                    points={`${xRight - dx},${y} ${xRight},${y - dy} ${xRight + dx},${y} ${xRight},${y + dy}`}
+                    fill="#ffffff"
+                    stroke="#c27803"
+                    strokeWidth={0.45}
+                    opacity={0.95}
+                  />
+                </>
+              ) : (
+                <>
+                  <Circle cx={xLeft} cy={y} r={1.6} fill="#ffffff" stroke="#c27803" strokeWidth={0.35} opacity={0.95} />
+                  <Circle cx={xRight} cy={y} r={1.6} fill="#ffffff" stroke="#c27803" strokeWidth={0.35} opacity={0.95} />
+                </>
+              )}
             </G>
           );
         })}
 
-        {/* Optional Diamond System Numbers (Base 50: 10, 20, 30... 80) */}
-        {showDiamondNumbers && (
+        {/* Optional Diamond System Numbers */}
+        {activeShowNumbers && (
           <G opacity={0.75}>
             {longDiamonds.map((ratio, i) => {
               const x = PLAY_OFFSET_X + ratio * TABLE_W;
-              const val = (i + 1) * 10;
+              const val = hasCorners ? i * 10 : (i + 1) * 10;
               return (
                 <G key={`diamond-num-long-${i}`}>
                   <SvgText x={x} y={RAIL_T * 0.85} fontSize={4.5} fill="#e2e8f0" textAnchor="middle" fontWeight="bold">
@@ -248,7 +340,7 @@ function TrainingPlayTableBase({
             })}
             {shortDiamonds.map((ratio, i) => {
               const y = PLAY_OFFSET_Y + ratio * TABLE_H;
-              const val = (i + 1) * 10;
+              const val = hasCorners ? i * 10 : (i + 1) * 10;
               return (
                 <G key={`diamond-num-short-${i}`}>
                   <SvgText x={RAIL_T * 0.75} y={y + 1.5} fontSize={4.5} fill="#e2e8f0" textAnchor="middle" fontWeight="bold">
@@ -272,7 +364,7 @@ function TrainingPlayTableBase({
             L ${PLAY_OFFSET_X} ${PLAY_OFFSET_Y}
             Z
           `}
-          fill={isBlue ? '#08324a' : '#0a3c2e'}
+          fill={clothPalette.cushionTop}
         />
         <Path
           d={`
@@ -282,7 +374,7 @@ function TrainingPlayTableBase({
             L ${RAIL_T} ${TOTAL_H - RAIL_T}
             Z
           `}
-          fill={isBlue ? '#062638' : '#083025'}
+          fill={clothPalette.cushionBottom}
         />
         <Path
           d={`
@@ -292,7 +384,7 @@ function TrainingPlayTableBase({
             L ${RAIL_T} ${TOTAL_H - RAIL_T}
             Z
           `}
-          fill={isBlue ? '#072b3f' : '#09382b'}
+          fill={clothPalette.cushionLeft}
         />
         <Path
           d={`
@@ -302,7 +394,7 @@ function TrainingPlayTableBase({
             L ${PLAY_OFFSET_X + TABLE_W} ${PLAY_OFFSET_Y + TABLE_H}
             Z
           `}
-          fill={isBlue ? '#052030' : '#072a20'}
+          fill={clothPalette.cushionRight}
         />
 
         {/* 4. Playfield Cloth Surface (Strict 2:1 Ratio, No Pockets) */}
@@ -311,13 +403,37 @@ function TrainingPlayTableBase({
           y={PLAY_OFFSET_Y}
           width={TABLE_W}
           height={TABLE_H}
-          fill={isBlue ? 'url(#clothBlue)' : 'url(#clothGreen)'}
+          fill="url(#clothGrad)"
+        />
+
+        {/* Cushion Nose Edge Line (Inner boundary of playing felt) */}
+        <Rect
+          x={PLAY_OFFSET_X}
+          y={PLAY_OFFSET_Y}
+          width={TABLE_W}
+          height={TABLE_H}
+          fill="none"
+          stroke={clothPalette.cushionNose}
+          strokeWidth={0.5}
+          opacity={0.35}
+        />
+
+        {/* Soft 3D Cushion Overhang Drop Shadow (Hugs only 1.2px of inner cushion perimeter) */}
+        <Rect
+          x={PLAY_OFFSET_X + 0.5}
+          y={PLAY_OFFSET_Y + 0.5}
+          width={TABLE_W - 1}
+          height={TABLE_H - 1}
+          fill="none"
+          stroke="rgba(0, 0, 0, 0.22)"
+          strokeWidth={1.2}
+          opacity={0.6}
         />
 
         {/* 8x4 Carom Diamond Aiming Grid (Module of 35.5cm squares) */}
-        {showGrid && (
+        {activeShowGrid && (
           <G opacity={0.14}>
-            {longDiamonds.map((ratio, i) => (
+            {(hasCorners ? longDiamonds.slice(1, -1) : longDiamonds).map((ratio, i) => (
               <Line
                 key={`grid-x-${i}`}
                 x1={PLAY_OFFSET_X + ratio * TABLE_W}
@@ -329,7 +445,7 @@ function TrainingPlayTableBase({
                 strokeDasharray="2.5, 3.5"
               />
             ))}
-            {shortDiamonds.map((ratio, i) => (
+            {(hasCorners ? shortDiamonds.slice(1, -1) : shortDiamonds).map((ratio, i) => (
               <Line
                 key={`grid-y-${i}`}
                 x1={PLAY_OFFSET_X}
@@ -370,21 +486,21 @@ function TrainingPlayTableBase({
         {/* 6. Object Ball 2 (Red Ball) */}
         <G>
           <Circle
-            cx={redBall.x + PLAY_OFFSET_X + 1.2}
-            cy={redBall.y + PLAY_OFFSET_Y + 1.6}
+            cx={safeRed.x + PLAY_OFFSET_X + 1.2}
+            cy={safeRed.y + PLAY_OFFSET_Y + 1.6}
             r={BALL_R * 1.05}
             fill="url(#ballShadow)"
           />
           <Circle
-            cx={redBall.x + PLAY_OFFSET_X}
-            cy={redBall.y + PLAY_OFFSET_Y}
+            cx={safeRed.x + PLAY_OFFSET_X}
+            cy={safeRed.y + PLAY_OFFSET_Y}
             r={BALL_R}
             fill="url(#redBallGrad)"
           />
           {/* Specular glint highlight */}
           <Circle
-            cx={redBall.x + PLAY_OFFSET_X - BALL_R * 0.35}
-            cy={redBall.y + PLAY_OFFSET_Y - BALL_R * 0.35}
+            cx={safeRed.x + PLAY_OFFSET_X - BALL_R * 0.35}
+            cy={safeRed.y + PLAY_OFFSET_Y - BALL_R * 0.35}
             r={BALL_R * 0.25}
             fill="#ffffff"
             opacity={0.65}
@@ -394,41 +510,41 @@ function TrainingPlayTableBase({
         {/* 7. Object Ball 1 (Yellow Ball with Aramith Pro-Cup Spots) */}
         <G>
           <Circle
-            cx={yellowBall.x + PLAY_OFFSET_X + 1.2}
-            cy={yellowBall.y + PLAY_OFFSET_Y + 1.6}
+            cx={safeYellow.x + PLAY_OFFSET_X + 1.2}
+            cy={safeYellow.y + PLAY_OFFSET_Y + 1.6}
             r={BALL_R * 1.05}
             fill="url(#ballShadow)"
           />
           <Circle
-            cx={yellowBall.x + PLAY_OFFSET_X}
-            cy={yellowBall.y + PLAY_OFFSET_Y}
+            cx={safeYellow.x + PLAY_OFFSET_X}
+            cy={safeYellow.y + PLAY_OFFSET_Y}
             r={BALL_R}
             fill="url(#yellowBallGrad)"
           />
           {/* Specular highlight */}
           <Circle
-            cx={yellowBall.x + PLAY_OFFSET_X - BALL_R * 0.35}
-            cy={yellowBall.y + PLAY_OFFSET_Y - BALL_R * 0.35}
+            cx={safeYellow.x + PLAY_OFFSET_X - BALL_R * 0.35}
+            cy={safeYellow.y + PLAY_OFFSET_Y - BALL_R * 0.35}
             r={BALL_R * 0.25}
             fill="#ffffff"
             opacity={0.7}
           />
           {/* Aramith Pro-Cup red rotation dots */}
           <Circle
-            cx={yellowBall.x + PLAY_OFFSET_X}
-            cy={yellowBall.y + PLAY_OFFSET_Y}
+            cx={safeYellow.x + PLAY_OFFSET_X}
+            cy={safeYellow.y + PLAY_OFFSET_Y}
             r={BALL_R * 0.22}
             fill="#b91c1c"
           />
           <Circle
-            cx={yellowBall.x + PLAY_OFFSET_X + BALL_R * 0.55}
-            cy={yellowBall.y + PLAY_OFFSET_Y}
+            cx={safeYellow.x + PLAY_OFFSET_X + BALL_R * 0.55}
+            cy={safeYellow.y + PLAY_OFFSET_Y}
             r={BALL_R * 0.12}
             fill="#b91c1c"
           />
           <Circle
-            cx={yellowBall.x + PLAY_OFFSET_X - BALL_R * 0.55}
-            cy={yellowBall.y + PLAY_OFFSET_Y}
+            cx={safeYellow.x + PLAY_OFFSET_X - BALL_R * 0.55}
+            cy={safeYellow.y + PLAY_OFFSET_Y}
             r={BALL_R * 0.12}
             fill="#b91c1c"
           />
@@ -437,41 +553,41 @@ function TrainingPlayTableBase({
         {/* 8. Cue Ball (White Ball with Aramith Pro-Cup Spots - Animated or Static) */}
         <G>
           <Circle
-            cx={animBall.x + PLAY_OFFSET_X + 1.2}
-            cy={animBall.y + PLAY_OFFSET_Y + 1.6}
+            cx={activeCueBall.x + PLAY_OFFSET_X + 1.2}
+            cy={activeCueBall.y + PLAY_OFFSET_Y + 1.6}
             r={BALL_R * 1.05}
             fill="url(#ballShadow)"
           />
           <Circle
-            cx={animBall.x + PLAY_OFFSET_X}
-            cy={animBall.y + PLAY_OFFSET_Y}
+            cx={activeCueBall.x + PLAY_OFFSET_X}
+            cy={activeCueBall.y + PLAY_OFFSET_Y}
             r={BALL_R}
             fill="url(#whiteBallGrad)"
           />
           {/* Specular highlight */}
           <Circle
-            cx={animBall.x + PLAY_OFFSET_X - BALL_R * 0.35}
-            cy={animBall.y + PLAY_OFFSET_Y - BALL_R * 0.35}
+            cx={activeCueBall.x + PLAY_OFFSET_X - BALL_R * 0.35}
+            cy={activeCueBall.y + PLAY_OFFSET_Y - BALL_R * 0.35}
             r={BALL_R * 0.25}
             fill="#ffffff"
             opacity={0.8}
           />
           {/* Aramith Pro-Cup red rotation dots */}
           <Circle
-            cx={animBall.x + PLAY_OFFSET_X}
-            cy={animBall.y + PLAY_OFFSET_Y}
+            cx={activeCueBall.x + PLAY_OFFSET_X}
+            cy={activeCueBall.y + PLAY_OFFSET_Y}
             r={BALL_R * 0.22}
             fill="#dc2626"
           />
           <Circle
-            cx={animBall.x + PLAY_OFFSET_X + BALL_R * 0.55}
-            cy={animBall.y + PLAY_OFFSET_Y}
+            cx={activeCueBall.x + PLAY_OFFSET_X + BALL_R * 0.55}
+            cy={activeCueBall.y + PLAY_OFFSET_Y}
             r={BALL_R * 0.12}
             fill="#dc2626"
           />
           <Circle
-            cx={animBall.x + PLAY_OFFSET_X - BALL_R * 0.55}
-            cy={animBall.y + PLAY_OFFSET_Y}
+            cx={activeCueBall.x + PLAY_OFFSET_X - BALL_R * 0.55}
+            cy={activeCueBall.y + PLAY_OFFSET_Y}
             r={BALL_R * 0.12}
             fill="#dc2626"
           />
@@ -482,6 +598,7 @@ function TrainingPlayTableBase({
 }
 
 export const TrainingPlayTable = memo(TrainingPlayTableBase);
+export default TrainingPlayTable;
 
 const styles = StyleSheet.create({
   container: {

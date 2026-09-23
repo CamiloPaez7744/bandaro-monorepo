@@ -11,12 +11,42 @@ interface VisionResponse {
     detectionMethod?: string;
 }
 
+export interface ProjectedGridLine {
+    diamondIndex: number;
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+}
+
+export interface ProjectedGrid {
+    verticalLines: ProjectedGridLine[];
+    horizontalLines: ProjectedGridLine[];
+}
+
+export interface VisionDetailedBall {
+    label: string;
+    x: number;
+    y: number;
+    radius?: number;
+    confidence?: number;
+    imageX?: number;
+    imageY?: number;
+    contactX?: number;
+    contactY?: number;
+    apparentRadius?: number;
+    depthTier?: 'cercana' | 'media' | 'lejana';
+    relativeDepth?: number;
+}
+
 export interface VisionDetailedResponse {
     snapshotId: string;
-    balls: { label: string; x: number; y: number; radius?: number; confidence?: number }[];
+    balls: VisionDetailedBall[];
     detectedCorners?: { x: number; y: number }[];
     detectedDiamonds?: { x: number; y: number; rail: string; index: number }[];
+    projectedGrid?: ProjectedGrid;
     cameraAngle?: string;
+    tableOrientation?: 'horizontal' | 'vertical';
     aspectRatio?: number;
     topDownImage?: string;
     detectionMethod?: string;

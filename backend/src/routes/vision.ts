@@ -5,7 +5,11 @@ import { db } from '../db/index.js';
 import { ballPosition, tableSnapshot } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 import { validateCorners, type Point } from '../services/cornerValidator.js';
-import { normalizeBalls, validateBallCount } from '../services/normalizer.js';
+import {
+    normalizeBalls,
+    validateBallCount,
+    enforceBilliardPhysicsNormalized,
+} from '../services/normalizer.js';
 import { processImage } from '../services/visionProcessor.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
@@ -25,15 +29,14 @@ visionRouter.post('/table-snapshot', upload.single('image'), async (req, res) =>
         if (req.body.corners) {
             try {
                 const parsed: Point[] = JSON.parse(req.body.corners as string);
-                corners = parsed;
                 const validation = validateCorners(parsed);
-                if (!validation.valid) {
-                    res.status(400).json({ error: validation.error });
-                    return;
+                if (validation.valid) {
+                    corners = parsed;
+                } else {
+                    console.warn('[vision] custom corners not strictly valid, falling back to auto-detection:', validation.error);
                 }
             } catch {
-                res.status(400).json({ error: 'Invalid corners JSON' });
-                return;
+                console.warn('[vision] invalid corners JSON, falling back to auto-detection');
             }
         }
 
@@ -50,7 +53,7 @@ visionRouter.post('/table-snapshot', upload.single('image'), async (req, res) =>
             return;
         }
 
-        const normalized = normalizeBalls(visionResult.balls);
+        const normalized = enforceBilliardPhysicsNormalized(normalizeBalls(visionResult.balls));
         const countCheck = validateBallCount(normalized);
 
         if (normalized.length < 3) {
@@ -91,7 +94,9 @@ visionRouter.post('/table-snapshot', upload.single('image'), async (req, res) =>
             detectionMethod: visionResult.detectionMethod,
             detectedCorners: visionResult.detectedCorners,
             detectedDiamonds: visionResult.detectedDiamonds,
+            projectedGrid: visionResult.projectedGrid,
             cameraAngle: visionResult.cameraAngle,
+            tableOrientation: visionResult.tableOrientation,
             aspectRatio: visionResult.aspectRatio,
         });
     } catch (error) {

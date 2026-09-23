@@ -2,6 +2,15 @@ export interface NormalizedBall {
     label: string;
     x: number;
     y: number;
+    radius?: number;
+    confidence?: number;
+    imageX?: number;
+    imageY?: number;
+    contactX?: number;
+    contactY?: number;
+    apparentRadius?: number;
+    depthTier?: 'cercana' | 'media' | 'lejana';
+    relativeDepth?: number;
 }
 
 interface VisionBall {
@@ -10,6 +19,13 @@ interface VisionBall {
     y: number;
     radius?: number;
     confidence?: number;
+    imageX?: number;
+    imageY?: number;
+    contactX?: number;
+    contactY?: number;
+    apparentRadius?: number;
+    depthTier?: 'cercana' | 'media' | 'lejana';
+    relativeDepth?: number;
 }
 
 // Map detected colors to standard simulator colors (white, yellow, red)
@@ -27,7 +43,8 @@ function mapColor(detectedLabel: string): string {
 }
 
 export function normalizeBalls(balls: VisionBall[]): NormalizedBall[] {
-    const mapped = balls.map((b) => ({
+    const mapped: NormalizedBall[] = balls.map((b) => ({
+        ...b,
         label: mapColor(b.label),
         x: clamp(b.x, 0, 1),
         y: clamp(b.y, 0, 1),
@@ -73,6 +90,81 @@ function clamp(value: number, min: number, max: number): number {
 
 const VALID_LABELS = ['white', 'yellow', 'red', 'orange', 'blue', 'habana'];
 
+const BALL_RADIUS_CM = 3.1;
+const TABLE_W_CM = 284.0;
+const TABLE_H_CM = 142.0;
+const MIN_BALL_DIST_CM = 6.25;
+
+/**
+ * Enforces real-world billiard physics on normalized ball positions [0..1]:
+ * 1. Clamps coordinates so ball never penetrates rubber cushions.
+ * 2. Resolves overlapping balls (distance >= 2 * radius).
+ */
+export function enforceBilliardPhysicsNormalized(balls: NormalizedBall[]): NormalizedBall[] {
+    if (balls.length === 0) return [];
+
+    const minX = BALL_RADIUS_CM;
+    const maxX = TABLE_W_CM - BALL_RADIUS_CM;
+    const minY = BALL_RADIUS_CM;
+    const maxY = TABLE_H_CM - BALL_RADIUS_CM;
+
+    // Convert to cm
+    const pts = balls.map((b) => ({
+        ...b,
+        xCm: Math.max(minX, Math.min(maxX, b.x * TABLE_W_CM)),
+        yCm: Math.max(minY, Math.min(maxY, b.y * TABLE_H_CM)),
+    }));
+
+    const fallbackAngles = [0, (2 * Math.PI) / 3, (4 * Math.PI) / 3];
+
+    for (let it = 0; it < 25; it++) {
+        let moved = false;
+        let pairIdx = 0;
+        for (let i = 0; i < pts.length; i++) {
+            for (let j = i + 1; j < pts.length; j++) {
+                const dx = pts[j].xCm - pts[i].xCm;
+                const dy = pts[j].yCm - pts[i].yCm;
+                const dist = Math.hypot(dx, dy);
+
+                if (dist < MIN_BALL_DIST_CM) {
+                    moved = true;
+                    const overlap = MIN_BALL_DIST_CM - dist;
+                    let nx: number;
+                    let ny: number;
+
+                    if (dist < 0.001) {
+                        const ang = fallbackAngles[pairIdx % fallbackAngles.length];
+                        nx = Math.cos(ang);
+                        ny = Math.sin(ang);
+                    } else {
+                        nx = dx / dist;
+                        ny = dy / dist;
+                    }
+
+                    const push = overlap * 0.55;
+                    pts[i].xCm -= nx * push;
+                    pts[i].yCm -= ny * push;
+                    pts[j].xCm += nx * push;
+                    pts[j].yCm += ny * push;
+
+                    pts[i].xCm = Math.max(minX, Math.min(maxX, pts[i].xCm));
+                    pts[i].yCm = Math.max(minY, Math.min(maxY, pts[i].yCm));
+                    pts[j].xCm = Math.max(minX, Math.min(maxX, pts[j].xCm));
+                    pts[j].yCm = Math.max(minY, Math.min(maxY, pts[j].yCm));
+                }
+                pairIdx++;
+            }
+        }
+        if (!moved) break;
+    }
+
+    return pts.map(({ xCm, yCm, ...rest }) => ({
+        ...rest,
+        x: Math.round((xCm / TABLE_W_CM) * 10000) / 10000,
+        y: Math.round((yCm / TABLE_H_CM) * 10000) / 10000,
+    }));
+}
+
 export function validateBallCount(balls: NormalizedBall[]): {
     valid: boolean;
     warning?: string;
@@ -87,7 +179,14 @@ export function validateBallCount(balls: NormalizedBall[]): {
     if (validDetected.length < 3) {
         return {
             valid: true,
-            warning: `Only ${validDetected.length} ball(s) detected: ${validDetected.join(', ')}`,
+            warning: `Missing: only ${validDetected.length} ball(s) detected: ${validDetected.join(', ')}`,
+        };
+    }
+
+    if (balls.length > 3) {
+        return {
+            valid: true,
+            warning: `Extra balls detected: expected 3, found ${balls.length}`,
         };
     }
 

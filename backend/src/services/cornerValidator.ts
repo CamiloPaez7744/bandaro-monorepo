@@ -43,8 +43,8 @@ export function validateCorners(corners: Point[]): CornerValidationResult {
         if (typeof c.x !== 'number' || typeof c.y !== 'number') {
             return { valid: false, error: 'Each corner must have numeric x and y' };
         }
-        if (c.x < 0 || c.x > 1 || c.y < 0 || c.y > 1) {
-            return { valid: false, error: 'Corner coordinates must be between 0 and 1' };
+        if (c.x < -0.8 || c.x > 1.8 || c.y < -0.8 || c.y > 1.8) {
+            return { valid: false, error: 'Corner coordinates must be within the expanded canvas (-0.8 to 1.8)' };
         }
     }
 
@@ -67,16 +67,16 @@ export function validateCorners(corners: Point[]): CornerValidationResult {
         return { valid: false, error: 'Quadrilateral must be convex' };
     }
 
-    // Check angles are between 30 and 150 degrees
+    // Check angles are between 10 and 170 degrees (allowing steep perspective shots)
     for (let i = 0; i < 4; i++) {
         const prev = corners[(i + 3) % 4];
         const curr = corners[i];
         const next = corners[(i + 1) % 4];
         const angle = angleBetween(prev, curr, next);
-        if (angle < 30 || angle > 150) {
+        if (angle < 10 || angle > 170) {
             return {
                 valid: false,
-                error: `Corner ${i + 1} has angle ${angle.toFixed(1)}° (expected 30°-150°)`,
+                error: `Corner ${i + 1} has angle ${angle.toFixed(1)}° (expected 10°-170°)`,
             };
         }
     }

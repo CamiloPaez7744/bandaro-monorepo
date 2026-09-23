@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { normalizeBalls, validateBallCount } from '../normalizer.js';
+import {
+    normalizeBalls,
+    validateBallCount,
+    enforceBilliardPhysicsNormalized,
+} from '../normalizer.js';
 
 describe('normalizeBalls', () => {
     it('clamps values to 0-1 range', () => {
@@ -64,5 +68,46 @@ describe('validateBallCount', () => {
         const result = validateBallCount(balls);
         expect(result.valid).toBe(true);
         expect(result.warning).toContain('Extra');
+    });
+});
+
+describe('enforceBilliardPhysicsNormalized', () => {
+    it('clamps balls away from cushion borders', () => {
+        const balls = [
+            { label: 'white', x: 0.0, y: 0.0 },
+            { label: 'yellow', x: 1.0, y: 1.0 },
+            { label: 'red', x: 0.5, y: 0.5 },
+        ];
+        const res = enforceBilliardPhysicsNormalized(balls);
+        const minX = 3.1 / 284;
+        const maxX = (284 - 3.1) / 284;
+        const minY = 3.1 / 142;
+        const maxY = (142 - 3.1) / 142;
+
+        for (const b of res) {
+            expect(b.x).toBeGreaterThanOrEqual(minX - 0.001);
+            expect(b.x).toBeLessThanOrEqual(maxX + 0.001);
+            expect(b.y).toBeGreaterThanOrEqual(minY - 0.001);
+            expect(b.y).toBeLessThanOrEqual(maxY + 0.001);
+        }
+    });
+
+    it('separates overlapping balls so they do not share coordinates', () => {
+        const balls = [
+            { label: 'white', x: 0.5, y: 0.5 },
+            { label: 'yellow', x: 0.5, y: 0.5 },
+            { label: 'red', x: 0.5, y: 0.5 },
+        ];
+        const res = enforceBilliardPhysicsNormalized(balls);
+        expect(res).toHaveLength(3);
+
+        for (let i = 0; i < 3; i++) {
+            for (let j = i + 1; j < 3; j++) {
+                const dxCm = (res[i].x - res[j].x) * 284;
+                const dyCm = (res[i].y - res[j].y) * 142;
+                const distCm = Math.hypot(dxCm, dyCm);
+                expect(distCm).toBeGreaterThanOrEqual(6.2);
+            }
+        }
     });
 });

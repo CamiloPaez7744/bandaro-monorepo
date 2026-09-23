@@ -10,12 +10,19 @@ import type { Point } from './cornerValidator.js';
 
 const execFileAsync = promisify(execFile);
 
-interface PythonBall {
+export interface PythonBall {
     label: string;
     x: number;
     y: number;
     radius: number;
     confidence: number;
+    imageX?: number;
+    imageY?: number;
+    contactX?: number;
+    contactY?: number;
+    apparentRadius?: number;
+    depthTier?: 'cercana' | 'media' | 'lejana';
+    relativeDepth?: number;
 }
 
 export interface DetectedDiamond {
@@ -23,6 +30,19 @@ export interface DetectedDiamond {
     y: number;
     rail: string;
     index: number;
+}
+
+export interface ProjectedGridLine {
+    diamondIndex: number;
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+}
+
+export interface ProjectedGrid {
+    verticalLines: ProjectedGridLine[];
+    horizontalLines: ProjectedGridLine[];
 }
 
 export interface VisionResult {
@@ -33,7 +53,9 @@ export interface VisionResult {
     detectionMethod?: string;
     detectedCorners?: Point[];
     detectedDiamonds?: DetectedDiamond[];
+    projectedGrid?: ProjectedGrid;
     cameraAngle?: string;
+    tableOrientation?: 'horizontal' | 'vertical';
     aspectRatio?: number;
     error?: string;
 }
@@ -90,7 +112,9 @@ export async function processImage(
             detectionMethod?: string;
             detectedCorners?: Point[];
             detectedDiamonds?: DetectedDiamond[];
+            projectedGrid?: ProjectedGrid;
             cameraAngle?: string;
+            tableOrientation?: 'horizontal' | 'vertical';
             aspectRatio?: number;
             error?: string;
         };
@@ -103,7 +127,9 @@ export async function processImage(
             detectionMethod: result.detectionMethod,
             detectedCorners: result.detectedCorners,
             detectedDiamonds: result.detectedDiamonds,
+            projectedGrid: result.projectedGrid,
             cameraAngle: result.cameraAngle,
+            tableOrientation: result.tableOrientation,
             aspectRatio: result.aspectRatio,
             error: result.error,
         };

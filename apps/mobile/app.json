@@ -3,7 +3,7 @@
     "name": "Bandaro",
     "slug": "bandaro",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/bandaro.png",
     "scheme": "bandaro",
     "userInterfaceStyle": "automatic",
