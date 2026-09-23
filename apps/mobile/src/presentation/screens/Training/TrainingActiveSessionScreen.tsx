@@ -123,8 +123,9 @@ export function TrainingActiveSessionScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
+  const isWideScreen = width >= 920;
   const palette = getPalette(useColorScheme());
-  const styles = getStyles(palette);
+  const styles = getStyles(palette, isWideScreen);
 
   const params = useLocalSearchParams<{
     shotId?: string;
@@ -459,58 +460,66 @@ export function TrainingActiveSessionScreen() {
           </ScrollView>
         </View>
 
-        {/* Motivational Coaching Quote Card */}
-        <View style={styles.quoteCard}>
-          <View style={styles.quoteIconWrap}>
-            <IconSparkles size={18} color={palette.primary} />
-          </View>
-          <View style={styles.quoteTextWrap}>
-            <Text style={styles.quoteBody}>"{quote.text}"</Text>
-            {quote.author && (
-              <Text style={styles.quoteAuthor}>— {quote.author}</Text>
-            )}
-          </View>
-        </View>
-
-        {/* Position Info Bar */}
-        <View style={styles.positionInfoBar}>
-          <View style={styles.positionTitleRow}>
-            <View style={styles.categoryBadge}>
-              <Text style={styles.categoryText}>{currentPos.category}</Text>
+        {/* Responsive Body Row (2-column workstation on desktop web, stacked on mobile) */}
+        <View style={styles.bodyRow}>
+          {/* Left Column: Tactical Info, Billiard Table, and Motivational Quote */}
+          <View style={styles.leftColumn}>
+            {/* Position Info Bar */}
+            <View style={styles.positionInfoBar}>
+              <View style={styles.positionTitleRow}>
+                <View style={styles.categoryBadge}>
+                  <Text style={styles.categoryText}>{currentPos.category}</Text>
+                </View>
+                <Text style={styles.positionName}>{currentPos.name}</Text>
+              </View>
+              {currentPos.hint && (
+                <Text style={styles.positionHint}>{currentPos.hint}</Text>
+              )}
             </View>
-            <Text style={styles.positionName}>{currentPos.name}</Text>
+
+            {/* 2:1 Carom Billiard Table */}
+            <View style={styles.tableWrapper}>
+              <TrainingPlayTable
+                whiteBall={currentPos.white}
+                yellowBall={currentPos.yellow}
+                redBall={currentPos.red}
+                trajectory={currentPos.trajectory}
+                isSimulating={isSimulating}
+                onSimulationEnd={() => setIsSimulating(false)}
+              />
+            </View>
+
+            {/* Motivational Coaching Quote Card */}
+            <View style={styles.quoteCard}>
+              <View style={styles.quoteIconWrap}>
+                <IconSparkles size={18} color={palette.primary} />
+              </View>
+              <View style={styles.quoteTextWrap}>
+                <Text style={styles.quoteBody}>"{quote.text}"</Text>
+                {quote.author && (
+                  <Text style={styles.quoteAuthor}>— {quote.author}</Text>
+                )}
+              </View>
+            </View>
           </View>
-          {currentPos.hint && (
-            <Text style={styles.positionHint}>{currentPos.hint}</Text>
-          )}
-        </View>
 
-        {/* 2:1 Carom Billiard Table */}
-        <View style={styles.tableWrapper}>
-          <TrainingPlayTable
-            whiteBall={currentPos.white}
-            yellowBall={currentPos.yellow}
-            redBall={currentPos.red}
-            trajectory={currentPos.trajectory}
-            isSimulating={isSimulating}
-            onSimulationEnd={() => setIsSimulating(false)}
-          />
+          {/* Right Column: Record Hits Overlay & Actions */}
+          <View style={styles.rightColumn}>
+            <RecordHitsOverlay
+              targetReps={targetReps}
+              madeHits={madeHits}
+              difficulty={currentPos.difficulty}
+              isSimulating={isSimulating}
+              onTargetRepsChange={setTargetReps}
+              onMadeHitsChange={setMadeHits}
+              onToggleSolution={handleToggleSolution}
+              onResetPosition={handleResetPosition}
+              onNextPosition={handleNextPosition}
+              onFinishSession={handleFinishSession}
+              isLastPosition={currentPosIndex === positions.length - 1}
+            />
+          </View>
         </View>
-
-        {/* Record Hits Overlay & Repetition Controls */}
-        <RecordHitsOverlay
-          targetReps={targetReps}
-          madeHits={madeHits}
-          difficulty={currentPos.difficulty}
-          isSimulating={isSimulating}
-          onTargetRepsChange={setTargetReps}
-          onMadeHitsChange={setMadeHits}
-          onToggleSolution={handleToggleSolution}
-          onResetPosition={handleResetPosition}
-          onNextPosition={handleNextPosition}
-          onFinishSession={handleFinishSession}
-          isLastPosition={currentPosIndex === positions.length - 1}
-        />
       </View>
 
       {/* Position Selector Modal */}
@@ -596,7 +605,7 @@ export function TrainingActiveSessionScreen() {
   );
 }
 
-const getStyles = (palette: ReturnType<typeof getPalette>) =>
+const getStyles = (palette: ReturnType<typeof getPalette>, isWideScreen: boolean) =>
   StyleSheet.create({
     scrollContainer: {
       backgroundColor: palette.background,
@@ -606,7 +615,22 @@ const getStyles = (palette: ReturnType<typeof getPalette>) =>
     },
     maxWidthWrap: {
       width: '100%',
-      maxWidth: 720,
+      maxWidth: isWideScreen ? 1160 : 720,
+      gap: 14,
+    },
+    bodyRow: {
+      flexDirection: isWideScreen ? 'row' : 'column',
+      gap: 18,
+      alignItems: 'flex-start',
+    },
+    leftColumn: {
+      flex: isWideScreen ? 1.35 : undefined,
+      width: '100%',
+      gap: 14,
+    },
+    rightColumn: {
+      flex: isWideScreen ? 1 : undefined,
+      width: '100%',
       gap: 14,
     },
     header: {

@@ -14,6 +14,8 @@ import IconCamera from '@tabler/icons-react-native/IconCamera';
 import IconDeviceGamepad2 from '@tabler/icons-react-native/IconDeviceGamepad2';
 import IconChevronRight from '@tabler/icons-react-native/IconChevronRight';
 import IconChevronLeft from '@tabler/icons-react-native/IconChevronLeft';
+import IconChevronDown from '@tabler/icons-react-native/IconChevronDown';
+import IconChevronUp from '@tabler/icons-react-native/IconChevronUp';
 import IconSearch from '@tabler/icons-react-native/IconSearch';
 import IconAdjustments from '@tabler/icons-react-native/IconAdjustments';
 import IconBolt from '@tabler/icons-react-native/IconBolt';
@@ -44,6 +46,13 @@ import IconMinus from '@tabler/icons-react-native/IconMinus';
 import IconSettings from '@tabler/icons-react-native/IconSettings';
 import IconStar from '@tabler/icons-react-native/IconStar';
 import IconStarFilled from '@tabler/icons-react-native/IconStarFilled';
+import IconLayoutColumns from '@tabler/icons-react-native/IconLayoutColumns';
+import IconMaximize from '@tabler/icons-react-native/IconMaximize';
+import IconLock from '@tabler/icons-react-native/IconLock';
+import IconSchool from '@tabler/icons-react-native/IconSchool';
+import IconBrain from '@tabler/icons-react-native/IconBrain';
+import IconFlag from '@tabler/icons-react-native/IconFlag';
+import IconTrendingUp from '@tabler/icons-react-native/IconTrendingUp';
 
 export {
     IconTrophy,
@@ -62,6 +71,8 @@ export {
     IconDeviceGamepad2,
     IconChevronRight,
     IconChevronLeft,
+    IconChevronDown,
+    IconChevronUp,
     IconSearch,
     IconAdjustments,
     IconBolt,
@@ -92,5 +103,13 @@ export {
     IconSettings,
     IconStar,
     IconStarFilled,
+    IconLayoutColumns,
+    IconMaximize,
+    IconLock,
+    IconSchool,
+    IconBrain,
+    IconFlag,
+    IconTrendingUp,
 };
+
 
