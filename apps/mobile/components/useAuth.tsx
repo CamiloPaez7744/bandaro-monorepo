@@ -35,6 +35,8 @@ interface AuthContextValue {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (input: LoginInput) => Promise<void>;
+  loginWithGoogle: (payload?: any) => Promise<void>;
+  loginWithMicrosoft: (payload?: any) => Promise<void>;
   register: (input: RegisterInput) => Promise<void>;
   updateProfile: (input: UpdateProfileInput) => Promise<void>;
   logout: () => Promise<void>;
@@ -123,6 +125,26 @@ export function AuthProvider({ children }: PropsWithChildren) {
       throw new Error('No se pudo iniciar sesion luego del registro.');
     }
 
+    setSession(nextSession);
+    setUser(nextUser);
+  }, []);
+
+  const loginWithGoogle = useCallback(async (payload?: any) => {
+    const nextSession = await container.loginWithGoogle(payload);
+    const nextUser = await container.getUserById.execute(nextSession.userId);
+    if (!nextUser) {
+      throw new Error('No se pudo obtener el perfil de Google.');
+    }
+    setSession(nextSession);
+    setUser(nextUser);
+  }, []);
+
+  const loginWithMicrosoft = useCallback(async (payload?: any) => {
+    const nextSession = await container.loginWithMicrosoft(payload);
+    const nextUser = await container.getUserById.execute(nextSession.userId);
+    if (!nextUser) {
+      throw new Error('No se pudo obtener el perfil de Microsoft.');
+    }
     setSession(nextSession);
     setUser(nextUser);
   }, []);
@@ -232,12 +254,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
       isLoading,
       isAuthenticated: !!user,
       login,
+      loginWithGoogle,
+      loginWithMicrosoft,
       register,
       updateProfile,
       logout,
       refresh,
     }),
-    [user, session, isLoading, login, register, updateProfile, logout, refresh]
+    [user, session, isLoading, login, loginWithGoogle, loginWithMicrosoft, register, updateProfile, logout, refresh]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

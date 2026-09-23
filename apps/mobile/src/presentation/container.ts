@@ -14,11 +14,11 @@ import { LogoutUser } from '@/src/application/usecases/LogoutUser';
 import { GetUserById } from '@/src/application/usecases/GetUserById';
 import { UpdateUserProfile } from '@/src/application/usecases/UpdateUserProfile';
 import { FileSystemMatchRepository } from '@/src/infrastructure/repositories/FileSystemMatchRepository';
-import { FileSystemAuthRepository } from '@/src/infrastructure/repositories/FileSystemAuthRepository';
+import { ApiAuthRepository } from '@/src/infrastructure/repositories/ApiAuthRepository';
 import { ApiSnapshotRepository } from '@/src/infrastructure/repositories/ApiSnapshotRepository';
 
 const repository = new FileSystemMatchRepository();
-const authRepository = new FileSystemAuthRepository();
+const authRepository = new ApiAuthRepository();
 const snapshotRepository = new ApiSnapshotRepository();
 
 export const container = {
@@ -37,4 +37,7 @@ export const container = {
     logoutUser: new LogoutUser(authRepository),
     getUserById: new GetUserById(authRepository),
     updateUserProfile: new UpdateUserProfile(authRepository),
+    authRepository,
+    loginWithGoogle: (payload?: any) => authRepository.loginWithGoogle(payload),
+    loginWithMicrosoft: (payload?: any) => authRepository.loginWithMicrosoft(payload),
 };
