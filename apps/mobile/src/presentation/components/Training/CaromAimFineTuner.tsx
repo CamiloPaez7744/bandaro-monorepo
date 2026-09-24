@@ -13,6 +13,7 @@ interface CaromAimFineTunerProps {
     aimDirection: Vec2;
     onAimChange: (direction: Vec2) => void;
     disabled?: boolean;
+    compact?: boolean;
 }
 
 /**
@@ -23,6 +24,7 @@ export const CaromAimFineTuner = React.memo(function CaromAimFineTuner({
     aimDirection,
     onAimChange,
     disabled = false,
+    compact = false,
 }: CaromAimFineTunerProps) {
     const currentAngleRad = Math.atan2(aimDirection.y, aimDirection.x);
     let currentAngleDeg = (currentAngleRad * 180) / Math.PI;
@@ -36,6 +38,34 @@ export const CaromAimFineTuner = React.memo(function CaromAimFineTuner({
         },
         [currentAngleRad, onAimChange, disabled]
     );
+
+    if (compact) {
+        return (
+            <View style={[styles.container, styles.containerCompact]}>
+                <TouchableOpacity
+                    style={[styles.btn, styles.btnCompact, disabled && styles.btnDisabled]}
+                    onPress={() => adjustAngle(-0.25)}
+                    disabled={disabled}
+                    activeOpacity={0.7}
+                    accessibilityLabel="Girar izquierda">
+                    <IconChevronLeft size={13} color="#e2e8f0" />
+                </TouchableOpacity>
+
+                <View style={[styles.angleDisplay, styles.angleDisplayCompact]}>
+                    <Text style={[styles.angleText, styles.angleTextCompact]}>{currentAngleDeg.toFixed(1)}°</Text>
+                </View>
+
+                <TouchableOpacity
+                    style={[styles.btn, styles.btnCompact, disabled && styles.btnDisabled]}
+                    onPress={() => adjustAngle(0.25)}
+                    disabled={disabled}
+                    activeOpacity={0.7}
+                    accessibilityLabel="Girar derecha">
+                    <IconChevronRight size={13} color="#e2e8f0" />
+                </TouchableOpacity>
+            </View>
+        );
+    }
 
     return (
         <View style={styles.container}>
@@ -128,5 +158,23 @@ const styles = StyleSheet.create({
     },
     btnDisabled: {
         opacity: 0.4,
+    },
+    containerCompact: {
+        paddingHorizontal: 4,
+        paddingVertical: 2,
+        borderRadius: 14,
+        gap: 3,
+    },
+    btnCompact: {
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+    },
+    angleDisplayCompact: {
+        paddingRight: 1,
+        gap: 2,
+    },
+    angleTextCompact: {
+        fontSize: 10,
     },
 });

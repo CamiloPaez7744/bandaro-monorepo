@@ -147,16 +147,23 @@ export function computeCushionSpinImpulse(
 }
 
 export function resolveCushionCollision(ball: Ball, normal: Vec2): Ball {
-    const dot = vec2Dot(ball.vel, normal);
-    const reflected = vec2Sub(ball.vel, vec2Scale(normal, 2 * dot));
-    const newVel = vec2Scale(reflected, PHYSICS.cushionRestitution);
+    const normalVel = vec2Dot(ball.vel, normal);
+    const normalComponent = vec2Scale(normal, normalVel);
+    const tangentComponent = vec2Sub(ball.vel, normalComponent);
+
+    // Normal velocity rebounds with cushion restitution
+    const reboundedNormal = vec2Scale(normalComponent, -PHYSICS.cushionRestitution);
+
+    // Tangential velocity with cushion friction
+    const frictionFactor = Math.max(0.70, 1 - PHYSICS.cushionFriction);
+    const dampedTangent = vec2Scale(tangentComponent, frictionFactor);
 
     // Apply spin English impulse along the cushion rail
-    const spinImpulse = computeCushionSpinImpulse(ball.spin, normal, dot);
-    const finalVel = vec2Add(newVel, spinImpulse);
+    const spinImpulse = computeCushionSpinImpulse(ball.spin, normal, normalVel);
+    const finalVel = vec2Add(vec2Add(reboundedNormal, dampedTangent), spinImpulse);
 
-    // Cushion consumes part of the side spin
-    const remainingSpin = vec2(ball.spin.x * 0.70, ball.spin.y * 0.85);
+    // Cushion consumes part of the spin
+    const remainingSpin = vec2(ball.spin.x * 0.65, ball.spin.y * 0.80);
 
     return {
         ...ball,

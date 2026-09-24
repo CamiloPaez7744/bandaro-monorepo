@@ -7,7 +7,7 @@ import {
     vec2,
     vec2Normalize,
 } from '../physics';
-import { DEFAULT_TABLE } from '../types';
+import { DEFAULT_TABLE, calculateShotVelocity } from '../types';
 
 describe('Carom Physics', () => {
     describe('Cushion English Spin Interaction', () => {
@@ -104,6 +104,40 @@ describe('Carom Physics', () => {
             expect(result.trails.white.length).toBeGreaterThan(5);
             expect(result.trails.yellow).toBeDefined();
             expect(result.trails.red).toBeDefined();
+        });
+    });
+
+    describe('Power Proportionality and Realistic Cushion Decay', () => {
+        it('calculateShotVelocity scales smoothly from low to max power', () => {
+            expect(calculateShotVelocity(0)).toBe(0);
+            expect(calculateShotVelocity(20)).toBeGreaterThan(2.0);
+            expect(calculateShotVelocity(50)).toBeGreaterThan(calculateShotVelocity(20));
+            expect(calculateShotVelocity(100)).toBeGreaterThan(calculateShotVelocity(50));
+            expect(calculateShotVelocity(100)).toBeCloseTo(12.5, 1);
+        });
+
+        it('low power shot (20%) produces gentle travel with 1-2 cushion rebounds', () => {
+            const vLow = calculateShotVelocity(20);
+            const cue = createBall('white', 100, 71);
+            cue.vel = vec2(vLow, 0);
+
+            const result = simulateShot([cue], 1000, DEFAULT_TABLE);
+            const cushionHits = result.events.filter((e) => e.type === 'cushion').length;
+            // A gentle 20% power shot should not bounce more than 2 cushions
+            expect(cushionHits).toBeLessThanOrEqual(2);
+        });
+
+        it('high power shot (80%) decays realistically without 15+ accordion bounces', () => {
+            const vHigh = calculateShotVelocity(80);
+            const dir = vec2Normalize(vec2(2, 1.2));
+            const cue = createBall('white', 40, 40);
+            cue.vel = vec2(dir.x * vHigh, dir.y * vHigh);
+
+            const result = simulateShot([cue], 2000, DEFAULT_TABLE);
+            const cushionHits = result.events.filter((e) => e.type === 'cushion').length;
+            // Realistic 3-cushion billiards: should achieve 3-5 cushions without 15+ accordion bounces
+            expect(cushionHits).toBeGreaterThanOrEqual(3);
+            expect(cushionHits).toBeLessThanOrEqual(6);
         });
     });
 });

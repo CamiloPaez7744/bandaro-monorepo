@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { BreakFormat, PbaFormationId } from '@bandaro/core';
 
 export type DiamondShape = 'rhombus' | 'circle';
 export type DiamondCount = '9_5' | '7_3';
@@ -154,6 +155,105 @@ export const CLOTH_SKIN_PRESETS: ClothSkinPreset[] = [
   },
 ];
 
+export type CueSkinId = 'venom_azure' | 'classic_gold' | 'carbon_stealth';
+
+export interface CueSkinPreset {
+  id: CueSkinId;
+  name: string;
+  subtitle: string;
+  description: string;
+  primaryColor: string;
+  accentColor: string;
+}
+
+export const CUE_SKIN_PRESETS: CueSkinPreset[] = [
+  {
+    id: 'venom_azure',
+    name: 'Venom Azure WS',
+    subtitle: 'Edición Pro Sin Letras • Neón Azul Eléctrico',
+    description: 'Inspirado en el taco Venom Win Streak: proporciones esbeltas de competición, cuerpo negro grafito, flecha de arce oscuro y llamas geométricas de púas en azul cian vibrante.',
+    primaryColor: '#0284c7',
+    accentColor: '#38bdf8',
+  },
+  {
+    id: 'classic_gold',
+    name: 'Clásico Ébano & Oro',
+    subtitle: 'Arce Canadiense Seleccionado',
+    description: 'Flecha tradicional en arce canadiense rubio, empuñadura de hilo irlandés negro, incrustaciones de cuatro puntas y anillos de oro 24K pulido.',
+    primaryColor: '#eab308',
+    accentColor: '#fef08a',
+  },
+  {
+    id: 'carbon_stealth',
+    name: 'Carbon Stealth',
+    subtitle: 'Fibra de Carbono Mate & Titanio',
+    description: 'Estructura ultraligera de carbono aeroespacial tejido en patrón sarga, collarín de titanio cepillado y acentos carmesí de alta precisión.',
+    primaryColor: '#ef4444',
+    accentColor: '#f87171',
+  },
+];
+
+export type BallSkinId = 'aramith_pro_cup' | 'cosmo_helix_pba' | 'dynaspheres' | 'classic_solid';
+
+export interface BallSkinPreset {
+  id: BallSkinId;
+  name: string;
+  subtitle: string;
+  manufacturer: string;
+  origin: string;
+  description: string;
+  dotsColorWhite: string;
+  dotsColorYellow: string;
+  dotsColorRed?: string;
+  hasRings?: boolean;
+}
+
+export const BALL_SKIN_PRESETS: BallSkinPreset[] = [
+  {
+    id: 'aramith_pro_cup',
+    name: 'Super Aramith Pro-Cup (UMB)',
+    subtitle: 'Estándar Oficial UMB Mundial',
+    manufacturer: 'Saluc (Bélgica)',
+    origin: 'Bélgica 🇧🇪',
+    description: 'Resina fenólica pura con los célebres 6 puntos rojos (measle dots) para máxima precisión de lectura de rotación.',
+    dotsColorWhite: '#dc2626',
+    dotsColorYellow: '#dc2626',
+  },
+  {
+    id: 'cosmo_helix_pba',
+    name: 'Cosmo Helix Vision (PBA)',
+    subtitle: 'Estándar Oficial PBA Tour Corea',
+    manufacturer: 'Cosmos Billiards (Corea)',
+    origin: 'Corea del Sur 🇰🇷',
+    description: 'Tecnología Vision para transmisiones TV 4K con 6 puntos azul cian neón de alto contraste y anillos de rotación.',
+    dotsColorWhite: '#00e5ff',
+    dotsColorYellow: '#0284c7',
+    dotsColorRed: '#ffffff',
+    hasRings: true,
+  },
+  {
+    id: 'dynaspheres',
+    name: 'Dynaspheres Platinum Carom',
+    subtitle: 'Diseño Rotor Dynamic de Compás',
+    manufacturer: 'Dynaspheres',
+    origin: 'Bélgica / Internacional 🌐',
+    description: 'Patrón de rotor concéntrico en gris platino y cobalto para visualizar el eje giroscópico exacto.',
+    dotsColorWhite: '#475569',
+    dotsColorYellow: '#3b82f6',
+    hasRings: true,
+  },
+  {
+    id: 'classic_solid',
+    name: 'Clásica Tradicional (Solid Vintage)',
+    subtitle: 'Acabado Marfil & Rubí Liso',
+    manufacturer: 'Tradicional',
+    origin: 'Vintage 🏛️',
+    description: 'Bolas lisas de competición tradicional con punto único sutil de identificación.',
+    dotsColorWhite: '#000000',
+    dotsColorYellow: '#dc2626',
+  },
+];
+
 export interface TablePreferences {
   activeSkinId: string; // 'tournament_umb' | 'royal_high_roller' | ...
   clothColor: string; // Preset id or raw hex ('#10638c')
@@ -168,6 +268,12 @@ export interface TablePreferences {
   decalOpacity: number; // Opacidad de la marca de agua del paño (0.05 a 0.50)
   showSpotlight: boolean; // Luz cenital de estadio
   showTableDecal: boolean; // Mostrar emblema central
+  cueSkin: CueSkinId; // Modelo visual del taco de billar
+  ballSkin: BallSkinId; // Skin visual del set de bolas
+  showBallDots: boolean; // Mostrar puntos de rotación
+  breakFormat: BreakFormat; // Formato de salida por defecto ('umb' o 'pba')
+  pbaFormation: PbaFormationId; // Formación PBA ('159', '357', '258', etc.)
+  umbSide: 'right' | 'left'; // Lado de la bola blanca en UMB ('right' o 'left')
 }
 
 export const DEFAULT_TABLE_PREFERENCES: TablePreferences = {
@@ -184,6 +290,12 @@ export const DEFAULT_TABLE_PREFERENCES: TablePreferences = {
   decalOpacity: 0.18,
   showSpotlight: true,
   showTableDecal: true,
+  cueSkin: 'venom_azure',
+  ballSkin: 'aramith_pro_cup',
+  showBallDots: true,
+  breakFormat: 'umb',
+  pbaFormation: '159',
+  umbSide: 'right',
 };
 
 

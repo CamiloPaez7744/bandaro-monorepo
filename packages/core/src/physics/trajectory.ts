@@ -6,6 +6,8 @@ import {
     DEFAULT_TABLE,
     PHYSICS,
     SpinEffect,
+    CushionContact,
+    BallCollision,
 } from './types';
 import {
     vec2,
@@ -23,6 +25,7 @@ import {
     resolveCushionCollision,
     checkBallCollision,
     resolveBallCollision,
+    simulateStep,
 } from './physics';
 
 export interface TrajectoryPoint {
@@ -52,8 +55,12 @@ export function predictTrajectory(
     maxSteps?: number,
     table: TableDimensions = DEFAULT_TABLE
 ): TrajectoryPrediction {
+    if (power <= 0) {
+        return { paths: [], cushionContacts: 0, ballCollisions: [], isValid: false };
+    }
+
     // Clone balls for simulation
-    const simBalls = initialBalls.map((b) => ({
+    let simBalls = initialBalls.map((b) => ({
         id: b.id,
         pos: { ...b.pos },
         vel: { x: 0, y: 0 },
@@ -71,14 +78,10 @@ export function predictTrajectory(
     cueBall.vel = vec2Scale(normalizedDir, power);
     cueBall.spin = vec2Scale(vec2(spin.x, spin.y), spin.magnitude);
 
-    // Calculate dynamic maxSteps based on power if not provided
-    // Formula: steps until velocity < MIN_VELOCITY (0.05)
-    // vel_final = vel_initial * friction^n
-    // 0.05 = power * 0.992^n
-    // n = log(0.05 / power) / log(0.992)
-    const FRICTION = 0.992;
-    const MIN_VELOCITY = 0.05;
-    const calculatedMaxSteps = maxSteps ?? Math.ceil(Math.log(MIN_VELOCITY / power) / Math.log(FRICTION)) + 50;
+    const calculatedMaxSteps = maxSteps ?? Math.min(
+        400,
+        Math.ceil(Math.log(PHYSICS.minVelocity / Math.max(0.1, power)) / Math.log(PHYSICS.friction)) + 20
+    );
 
     // Initialize paths - only cue ball starts with initial position
     const paths: Record<string, Vec2[]> = {};
@@ -93,120 +96,45 @@ export function predictTrajectory(
     let cushionContacts = 0;
     let cushionsBeforeSecondCollision = 0;
     let secondCollisionRegistered = false;
+    const POINT_DISTANCE_THRESHOLD = 2.5;
 
-    const CUSHION_RESTITUTION = 0.90;
-    const POINT_DISTANCE_THRESHOLD = 3;
-    const SUBSTEPS = 8;
-
-    // Simulate step by step with substeps for accurate collision detection
+    // Simulate step by step using simulateStep (identical to real runtime execution)
     for (let step = 0; step < calculatedMaxSteps; step++) {
-        // Substep loop for better collision detection
-        for (let sub = 0; sub < SUBSTEPS; sub++) {
-            // Update each ball position
-            simBalls.forEach((ball) => {
-                if (Math.abs(ball.vel.x) < MIN_VELOCITY && Math.abs(ball.vel.y) < MIN_VELOCITY) {
-                    ball.vel.x = 0;
-                    ball.vel.y = 0;
-                    return;
+        const anyMoving = simBalls.some((b) => isBallMoving(b));
+        if (!anyMoving) break;
+
+        const { balls: nextBalls, events } = simulateStep(simBalls, table);
+        simBalls = nextBalls;
+
+        // Process collision and cushion events
+        for (const evt of events) {
+            if (evt.type === 'cushion') {
+                const data = evt.data as CushionContact;
+                if (data.ballId === cueBallId) {
+                    cushionContacts++;
                 }
+            } else if (evt.type === 'ball_collision') {
+                const data = evt.data as BallCollision;
+                const isCueBallCollision = data.ball1 === cueBallId || data.ball2 === cueBallId;
+                const alreadyCollided = ballCollisions.some(
+                    (c) => (c.ball1 === data.ball1 && c.ball2 === data.ball2) || (c.ball1 === data.ball2 && c.ball2 === data.ball1)
+                );
 
-                // Update position (divided by substeps)
-                ball.pos.x += ball.vel.x / SUBSTEPS;
-                ball.pos.y += ball.vel.y / SUBSTEPS;
+                if (isCueBallCollision && !alreadyCollided) {
+                    const pointIndex = Math.max(0, paths[cueBallId].length - 1);
+                    ballCollisions.push({
+                        ball1: data.ball1,
+                        ball2: data.ball2,
+                        pointIndex,
+                    });
 
-                // Cushion collisions
-                const minX = ball.radius;
-                const maxX = table.width - ball.radius;
-                const minY = ball.radius;
-                const maxY = table.height - ball.radius;
-
-                if (ball.pos.x < minX) {
-                    ball.pos.x = minX;
-                    ball.vel.x = -ball.vel.x * CUSHION_RESTITUTION;
-                    if (ball.id === cueBallId) {
-                        cushionContacts++;
-                        applySpinEffect(ball, spin, 'left');
-                    }
-                }
-                if (ball.pos.x > maxX) {
-                    ball.pos.x = maxX;
-                    ball.vel.x = -ball.vel.x * CUSHION_RESTITUTION;
-                    if (ball.id === cueBallId) {
-                        cushionContacts++;
-                        applySpinEffect(ball, spin, 'right');
-                    }
-                }
-                if (ball.pos.y < minY) {
-                    ball.pos.y = minY;
-                    ball.vel.y = -ball.vel.y * CUSHION_RESTITUTION;
-                    if (ball.id === cueBallId) {
-                        cushionContacts++;
-                        applySpinEffect(ball, spin, 'top');
-                    }
-                }
-                if (ball.pos.y > maxY) {
-                    ball.pos.y = maxY;
-                    ball.vel.y = -ball.vel.y * CUSHION_RESTITUTION;
-                    if (ball.id === cueBallId) {
-                        cushionContacts++;
-                        applySpinEffect(ball, spin, 'bottom');
-                    }
-                }
-            });
-
-            // Ball-to-ball collisions (check in each substep)
-            for (let i = 0; i < simBalls.length; i++) {
-                for (let j = i + 1; j < simBalls.length; j++) {
-                    const b1 = simBalls[i];
-                    const b2 = simBalls[j];
-                    const distance = vec2Distance(b1.pos, b2.pos);
-
-                    if (distance < b1.radius + b2.radius && distance > 0) {
-                        const isCueBallCollision = b1.id === cueBallId || b2.id === cueBallId;
-                        const alreadyCollided = ballCollisions.some(
-                            (c) => (c.ball1 === b1.id && c.ball2 === b2.id) || (c.ball1 === b2.id && c.ball2 === b1.id)
-                        );
-
-                        if (isCueBallCollision && !alreadyCollided) {
-                            const pointIndex = Math.max(0, paths[cueBallId].length - 1);
-                            ballCollisions.push({
-                                ball1: b1.id,
-                                ball2: b2.id,
-                                pointIndex,
-                            });
-
-                            if (ballCollisions.length === 2 && !secondCollisionRegistered) {
-                                cushionsBeforeSecondCollision = cushionContacts;
-                                secondCollisionRegistered = true;
-                            }
-                        }
-
-                        // Resolve elastic collision
-                        const normal = vec2Normalize(vec2Sub(b2.pos, b1.pos));
-                        const relVel = vec2Sub(b1.vel, b2.vel);
-                        const velAlongNormal = vec2Dot(relVel, normal);
-
-                        if (velAlongNormal > 0) {
-                            const impulse = velAlongNormal * PHYSICS.ballRestitution;
-                            b1.vel = vec2Sub(b1.vel, vec2Scale(normal, impulse));
-                            b2.vel = vec2Add(b2.vel, vec2Scale(normal, impulse));
-                        }
-
-                        // Separate overlapping balls
-                        const overlap = b1.radius + b2.radius - distance;
-                        const separation = vec2Scale(normal, overlap / 2);
-                        b1.pos = vec2Sub(b1.pos, separation);
-                        b2.pos = vec2Add(b2.pos, separation);
+                    if (ballCollisions.length === 2 && !secondCollisionRegistered) {
+                        cushionsBeforeSecondCollision = cushionContacts;
+                        secondCollisionRegistered = true;
                     }
                 }
             }
         }
-
-
-        // Apply friction once per full step
-        simBalls.forEach((ball) => {
-            ball.vel = vec2Scale(ball.vel, FRICTION);
-        });
 
         // Record positions every step if ball moved significantly
         simBalls.forEach((ball) => {
@@ -223,12 +151,6 @@ export function predictTrajectory(
                 }
             }
         });
-
-        // Break early if all balls stopped
-        const anyMoving = simBalls.some(
-            (b) => Math.abs(b.vel.x) >= MIN_VELOCITY || Math.abs(b.vel.y) >= MIN_VELOCITY
-        );
-        if (!anyMoving) break;
     }
 
     // Convert paths to TrajectoryPath format
@@ -254,18 +176,6 @@ export function predictTrajectory(
         ballCollisions,
         isValid,
     };
-}
-
-function applySpinEffect(ball: any, spin: SpinEffect, cushion: 'left' | 'right' | 'top' | 'bottom'): void {
-    if (spin.magnitude === 0) return;
-
-    const spinForce = spin.x * 1.8 * spin.magnitude;
-    
-    if (cushion === 'top' || cushion === 'bottom') {
-        ball.vel.x += spinForce;
-    } else {
-        ball.vel.y -= spinForce;
-    }
 }
 
 export function getTrajectoryForBall(

@@ -1,6 +1,6 @@
 import { memo, useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import { StyleSheet, View, Text, type StyleProp, type ViewStyle, PanResponder, GestureResponderEvent, Platform } from 'react-native';
-import Svg, { Circle, Defs, G, Line, LinearGradient, Polygon, Polyline, RadialGradient, Rect, Stop, Path, Image as SvgImage } from 'react-native-svg';
+import Svg, { Circle, Defs, G, Line, LinearGradient, Polygon, Polyline, RadialGradient, Rect, Stop, Path, Ellipse, Image as SvgImage } from 'react-native-svg';
 import { IconHandClick, IconTarget } from '@/src/presentation/components/icons';
 import { SKULL_DECAL_SOURCE } from './tableDecals';
 
@@ -22,8 +22,22 @@ import {
     resolveWoodPalette,
     resolveCornerMetalPalette,
     type TablePreferences,
+    type BallSkinId,
 } from './tablePreferences';
 import { CaromCueGadget } from './CaromCueGadget';
+import {
+    Quaternion,
+    INITIAL_BALL_QUATERNION,
+    updateBallOrientation,
+    projectSpherePointToSvg,
+    projectSphereRingToSvg,
+    SPHERE_OCTAHEDRAL_DOTS,
+    SPHERE_CLASSIC_DOTS,
+    PBA_VISION_RING_1,
+    PBA_VISION_RING_2,
+    DYNASPHERES_RING,
+} from './ballPhysics3D';
+import type { CollisionPulse } from '../../hooks/useTrainingSimulation';
 
 type Orientation = 'horizontal' | 'vertical';
 
@@ -34,6 +48,7 @@ interface InteractiveBilliardsTableProps {
     cueBallId: BallId;
     trajectory: TrajectoryPrediction | null;
     dynamicTrails?: Record<BallId, { pos: Vec2; timestamp?: number }[]>;
+    collisionPulses?: CollisionPulse[];
     aimDirection?: Vec2;
     powerLevel?: number;
     tablePreferences?: TablePreferences;
@@ -407,6 +422,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
         cueBallId,
         trajectory,
         dynamicTrails,
+        collisionPulses,
         aimDirection = vec2(1, 0),
         powerLevel = 0,
         tablePreferences = DEFAULT_TABLE_PREFERENCES,
@@ -442,14 +458,13 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
     const layout = getLayout(orientation);
     const diamonds = useMemo(() => getDiamondPoints(orientation, layout), [orientation, layout]);
     const containerRef = useRef<View>(null);
-    const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+    const containerSizeRef = useRef({ width: 0, height: 0 });
     const [draggingBallId, setDraggingBallId] = useState<BallId | null>(null);
     
     const isEditModeRef = useRef(isEditMode);
     const isSimulatingRef = useRef(isSimulating);
     const ballsRef = useRef(balls);
     const cueBallIdRef = useRef(cueBallId);
-    const containerSizeRef = useRef(containerSize);
     const layoutRef = useRef(layout);
     const orientationRef = useRef(orientation);
     const onBallMoveRef = useRef(onBallMove);
@@ -462,34 +477,66 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
     const onPowerChangeRef = useRef(onPowerChange);
     const onShootRef = useRef(onShoot);
     const aimDirectionRef = useRef(aimDirection);
-    aimDirectionRef.current = aimDirection;
     const isDraggingCueRef = useRef(false);
     const cueDragStartProjRef = useRef(0);
     const cueDragStartPowerRef = useRef(0);
     const currentPowerRef = useRef(powerLevel);
 
-    useEffect(() => { isEditModeRef.current = isEditMode; }, [isEditMode]);
-    useEffect(() => { isSimulatingRef.current = isSimulating; }, [isSimulating]);
-    useEffect(() => { ballsRef.current = balls; }, [balls]);
-    useEffect(() => { cueBallIdRef.current = cueBallId; }, [cueBallId]);
-    useEffect(() => { containerSizeRef.current = containerSize; }, [containerSize]);
-    useEffect(() => { layoutRef.current = layout; }, [layout]);
-    useEffect(() => { orientationRef.current = orientation; }, [orientation]);
-    useEffect(() => { onBallMoveRef.current = onBallMove; }, [onBallMove]);
-    useEffect(() => { onAimChangeRef.current = onAimChange; }, [onAimChange]);
-    useEffect(() => { onNumberingAnchorsChangeRef.current = onNumberingAnchorsChange; }, [onNumberingAnchorsChange]);
-    useEffect(() => { onPowerChangeRef.current = onPowerChange; }, [onPowerChange]);
-    useEffect(() => { onShootRef.current = onShoot; }, [onShoot]);
-    useEffect(() => { currentPowerRef.current = powerLevel; }, [powerLevel]);
-    useEffect(() => { numberingAnchorsRef.current = numberingAnchors; }, [numberingAnchors]);
-    useEffect(() => { showNumberingRef.current = showNumbering; }, [showNumbering]);
-    useEffect(() => { draggingBallIdRef.current = draggingBallId; }, [draggingBallId]);
+    isEditModeRef.current = isEditMode;
+    isSimulatingRef.current = isSimulating;
+    ballsRef.current = balls;
+    cueBallIdRef.current = cueBallId;
+    layoutRef.current = layout;
+    orientationRef.current = orientation;
+    onBallMoveRef.current = onBallMove;
+    onAimChangeRef.current = onAimChange;
+    onNumberingAnchorsChangeRef.current = onNumberingAnchorsChange;
+    onPowerChangeRef.current = onPowerChange;
+    onShootRef.current = onShoot;
+    aimDirectionRef.current = aimDirection;
+    currentPowerRef.current = powerLevel;
+    numberingAnchorsRef.current = numberingAnchors;
+    showNumberingRef.current = showNumbering;
+    draggingBallIdRef.current = draggingBallId;
 
     const ballColors: Record<BallId, { color: string; border: string; gradientId: string }> = {
-        white: { color: '#f8fafc', border: '#cbd5e1', gradientId: 'ballWhite' },
+        white: { color: '#f8fafc', border: '#94a3b8', gradientId: 'ballWhite' },
         yellow: { color: '#facc15', border: '#ca8a04', gradientId: 'ballYellow' },
-        red: { color: '#dc2626', border: '#991b1b', gradientId: 'ballRed' },
+        red: { color: '#ef4444', border: '#991b1b', gradientId: 'ballRed' },
     };
+
+    const ballRotationsRef = useRef<Record<BallId, Quaternion>>({
+        white: [...INITIAL_BALL_QUATERNION],
+        yellow: [...INITIAL_BALL_QUATERNION],
+        red: [...INITIAL_BALL_QUATERNION],
+    });
+    const prevBallPositionsRef = useRef<Record<BallId, Vec2>>({
+        white: { x: -1, y: -1 },
+        yellow: { x: -1, y: -1 },
+        red: { x: -1, y: -1 },
+    });
+
+    // Actualización continua de rotación física sobre la superficie esférica en 3D
+    for (const b of balls) {
+        const prev = prevBallPositionsRef.current[b.id];
+        if (prev && prev.x >= 0 && prev.y >= 0) {
+            const dx = b.pos.x - prev.x;
+            const dy = b.pos.y - prev.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist > 0.001 && dist < 25) {
+                ballRotationsRef.current[b.id] = updateBallOrientation(
+                    ballRotationsRef.current[b.id],
+                    dx,
+                    dy,
+                    b.spin?.x ?? 0,
+                    b.radius || 3.075
+                );
+            } else if (dist >= 25) {
+                ballRotationsRef.current[b.id] = [...INITIAL_BALL_QUATERNION];
+            }
+        }
+        prevBallPositionsRef.current[b.id] = { ...b.pos };
+    }
 
     const screenToTableRef = useCallback(
         (screenX: number, screenY: number): Vec2 => {
@@ -768,16 +815,16 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
 
             const color = path.ballId === 'white' ? '#f8fafc' : path.ballId === 'yellow' ? '#facc15' : '#ef4444';
             
-            // Different stroke widths for cue ball vs target balls
-            const glowWidth = isCueBall ? 1.8 : 1.2;
-            const lineWidth = isCueBall ? 0.8 : 0.5;
+            // Different stroke widths for cue ball vs target balls - trazos delgados con 80% opacidad
+            const glowWidth = isCueBall ? 1.4 : 1.0;
+            const lineWidth = isCueBall ? 0.65 : 0.45;
 
             return (
-                <G key={path.ballId}>
+                <G key={path.ballId} opacity={0.80}>
                     <Polyline
                         points={points}
                         fill="none"
-                        stroke="rgba(255,255,255,0.14)"
+                        stroke="rgba(255,255,255,0.18)"
                         strokeWidth={glowWidth}
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -787,7 +834,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                         fill="none"
                         stroke={color}
                         strokeWidth={lineWidth}
-                        strokeDasharray="4 4"
+                        strokeDasharray="3 3"
                         strokeLinecap="round"
                         strokeLinejoin="round"
                     />
@@ -816,10 +863,8 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
             ref={containerRef}
             style={[styles.container, { aspectRatio: layout.viewBox.width / layout.viewBox.height }, style]}
             onLayout={(event) => {
-                setContainerSize({
-                    width: event.nativeEvent.layout.width,
-                    height: event.nativeEvent.layout.height,
-                });
+                const { width, height } = event.nativeEvent.layout;
+                containerSizeRef.current = { width, height };
             }}
             {...panResponder.panHandlers}>
             <Svg width="100%" height="100%" viewBox={`0 0 ${layout.viewBox.width} ${layout.viewBox.height}`} style={{ overflow: 'visible' }}>
@@ -862,41 +907,57 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                     </LinearGradient>
 
                     {/* Sombras de oclusión ambiental bajo la nariz de las bandas */}
+                    {/* Sombras de oclusión ambiental bajo la nariz de las bandas con iluminación direccional */}
                     <LinearGradient id="topCushionShadow" x1="0" y1="0" x2="0" y2="1">
-                        <Stop offset="0%" stopColor="#000000" stopOpacity={0.48} />
+                        <Stop offset="0%" stopColor="#000000" stopOpacity={0.62} />
+                        <Stop offset="60%" stopColor="#000000" stopOpacity={0.24} />
                         <Stop offset="100%" stopColor="#000000" stopOpacity={0.0} />
                     </LinearGradient>
                     <LinearGradient id="bottomCushionShadow" x1="0" y1="1" x2="0" y2="0">
-                        <Stop offset="0%" stopColor="#000000" stopOpacity={0.48} />
+                        <Stop offset="0%" stopColor="#000000" stopOpacity={0.35} />
                         <Stop offset="100%" stopColor="#000000" stopOpacity={0.0} />
                     </LinearGradient>
                     <LinearGradient id="leftCushionShadow" x1="0" y1="0" x2="1" y2="0">
-                        <Stop offset="0%" stopColor="#000000" stopOpacity={0.48} />
+                        <Stop offset="0%" stopColor="#000000" stopOpacity={0.62} />
+                        <Stop offset="60%" stopColor="#000000" stopOpacity={0.24} />
                         <Stop offset="100%" stopColor="#000000" stopOpacity={0.0} />
                     </LinearGradient>
                     <LinearGradient id="rightCushionShadow" x1="1" y1="0" x2="0" y2="0">
-                        <Stop offset="0%" stopColor="#000000" stopOpacity={0.48} />
+                        <Stop offset="0%" stopColor="#000000" stopOpacity={0.35} />
                         <Stop offset="100%" stopColor="#000000" stopOpacity={0.0} />
                     </LinearGradient>
 
-                    {/* Esferas 3D de bolas de billar con destello y sombra */}
-                    <RadialGradient id="ballWhite" cx="30%" cy="30%" r="70%">
+                    {/* Sombra de oclusión y contacto de las bolas sobre el paño */}
+                    <RadialGradient id="ballDropShadow" cx="50%" cy="50%" r="50%">
+                        <Stop offset="0%" stopColor="#000000" stopOpacity={0.72} />
+                        <Stop offset="45%" stopColor="#000000" stopOpacity={0.38} />
+                        <Stop offset="100%" stopColor="#000000" stopOpacity={0.0} />
+                    </RadialGradient>
+
+                    {/* Esferas 3D fotorrealistas de bolas de carambola estilo 8 Ball Pool */}
+                    <RadialGradient id="ballWhite" cx="34%" cy="28%" r="68%">
                         <Stop offset="0%" stopColor="#ffffff" />
-                        <Stop offset="45%" stopColor="#f8fafc" />
-                        <Stop offset="80%" stopColor="#cbd5e1" />
-                        <Stop offset="100%" stopColor="#94a3b8" />
+                        <Stop offset="28%" stopColor="#f8fafc" />
+                        <Stop offset="58%" stopColor="#e2e8f0" />
+                        <Stop offset="80%" stopColor="#94a3b8" />
+                        <Stop offset="93%" stopColor="#64748b" />
+                        <Stop offset="100%" stopColor="#334155" />
                     </RadialGradient>
-                    <RadialGradient id="ballYellow" cx="30%" cy="30%" r="70%">
-                        <Stop offset="0%" stopColor="#fef08a" />
-                        <Stop offset="45%" stopColor="#facc15" />
-                        <Stop offset="80%" stopColor="#eab308" />
-                        <Stop offset="100%" stopColor="#a16207" />
+                    <RadialGradient id="ballYellow" cx="34%" cy="28%" r="68%">
+                        <Stop offset="0%" stopColor="#fffbeb" />
+                        <Stop offset="26%" stopColor="#fef08a" />
+                        <Stop offset="56%" stopColor="#facc15" />
+                        <Stop offset="78%" stopColor="#ca8a04" />
+                        <Stop offset="92%" stopColor="#854d0e" />
+                        <Stop offset="100%" stopColor="#451a03" />
                     </RadialGradient>
-                    <RadialGradient id="ballRed" cx="30%" cy="30%" r="70%">
-                        <Stop offset="0%" stopColor="#fca5a5" />
-                        <Stop offset="45%" stopColor="#ef4444" />
-                        <Stop offset="80%" stopColor="#dc2626" />
-                        <Stop offset="100%" stopColor="#7f1d1d" />
+                    <RadialGradient id="ballRed" cx="34%" cy="28%" r="68%">
+                        <Stop offset="0%" stopColor="#fee2e2" />
+                        <Stop offset="26%" stopColor="#f87171" />
+                        <Stop offset="56%" stopColor="#ef4444" />
+                        <Stop offset="78%" stopColor="#dc2626" />
+                        <Stop offset="92%" stopColor="#991b1b" />
+                        <Stop offset="100%" stopColor="#450a0a" />
                     </RadialGradient>
                 </Defs>
 
@@ -998,22 +1059,17 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                     />
                 )}
 
-                {/* 6. Sombras 3D bajo la nariz del caucho */}
-                <Rect x={layout.playX} y={layout.playY} width={layout.playW} height={4.0} fill="url(#topCushionShadow)" />
-                <Rect x={layout.playX} y={layout.playY + layout.playH - 4.0} width={layout.playW} height={4.0} fill="url(#bottomCushionShadow)" />
-                <Rect x={layout.playX} y={layout.playY} width={4.0} height={layout.playH} fill="url(#leftCushionShadow)" />
-                <Rect x={layout.playX + layout.playW - 4.0} y={layout.playY} width={4.0} height={layout.playH} fill="url(#rightCushionShadow)" />
+                {/* 6. Sombras 3D bajo la nariz del caucho con iluminación direccional */}
+                <Rect x={layout.playX} y={layout.playY} width={layout.playW} height={5.5} fill="url(#topCushionShadow)" />
+                <Rect x={layout.playX} y={layout.playY + layout.playH - 3.2} width={layout.playW} height={3.2} fill="url(#bottomCushionShadow)" />
+                <Rect x={layout.playX} y={layout.playY} width={5.5} height={layout.playH} fill="url(#leftCushionShadow)" />
+                <Rect x={layout.playX + layout.playW - 3.2} y={layout.playY} width={3.2} height={layout.playH} fill="url(#rightCushionShadow)" />
 
-                {/* Línea de brillo superior en el filo de la banda */}
-                <Rect
-                    x={layout.playX}
-                    y={layout.playY}
-                    width={layout.playW}
-                    height={layout.playH}
-                    fill="none"
-                    stroke="rgba(255,255,255,0.22)"
-                    strokeWidth={0.7}
-                />
+                {/* Biselado de luz y sombra en la nariz de las bandas */}
+                <Line x1={layout.playX} y1={layout.playY} x2={layout.playX + layout.playW} y2={layout.playY} stroke="rgba(255,255,255,0.40)" strokeWidth={0.8} />
+                <Line x1={layout.playX} y1={layout.playY} x2={layout.playX} y2={layout.playY + layout.playH} stroke="rgba(255,255,255,0.40)" strokeWidth={0.8} />
+                <Line x1={layout.playX} y1={layout.playY + layout.playH} x2={layout.playX + layout.playW} y2={layout.playY + layout.playH} stroke="rgba(0,0,0,0.40)" strokeWidth={0.8} />
+                <Line x1={layout.playX + layout.playW} y1={layout.playY} x2={layout.playX + layout.playW} y2={layout.playY + layout.playH} stroke="rgba(0,0,0,0.40)" strokeWidth={0.8} />
 
                 {/* 7. Marca de agua / Calcomanía central de paño (Sticker / Decal) */}
                 {tablePreferences.showTableDecal && tablePreferences.tableDecal !== 'none' && (() => {
@@ -1220,14 +1276,14 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                     );
                 })}
 
-                {/* 10. Trazas dinámicas continuas estilo Billiard-Bible (⚪ 🟡 🔴) */}
+                {/* 10. Trazas dinámicas continuas estilo Billiard-Bible con 80% de opacidad (⚪ 🟡 🔴) */}
                 {dynamicTrails && (
-                    <G>
+                    <G opacity={0.80}>
                         {(['white', 'yellow', 'red'] as BallId[]).map((ballId) => {
                             const trail = dynamicTrails[ballId];
                             if (!trail || trail.length < 2) return null;
                             const strokeColor = ballId === 'white' ? '#ffffff' : ballId === 'yellow' ? '#facc15' : '#ef4444';
-                            const glowColor = ballId === 'white' ? 'rgba(255,255,255,0.32)' : ballId === 'yellow' ? 'rgba(250,204,21,0.32)' : 'rgba(239,68,68,0.32)';
+                            const glowColor = ballId === 'white' ? 'rgba(255,255,255,0.22)' : ballId === 'yellow' ? 'rgba(250,204,21,0.22)' : 'rgba(239,68,68,0.22)';
                             const pointsStr = trail
                                 .map((p) => {
                                     const svgPos = mapPointToSvg(p.pos, orientation, layout);
@@ -1237,21 +1293,21 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
 
                             return (
                                 <G key={`dynamic-trail-${ballId}`}>
-                                    {/* Resplandor exterior */}
+                                    {/* Resplandor exterior delgado */}
                                     <Polyline
                                         points={pointsStr}
                                         fill="none"
                                         stroke={glowColor}
-                                        strokeWidth={2.4}
+                                        strokeWidth={1.5}
                                         strokeLinecap="round"
                                         strokeLinejoin="round"
                                     />
-                                    {/* Línea viva interior */}
+                                    {/* Línea viva interior nítida */}
                                     <Polyline
                                         points={pointsStr}
                                         fill="none"
                                         stroke={strokeColor}
-                                        strokeWidth={1.1}
+                                        strokeWidth={0.75}
                                         strokeLinecap="round"
                                         strokeLinejoin="round"
                                     />
@@ -1260,6 +1316,55 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                         })}
                     </G>
                 )}
+
+                {/* 10.5. Micro-impactos y ondas de choque de colisiones estilo 8 Ball Pool */}
+                {collisionPulses && collisionPulses.length > 0 && (() => {
+                    const now = Date.now();
+                    return collisionPulses.map((pulse) => {
+                        const age = Math.min(1, Math.max(0, (now - pulse.timestamp) / 340));
+                        if (age >= 1) return null;
+                        const svgPos = mapPointToSvg(pulse.pos, orientation, layout);
+                        const isBallHit = pulse.type === 'ball';
+                        const radius = isBallHit ? 1.6 + age * 5.4 : 1.2 + age * 3.8;
+                        const strokeW = Math.max(0.3, 1.4 * (1 - age));
+                        const opacity = (1 - age) * 0.95;
+
+                        return (
+                            <G key={pulse.id} pointerEvents="none">
+                                {/* Anillo de choque exterior cian */}
+                                <Circle
+                                    cx={svgPos.x}
+                                    cy={svgPos.y}
+                                    r={radius * 1.35}
+                                    fill="none"
+                                    stroke="rgba(56, 189, 248, 0.75)"
+                                    strokeWidth={strokeW * 0.7}
+                                    opacity={opacity * 0.8}
+                                />
+                                {/* Onda de impacto nítida blanca */}
+                                <Circle
+                                    cx={svgPos.x}
+                                    cy={svgPos.y}
+                                    r={radius}
+                                    fill="none"
+                                    stroke="#ffffff"
+                                    strokeWidth={strokeW}
+                                    opacity={opacity}
+                                />
+                                {/* Destello de contacto instantáneo */}
+                                {age < 0.28 && (
+                                    <Circle
+                                        cx={svgPos.x}
+                                        cy={svgPos.y}
+                                        r={2.4 * (1 - age * 3.5)}
+                                        fill="#ffffff"
+                                        opacity={(1 - age * 3.5) * 0.95}
+                                    />
+                                )}
+                            </G>
+                        );
+                    });
+                })()}
 
                 {/* 11. Guía láser de puntería limpia y profesional estilo 8 Ball Pool */}
                 {showGuides && !isSimulating && (() => {
@@ -1404,41 +1509,219 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                     );
                 })()}
 
-                {/* 13. Bolas de Carambola en 3D con sombras suaves */}
+                {/* 13. Bolas de Carambola en 3D fotorrealistas con física de rodadura real (8 Ball Pool) */}
                 {balls.map((ball) => {
                     const mapped = mapPointToSvg(ball.pos, orientation, layout);
                     const ballStyle = ballColors[ball.id];
                     const isCueBall = ball.id === cueBallId;
+                    const ballSkin: BallSkinId = tablePreferences.ballSkin ?? 'aramith_pro_cup';
+                    const showDots = tablePreferences.showBallDots !== false;
+                    const quat = ballRotationsRef.current[ball.id] ?? INITIAL_BALL_QUATERNION;
+                    const isVertical = orientation === 'vertical';
+                    const ballRadiusSvg = 3.075;
 
                     return (
                         <G key={ball.id}>
-                            {/* Sombra de oclusión en el paño */}
-                            <Circle cx={mapped.x + 0.6} cy={mapped.y + 0.6} r={3.2} fill="rgba(0,0,0,0.30)" />
-                            {/* Cuerpo 3D esférico */}
+                            {/* Sombra de oclusión y contacto volumétrica sobre el paño */}
+                            <Ellipse
+                                cx={mapped.x + 0.55}
+                                cy={mapped.y + 0.65}
+                                rx={3.45}
+                                ry={3.2}
+                                fill="url(#ballDropShadow)"
+                            />
+
+                            {/* Cuerpo esférico 3D fotorrealista con gradiente multicapa */}
                             <Circle
                                 cx={mapped.x}
                                 cy={mapped.y}
-                                r={3.075}
+                                r={ballRadiusSvg}
                                 fill={`url(#${ballStyle.gradientId})`}
                                 stroke={ballStyle.border}
-                                strokeWidth={0.35}
+                                strokeWidth={0.22}
                             />
-                            {/* Destellos especulares */}
-                            <Circle cx={mapped.x - 1.0} cy={mapped.y - 1.0} r={1.1} fill="rgba(255,255,255,0.88)" />
-                            <Circle cx={mapped.x - 0.7} cy={mapped.y - 0.7} r={0.6} fill="rgba(255,255,255,0.98)" />
 
-                            {/* Anillo de selección si es bola tiradora */}
-                            {isCueBall && !isSimulating && (
-                                <Circle
-                                    cx={mapped.x}
-                                    cy={mapped.y}
-                                    r={4.6}
-                                    fill="none"
-                                    stroke="#38bdf8"
-                                    strokeWidth={0.7}
-                                    strokeDasharray="2.5 2.5"
-                                    opacity={0.85}
+                            {/* Marcajes oficiales en 3D que ruedan físicamente sobre la esfera */}
+                            {showDots && (() => {
+                                if (ballSkin === 'classic_solid') {
+                                    if (ball.id === 'white' || ball.id === 'yellow') {
+                                        const dotColor = ball.id === 'white' ? '#dc2626' : '#0f172a';
+                                        return (
+                                            <G pointerEvents="none">
+                                                {SPHERE_CLASSIC_DOTS.map((pt, idx) => {
+                                                    const proj = projectSpherePointToSvg(pt, quat, mapped, ballRadiusSvg, 0.42, isVertical);
+                                                    if (!proj) return null;
+                                                    return (
+                                                        <Ellipse
+                                                            key={`classic-dot-${ball.id}-${idx}`}
+                                                            cx={proj.cx}
+                                                            cy={proj.cy}
+                                                            rx={proj.rx}
+                                                            ry={proj.ry}
+                                                            transform={`rotate(${proj.rotationDeg} ${proj.cx} ${proj.cy})`}
+                                                            fill={dotColor}
+                                                            opacity={proj.opacity * 0.9}
+                                                        />
+                                                    );
+                                                })}
+                                            </G>
+                                        );
+                                    }
+                                    return null;
+                                }
+
+                                if (ballSkin === 'cosmo_helix_pba') {
+                                    // Cosmo Helix Vision (PBA Tour): 6 puntos de alta visibilidad + anillos orbitales en 3D
+                                    const dotColor = ball.id === 'white' ? '#00e5ff' : ball.id === 'yellow' ? '#1e3a8a' : '#ffffff';
+                                    const strokeColor = ball.id === 'white' ? 'rgba(0,0,0,0.5)' : ball.id === 'yellow' ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)';
+                                    const ringColor = ball.id === 'white' ? 'rgba(0,229,255,0.65)' : ball.id === 'yellow' ? 'rgba(30,58,138,0.7)' : 'rgba(255,255,255,0.5)';
+
+                                    const ringSegments1 = projectSphereRingToSvg(PBA_VISION_RING_1, quat, mapped, ballRadiusSvg, isVertical);
+                                    const ringSegments2 = projectSphereRingToSvg(PBA_VISION_RING_2, quat, mapped, ballRadiusSvg, isVertical);
+
+                                    return (
+                                        <G pointerEvents="none">
+                                            {/* Anillos de visión orbitales que giran con la bola */}
+                                            {ringSegments1.map((d, i) => (
+                                                <Path key={`pba-ring1-${i}`} d={d} fill="none" stroke={ringColor} strokeWidth={0.24} strokeDasharray="1.2 0.8" />
+                                            ))}
+                                            {ringSegments2.map((d, i) => (
+                                                <Path key={`pba-ring2-${i}`} d={d} fill="none" stroke={ringColor} strokeWidth={0.24} strokeDasharray="1.2 0.8" />
+                                            ))}
+
+                                            {/* 6 puntos que rotan sobre la esfera con proyección ortográfica esférica */}
+                                            {SPHERE_OCTAHEDRAL_DOTS.map((pt, idx) => {
+                                                const proj = projectSpherePointToSvg(pt, quat, mapped, ballRadiusSvg, 0.42, isVertical);
+                                                if (!proj) return null;
+                                                return (
+                                                    <Ellipse
+                                                        key={`pba-dot-${ball.id}-${idx}`}
+                                                        cx={proj.cx}
+                                                        cy={proj.cy}
+                                                        rx={proj.rx}
+                                                        ry={proj.ry}
+                                                        transform={`rotate(${proj.rotationDeg} ${proj.cx} ${proj.cy})`}
+                                                        fill={dotColor}
+                                                        stroke={strokeColor}
+                                                        strokeWidth={0.12}
+                                                        opacity={proj.opacity}
+                                                    />
+                                                );
+                                            })}
+                                        </G>
+                                    );
+                                }
+
+                                if (ballSkin === 'dynaspheres') {
+                                    const dotColor = ball.id === 'white' ? '#334155' : ball.id === 'yellow' ? '#1d4ed8' : '#d97706';
+                                    const ringColor = ball.id === 'white' ? 'rgba(51,65,85,0.6)' : ball.id === 'yellow' ? 'rgba(29,78,216,0.6)' : 'rgba(217,119,6,0.6)';
+                                    const ringSegments = projectSphereRingToSvg(DYNASPHERES_RING, quat, mapped, ballRadiusSvg, isVertical);
+
+                                    return (
+                                        <G pointerEvents="none">
+                                            {ringSegments.map((d, i) => (
+                                                <Path key={`dyna-ring-${i}`} d={d} fill="none" stroke={ringColor} strokeWidth={0.25} />
+                                            ))}
+                                            {SPHERE_OCTAHEDRAL_DOTS.map((pt, idx) => {
+                                                const proj = projectSpherePointToSvg(pt, quat, mapped, ballRadiusSvg, 0.36, isVertical);
+                                                if (!proj) return null;
+                                                return (
+                                                    <Ellipse
+                                                        key={`dyna-dot-${ball.id}-${idx}`}
+                                                        cx={proj.cx}
+                                                        cy={proj.cy}
+                                                        rx={proj.rx}
+                                                        ry={proj.ry}
+                                                        transform={`rotate(${proj.rotationDeg} ${proj.cx} ${proj.cy})`}
+                                                        fill={dotColor}
+                                                        opacity={proj.opacity}
+                                                    />
+                                                );
+                                            })}
+                                        </G>
+                                    );
+                                }
+
+                                // Predeterminado: Aramith Super Pro-Cup (UMB) - 6 puntos polka en los 6 polos cardinales
+                                if (ball.id === 'white' || ball.id === 'yellow') {
+                                    return (
+                                        <G pointerEvents="none">
+                                            {SPHERE_OCTAHEDRAL_DOTS.map((pt, idx) => {
+                                                const proj = projectSpherePointToSvg(pt, quat, mapped, ballRadiusSvg, 0.44, isVertical);
+                                                if (!proj) return null;
+                                                return (
+                                                    <Ellipse
+                                                        key={`procup-dot-${ball.id}-${idx}`}
+                                                        cx={proj.cx}
+                                                        cy={proj.cy}
+                                                        rx={proj.rx}
+                                                        ry={proj.ry}
+                                                        transform={`rotate(${proj.rotationDeg} ${proj.cx} ${proj.cy})`}
+                                                        fill="#dc2626"
+                                                        stroke="rgba(0,0,0,0.28)"
+                                                        strokeWidth={0.12}
+                                                        opacity={proj.opacity}
+                                                    />
+                                                );
+                                            })}
+                                        </G>
+                                    );
+                                }
+
+                                return null;
+                            })()}
+
+                            {/* Destellos especulares y reflejo de caperuza fija estilo 8 Ball Pool */}
+                            <G pointerEvents="none">
+                                {/* Caperuza curva elíptica de brillo superior izquierdo */}
+                                <Ellipse
+                                    cx={mapped.x - 0.92}
+                                    cy={mapped.y - 0.92}
+                                    rx={1.22}
+                                    ry={0.62}
+                                    transform={`rotate(-42 ${mapped.x - 0.92} ${mapped.y - 0.92})`}
+                                    fill="rgba(255, 255, 255, 0.62)"
                                 />
+                                {/* Pinpoint especular de foco puntual cenital */}
+                                <Circle
+                                    cx={mapped.x - 0.8}
+                                    cy={mapped.y - 0.8}
+                                    r={0.4}
+                                    fill="#ffffff"
+                                    opacity={0.96}
+                                />
+                                {/* Resplandor Fresnel secundario en el limbo opuesto (rebote del paño) */}
+                                <Path
+                                    d={`M ${(mapped.x - 0.4).toFixed(2)} ${(mapped.y + 2.7).toFixed(2)} A 2.75 2.75 0 0 0 ${(mapped.x + 2.7).toFixed(2)} ${(mapped.y - 0.4).toFixed(2)}`}
+                                    fill="none"
+                                    stroke="rgba(255, 255, 255, 0.22)"
+                                    strokeWidth={0.42}
+                                    strokeLinecap="round"
+                                />
+                            </G>
+
+                            {/* Anillo de selección táctil si es la bola tiradora */}
+                            {isCueBall && !isSimulating && (
+                                <G pointerEvents="none">
+                                    <Circle
+                                        cx={mapped.x}
+                                        cy={mapped.y}
+                                        r={4.7}
+                                        fill="none"
+                                        stroke="#38bdf8"
+                                        strokeWidth={0.65}
+                                        strokeDasharray="2.5 2.5"
+                                        opacity={0.88}
+                                    />
+                                    <Circle
+                                        cx={mapped.x}
+                                        cy={mapped.y}
+                                        r={5.5}
+                                        fill="none"
+                                        stroke="rgba(56, 189, 248, 0.25)"
+                                        strokeWidth={0.5}
+                                    />
+                                </G>
                             )}
                         </G>
                     );
@@ -1459,6 +1742,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                                 powerLevel={powerLevel}
                                 isSimulating={isSimulating}
                                 visible={true}
+                                cueSkin={tablePreferences.cueSkin}
                             />
                         );
                     })()

@@ -1,12 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import {
     IconTrophy,
     IconAlertTriangle,
-    IconCheck,
-    IconInfoCircle,
     IconChevronDown,
     IconChevronUp,
+    IconX,
 } from '@/src/presentation/components/icons';
 import { ShotValidation } from '@bandaro/core';
 
@@ -20,7 +19,11 @@ interface CaromRefereeBannerProps {
 
 /**
  * HUD y Banner Oficial del Árbitro UMB de Tres Bandas.
- * Muestra el conteo de bandas en tiempo real durante la jugada y el veredicto final.
+ * - En vivo: Muestra el conteo de bandas y bolas impactadas en tiempo real.
+ * - Al detenerse las bolas: Presenta el veredicto oficial. Si el usuario no interactúa,
+ *   se desvanece suavemente tras ~1 segundo.
+ * - Si el usuario interactúa (toca el banner o expande detalles), cancela el auto-desvanecido
+ *   y permanece visible hasta que el usuario lo cierre manualmente.
  */
 export const CaromRefereeBanner = React.memo(function CaromRefereeBanner({
     validation,
@@ -30,8 +33,124 @@ export const CaromRefereeBanner = React.memo(function CaromRefereeBanner({
     onDismiss,
 }: CaromRefereeBannerProps) {
     const [showDetails, setShowDetails] = useState(false);
+    const [hasInteracted, setHasInteracted] = useState(false);
 
-    // Estado durante la simulación en vivo
+    const fadeAnim = useRef(new Animated.Value(1)).current;
+    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const hasInteractedRef = useRef(false);
+    const showDetailsRef = useRef(false);
+    const isMountedRef = useRef(true);
+
+    useEffect(() => {
+        hasInteractedRef.current = hasInteracted;
+    }, [hasInteracted]);
+
+    useEffect(() => {
+        showDetailsRef.current = showDetails;
+    }, [showDetails]);
+
+    useEffect(() => {
+        isMountedRef.current = true;
+        return () => {
+            isMountedRef.current = false;
+            if (timerRef.current) {
+                clearTimeout(timerRef.current);
+            }
+        };
+    }, []);
+
+    // Temporizador de desvanecido automático cuando aparece el veredicto
+    useEffect(() => {
+        // Limpiar temporizador previo
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
+            timerRef.current = null;
+        }
+
+        if (isSimulating || !validation) {
+            // Durante la jugada o sin validación: restaurar opacidad y resetear interacciones
+            fadeAnim.setValue(1);
+            setShowDetails(false);
+            setHasInteracted(false);
+            hasInteractedRef.current = false;
+            showDetailsRef.current = false;
+            return;
+        }
+
+        // Nueva validación recibida
+        fadeAnim.setValue(1);
+        setShowDetails(false);
+        setHasInteracted(false);
+        hasInteractedRef.current = false;
+        showDetailsRef.current = false;
+
+        // Auto-desvanecido: ~1.2 segundos tras detenerse las bolas (1200ms para tiro inválido, 2200ms para carambola válida)
+        const delay = validation.isValid ? 2200 : 1200;
+
+        timerRef.current = setTimeout(() => {
+            // Solo desvanecer si el usuario no ha interactuado ni abierto detalles
+            if (!hasInteractedRef.current && !showDetailsRef.current) {
+                Animated.timing(fadeAnim, {
+                    toValue: 0,
+                    duration: 400,
+                    useNativeDriver: true,
+                }).start(({ finished }) => {
+                    if (finished && isMountedRef.current) {
+                        onDismiss?.();
+                    }
+                });
+            }
+        }, delay);
+
+        return () => {
+            if (timerRef.current) {
+                clearTimeout(timerRef.current);
+                timerRef.current = null;
+            }
+        };
+    }, [validation, isSimulating, fadeAnim, onDismiss]);
+
+    // Detiene el temporizador y ancla el banner en pantalla cuando el usuario interactúa
+    const cancelAutoDismissAndHold = useCallback(() => {
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
+            timerRef.current = null;
+        }
+        fadeAnim.stopAnimation();
+        fadeAnim.setValue(1);
+        setHasInteracted(true);
+        hasInteractedRef.current = true;
+    }, [fadeAnim]);
+
+    const handleBannerPress = useCallback(() => {
+        cancelAutoDismissAndHold();
+        setShowDetails((prev) => !prev);
+    }, [cancelAutoDismissAndHold]);
+
+    const handleToggleDetails = useCallback((e?: any) => {
+        e?.stopPropagation?.();
+        cancelAutoDismissAndHold();
+        setShowDetails((prev) => !prev);
+    }, [cancelAutoDismissAndHold]);
+
+    const handleManualDismiss = useCallback((e?: any) => {
+        e?.stopPropagation?.();
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
+            timerRef.current = null;
+        }
+        Animated.timing(fadeAnim, {
+            toValue: 0,
+            duration: 250,
+            useNativeDriver: true,
+        }).start(({ finished }) => {
+            if (finished && isMountedRef.current) {
+                onDismiss?.();
+            }
+        });
+    }, [fadeAnim, onDismiss]);
+
+    // Estado durante la simulación en vivo (HUD de conteo de bandas)
     if (isSimulating) {
         const isThirdReached = cushionCountLive >= 3;
         return (
@@ -93,45 +212,90 @@ export const CaromRefereeBanner = React.memo(function CaromRefereeBanner({
     if (!validation) return null;
 
     const isValid = validation.isValid;
+    const hasTimeline = Boolean(validation.scoringDetails?.eventTimeline?.length);
 
     return (
-        <View style={[styles.container, isValid ? styles.validContainer : styles.foulContainer]}>
-            <View style={styles.mainRow}>
-                <View style={styles.iconBadge}>
-                    {isValid ? (
-                        <IconTrophy size={18} color="#22c55e" />
-                    ) : (
-                        <IconAlertTriangle size={18} color="#ef4444" />
-                    )}
-                </View>
-
-                <View style={styles.textContainer}>
-                    <Text style={[styles.verdictTitle, { color: isValid ? '#4ade80' : '#f87171' }]}>
-                        {isValid ? '¡CARAMBOLA VÁLIDA! (+1)' : 'TIRO NO VÁLIDO'}
-                    </Text>
-                    <Text style={styles.classificationLabel} numberOfLines={1}>
-                        {validation.classificationLabel}
-                    </Text>
-                </View>
-
-                {validation.scoringDetails?.eventTimeline?.length > 0 && (
-                    <TouchableOpacity
-                        style={styles.detailsToggleBtn}
-                        onPress={() => setShowDetails((prev) => !prev)}
-                        activeOpacity={0.7}>
-                        {showDetails ? (
-                            <IconChevronUp size={16} color="#94a3b8" />
+        <Animated.View
+            style={[
+                styles.container,
+                isValid ? styles.validContainer : styles.foulContainer,
+                { opacity: fadeAnim },
+            ]}>
+            <TouchableOpacity
+                activeOpacity={0.88}
+                onPress={handleBannerPress}
+                style={styles.touchableWrapper}>
+                <View style={styles.mainRow}>
+                    <View style={styles.iconBadge}>
+                        {isValid ? (
+                            <IconTrophy size={18} color="#22c55e" />
                         ) : (
-                            <IconChevronDown size={16} color="#94a3b8" />
+                            <IconAlertTriangle size={18} color="#ef4444" />
                         )}
-                    </TouchableOpacity>
-                )}
-            </View>
+                    </View>
+
+                    <View style={styles.textContainer}>
+                        <View style={styles.verdictHeaderRow}>
+                            <Text
+                                style={[
+                                    styles.verdictTitle,
+                                    { color: isValid ? '#4ade80' : '#f87171' },
+                                ]}>
+                                {isValid ? '¡CARAMBOLA VÁLIDA! (+1)' : 'TIRO NO VÁLIDO'}
+                            </Text>
+                            {!hasInteracted && (
+                                <Text style={styles.autoDismissHint}>
+                                    • Toca para ver detalles
+                                </Text>
+                            )}
+                        </View>
+                        <Text
+                            style={styles.classificationLabel}
+                            numberOfLines={showDetails ? undefined : 1}>
+                            {validation.classificationLabel}
+                        </Text>
+                    </View>
+
+                    <View style={styles.actionButtonsRow}>
+                        {hasTimeline && (
+                            <TouchableOpacity
+                                style={styles.iconBtn}
+                                onPress={handleToggleDetails}
+                                activeOpacity={0.7}
+                                accessibilityLabel={showDetails ? 'Ocultar detalles' : 'Ver detalles'}>
+                                {showDetails ? (
+                                    <IconChevronUp size={16} color="#94a3b8" />
+                                ) : (
+                                    <IconChevronDown size={16} color="#94a3b8" />
+                                )}
+                            </TouchableOpacity>
+                        )}
+                        <TouchableOpacity
+                            style={styles.iconBtn}
+                            onPress={handleManualDismiss}
+                            activeOpacity={0.7}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            accessibilityLabel="Cerrar veredicto">
+                            <IconX size={15} color="#94a3b8" />
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </TouchableOpacity>
 
             {/* Desglose cronológico de eventos si está expandido */}
             {showDetails && validation.scoringDetails?.eventTimeline && (
                 <View style={styles.detailsBox}>
-                    <Text style={styles.detailsTitle}>Cronología Oficial de Contactos:</Text>
+                    <View style={styles.detailsHeader}>
+                        <Text style={styles.detailsTitle}>Cronología Oficial de Contactos:</Text>
+                        <TouchableOpacity
+                            style={styles.closeDetailsPill}
+                            onPress={handleManualDismiss}
+                            activeOpacity={0.7}
+                            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                            <IconX size={12} color="#94a3b8" />
+                            <Text style={styles.closeDetailsPillText}>Cerrar</Text>
+                        </TouchableOpacity>
+                    </View>
                     {validation.scoringDetails.eventTimeline.map((item, idx) => (
                         <View key={idx} style={styles.timelineItem}>
                             <View
@@ -145,38 +309,43 @@ export const CaromRefereeBanner = React.memo(function CaromRefereeBanner({
                             <Text style={styles.timelineText}>{item.description}</Text>
                         </View>
                     ))}
-                    <Text style={styles.reasonText}>{validation.reason}</Text>
+                    {Boolean(validation.reason) && (
+                        <Text style={styles.reasonText}>{validation.reason}</Text>
+                    )}
                 </View>
             )}
-        </View>
+        </Animated.View>
     );
 });
 
 const styles = StyleSheet.create({
     container: {
         width: '100%',
-        maxWidth: 500,
+        maxWidth: 520,
         borderRadius: 14,
         paddingHorizontal: 12,
         paddingVertical: 8,
         borderWidth: 1.5,
-        backgroundColor: 'rgba(15, 23, 42, 0.92)',
+        backgroundColor: 'rgba(15, 23, 42, 0.94)',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.4,
-        shadowRadius: 8,
-        elevation: 6,
+        shadowOpacity: 0.45,
+        shadowRadius: 10,
+        elevation: 8,
     },
     simulatingContainer: {
         borderColor: 'rgba(56, 189, 248, 0.4)',
     },
     validContainer: {
-        borderColor: 'rgba(34, 197, 94, 0.6)',
-        backgroundColor: 'rgba(5, 46, 22, 0.88)',
+        borderColor: 'rgba(34, 197, 94, 0.65)',
+        backgroundColor: 'rgba(5, 46, 22, 0.92)',
     },
     foulContainer: {
-        borderColor: 'rgba(239, 68, 68, 0.6)',
-        backgroundColor: 'rgba(69, 10, 10, 0.88)',
+        borderColor: 'rgba(239, 68, 68, 0.65)',
+        backgroundColor: 'rgba(69, 10, 10, 0.92)',
+    },
+    touchableWrapper: {
+        width: '100%',
     },
     liveContent: {
         flexDirection: 'row',
@@ -254,10 +423,21 @@ const styles = StyleSheet.create({
     textContainer: {
         flex: 1,
     },
+    verdictHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'baseline',
+        flexWrap: 'wrap',
+        gap: 6,
+    },
     verdictTitle: {
         fontSize: 13,
         fontWeight: '900',
         letterSpacing: 0.5,
+    },
+    autoDismissHint: {
+        fontSize: 10,
+        color: 'rgba(203, 213, 225, 0.75)',
+        fontStyle: 'italic',
     },
     classificationLabel: {
         fontSize: 11,
@@ -265,8 +445,18 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         marginTop: 1,
     },
-    detailsToggleBtn: {
-        padding: 6,
+    actionButtonsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    iconBtn: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.07)',
     },
     detailsBox: {
         marginTop: 8,
@@ -275,12 +465,31 @@ const styles = StyleSheet.create({
         borderTopColor: 'rgba(255, 255, 255, 0.1)',
         gap: 4,
     },
+    detailsHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 4,
+    },
     detailsTitle: {
         fontSize: 10,
         fontWeight: '700',
         color: '#94a3b8',
         textTransform: 'uppercase',
-        marginBottom: 2,
+    },
+    closeDetailsPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 10,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    },
+    closeDetailsPillText: {
+        fontSize: 10,
+        fontWeight: '600',
+        color: '#cbd5e1',
     },
     timelineItem: {
         flexDirection: 'row',

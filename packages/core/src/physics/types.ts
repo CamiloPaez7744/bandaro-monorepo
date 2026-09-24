@@ -88,17 +88,23 @@ export const DEFAULT_TABLE: TableDimensions = {
 export const BALL_RADIUS = 3.075;
 
 export const PHYSICS = {
-    friction: 0.992,
+    friction: 0.990,
     minVelocity: 0.05,
     maxIterations: 15000,
     timeStep: 0.016,
-    cushionRestitution: 0.82,
-    cushionFriction: 0.18,
-    ballRestitution: 0.96,
-    spinDecay: 0.965,
-    spinInfluence: 0.28,
-    englishBounceFactor: 1.45,
+    cushionRestitution: 0.74,
+    cushionFriction: 0.22,
+    ballRestitution: 0.95,
+    spinDecay: 0.970,
+    spinInfluence: 0.25,
+    englishBounceFactor: 1.25,
 };
+
+export function calculateShotVelocity(powerPercentage: number): number {
+    const clamped = Math.max(0, Math.min(100, powerPercentage));
+    if (clamped <= 0) return 0;
+    return 1.2 + (clamped / 100) * 11.3;
+}
 
 export interface PowerLevel {
     level: number;

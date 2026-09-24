@@ -196,7 +196,7 @@ function TrainingSystemWorkspace() {
         red: true,
     });
     const [tableOrientation, setTableOrientation] = useState<Orientation>(defaultOrientation);
-    const [stageLayout, setStageLayout] = useState({ width: 0, height: 0 });
+    const stageLayoutRef = useRef({ width: 0, height: 0 });
     const [statusMessage, setStatusMessage] = useState<string | null>(null);
     const gestureModeRef = useRef<{ mode: 'drag' | 'aim' | null; ballId: BallId | null }>({ mode: null, ballId: null });
 
@@ -375,6 +375,7 @@ function TrainingSystemWorkspace() {
     };
 
     const findBallAtStagePoint = (stagePoint: Point2D) => {
+        const stageLayout = stageLayoutRef.current;
         if (!stageLayout.width || !stageLayout.height) {
             return null;
         }
@@ -387,6 +388,7 @@ function TrainingSystemWorkspace() {
     };
 
     const updateByStagePoint = (stagePoint: Point2D) => {
+        const stageLayout = stageLayoutRef.current;
         if (!stageLayout.width || !stageLayout.height) {
             return;
         }
@@ -471,10 +473,10 @@ function TrainingSystemWorkspace() {
                 <View
                     style={styles.tableWrap}
                     onLayout={(event) => {
-                        setStageLayout({
+                        stageLayoutRef.current = {
                             width: event.nativeEvent.layout.width,
                             height: event.nativeEvent.layout.height,
-                        });
+                        };
                     }}
                     onStartShouldSetResponder={() => true}
                     onMoveShouldSetResponder={() => true}

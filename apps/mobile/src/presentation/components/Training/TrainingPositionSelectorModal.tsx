@@ -2,12 +2,14 @@ import {
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
   useWindowDimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   IconBook,
   IconCamera,
@@ -39,9 +41,10 @@ export function TrainingPositionSelectorModal({
   quote,
 }: TrainingPositionSelectorModalProps) {
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const isDesktop = width >= 640;
   const palette = getPalette(useColorScheme());
-  const styles = getStyles(palette, isDesktop);
+  const styles = getStyles(palette, isDesktop, insets.bottom);
 
   return (
     <Modal
@@ -52,141 +55,150 @@ export function TrainingPositionSelectorModal({
     >
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.headerLeft}>
-              <View style={styles.headerIconCircle}>
-                <IconSparkles size={22} color={palette.primary} strokeWidth={2} />
-              </View>
-              <View style={styles.headerTextWrap}>
-                <View style={styles.headerTagRow}>
-                  <Text style={styles.headerTag}>CONFIGURACIÓN DE ENTRENAMIENTO</Text>
+          {!isDesktop && <View style={styles.sheetHandle} />}
+
+          <ScrollView
+            style={styles.sheetScroll}
+            contentContainerStyle={styles.sheetScrollContent}
+            showsVerticalScrollIndicator={false}
+            bounces={false}>
+            {/* Header */}
+            <View style={styles.header}>
+              <View style={styles.headerLeft}>
+                <View style={styles.headerIconCircle}>
+                  <IconSparkles size={isDesktop ? 22 : 18} color={palette.primary} strokeWidth={2} />
                 </View>
-                <Text style={styles.title}>Nueva Sesión de Billar</Text>
-                <Text style={styles.subtitle}>
-                  Elige cómo deseas configurar o cargar las posiciones en la mesa
-                </Text>
+                <View style={styles.headerTextWrap}>
+                  <View style={styles.headerTagRow}>
+                    <Text style={styles.headerTag}>CONFIGURACIÓN DE ENTRENAMIENTO</Text>
+                  </View>
+                  <Text style={styles.title}>Nueva Sesión de Billar</Text>
+                  <Text style={styles.subtitle} numberOfLines={isDesktop ? 2 : 1}>
+                    Elige cómo deseas configurar o cargar las posiciones en la mesa
+                  </Text>
+                </View>
               </View>
+              <TouchableOpacity
+                style={styles.closeBtn}
+                onPress={onClose}
+                activeOpacity={0.7}
+                accessibilityLabel="Cerrar modal"
+              >
+                <IconX size={isDesktop ? 20 : 18} color={palette.muted} />
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity
-              style={styles.closeBtn}
-              onPress={onClose}
-              activeOpacity={0.7}
-            >
-              <IconX size={20} color={palette.muted} />
-            </TouchableOpacity>
-          </View>
 
-          {/* Motivational Quote Banner */}
-          {quote ? (
-            <View style={styles.quoteCard}>
-              <IconSparkles size={16} color={palette.primary} />
-              <Text style={styles.quoteText}>{quote}</Text>
+            {/* Motivational Quote Banner */}
+            {quote ? (
+              <View style={styles.quoteCard}>
+                <IconSparkles size={14} color={palette.primary} />
+                <Text style={styles.quoteText}>{quote}</Text>
+              </View>
+            ) : null}
+
+            {/* 3 Rich Visual Entry Options (Grid on Web, Responsive on Mobile) */}
+            <View style={styles.cardsGrid}>
+              {/* Option 1: Catalog */}
+              <TouchableOpacity
+                style={[styles.actionCard, { borderColor: `${palette.primary}35` }]}
+                activeOpacity={0.85}
+                onPress={() => {
+                  onClose();
+                  onSelectCatalog();
+                }}
+              >
+                <View style={styles.cardHeaderRow}>
+                  <View style={[styles.cardIconCircle, { backgroundColor: `${palette.primary}18` }]}>
+                    <IconBook size={isDesktop ? 24 : 20} color={palette.primary} strokeWidth={2} />
+                  </View>
+                  <View style={[styles.cardTagBadge, { backgroundColor: `${palette.primary}15`, borderColor: `${palette.primary}40` }]}>
+                    <Text style={[styles.cardTagText, { color: palette.primary }]}>BILLIARD-BIBLE</Text>
+                  </View>
+                </View>
+
+                <View style={styles.cardBody}>
+                  <Text style={styles.cardTitle}>Elegir del Catálogo</Text>
+                  <Text style={styles.cardDesc}>
+                    Banda previa, Bricoles, Pase bola, Rondas y sistemas maestros UMB organizados por categoría y nivel.
+                  </Text>
+                </View>
+
+                <View style={styles.cardFooter}>
+                  <Text style={[styles.cardActionCue, { color: palette.primary }]}>Explorar Jugadas</Text>
+                  <IconArrowRight size={14} color={palette.primary} strokeWidth={2.5} />
+                </View>
+              </TouchableOpacity>
+
+              {/* Option 2: Simulator */}
+              <TouchableOpacity
+                style={[styles.actionCard, { borderColor: `${palette.secondary}35` }]}
+                activeOpacity={0.85}
+                onPress={() => {
+                  onClose();
+                  onOpenSimulator();
+                }}
+              >
+                <View style={styles.cardHeaderRow}>
+                  <View style={[styles.cardIconCircle, { backgroundColor: `${palette.secondary}18` }]}>
+                    <IconDeviceGamepad2 size={isDesktop ? 24 : 20} color={palette.secondary} strokeWidth={2} />
+                  </View>
+                  <View style={[styles.cardTagBadge, { backgroundColor: `${palette.secondary}15`, borderColor: `${palette.secondary}40` }]}>
+                    <Text style={[styles.cardTagText, { color: palette.secondary }]}>INTERACTIVO</Text>
+                  </View>
+                </View>
+
+                <View style={styles.cardBody}>
+                  <Text style={styles.cardTitle}>Armar en Simulador</Text>
+                  <Text style={styles.cardDesc}>
+                    Coloca las 3 bolas libremente en la mesa virtual, ajusta efecto, fuerza y ángulo de ataque para practicar.
+                  </Text>
+                </View>
+
+                <View style={styles.cardFooter}>
+                  <Text style={[styles.cardActionCue, { color: palette.secondary }]}>Abrir Mesa Virtual</Text>
+                  <IconArrowRight size={14} color={palette.secondary} strokeWidth={2.5} />
+                </View>
+              </TouchableOpacity>
+
+              {/* Option 3: Camera / Snapshot */}
+              <TouchableOpacity
+                style={[styles.actionCard, { borderColor: `${palette.tertiary}35` }]}
+                activeOpacity={0.85}
+                onPress={() => {
+                  onClose();
+                  onCapturePhoto();
+                }}
+              >
+                <View style={styles.cardHeaderRow}>
+                  <View style={[styles.cardIconCircle, { backgroundColor: `${palette.tertiary}18` }]}>
+                    <IconCamera size={isDesktop ? 24 : 20} color={palette.tertiary} strokeWidth={2} />
+                  </View>
+                  <View style={[styles.cardTagBadge, { backgroundColor: `${palette.tertiary}15`, borderColor: `${palette.tertiary}40` }]}>
+                    <Text style={[styles.cardTagText, { color: palette.tertiary }]}>VISIÓN AI</Text>
+                  </View>
+                </View>
+
+                <View style={styles.cardBody}>
+                  <Text style={styles.cardTitle}>Escanear con Foto</Text>
+                  <Text style={styles.cardDesc}>
+                    Toma una foto de tu mesa física o pega una captura de YouTube para clonar la posición con calibración proyectiva.
+                  </Text>
+                </View>
+
+                <View style={styles.cardFooter}>
+                  <Text style={[styles.cardActionCue, { color: palette.tertiary }]}>Escanear Mesa</Text>
+                  <IconArrowRight size={14} color={palette.tertiary} strokeWidth={2.5} />
+                </View>
+              </TouchableOpacity>
             </View>
-          ) : null}
-
-          {/* 3 Rich Visual Entry Options (Grid on Web, Responsive on Mobile) */}
-          <View style={styles.cardsGrid}>
-            {/* Option 1: Catalog */}
-            <TouchableOpacity
-              style={[styles.actionCard, { borderColor: `${palette.primary}35` }]}
-              activeOpacity={0.85}
-              onPress={() => {
-                onClose();
-                onSelectCatalog();
-              }}
-            >
-              <View style={styles.cardHeaderRow}>
-                <View style={[styles.cardIconCircle, { backgroundColor: `${palette.primary}18` }]}>
-                  <IconBook size={24} color={palette.primary} strokeWidth={2} />
-                </View>
-                <View style={[styles.cardTagBadge, { backgroundColor: `${palette.primary}15`, borderColor: `${palette.primary}40` }]}>
-                  <Text style={[styles.cardTagText, { color: palette.primary }]}>BILLIARD-BIBLE</Text>
-                </View>
-              </View>
-
-              <View style={styles.cardBody}>
-                <Text style={styles.cardTitle}>Elegir del Catálogo</Text>
-                <Text style={styles.cardDesc}>
-                  Banda previa, Bricoles, Pase bola, Rondas y sistemas maestros UMB organizados por categoría y nivel.
-                </Text>
-              </View>
-
-              <View style={styles.cardFooter}>
-                <Text style={[styles.cardActionCue, { color: palette.primary }]}>Explorar Jugadas</Text>
-                <IconArrowRight size={16} color={palette.primary} strokeWidth={2.5} />
-              </View>
-            </TouchableOpacity>
-
-            {/* Option 2: Simulator */}
-            <TouchableOpacity
-              style={[styles.actionCard, { borderColor: `${palette.secondary}35` }]}
-              activeOpacity={0.85}
-              onPress={() => {
-                onClose();
-                onOpenSimulator();
-              }}
-            >
-              <View style={styles.cardHeaderRow}>
-                <View style={[styles.cardIconCircle, { backgroundColor: `${palette.secondary}18` }]}>
-                  <IconDeviceGamepad2 size={24} color={palette.secondary} strokeWidth={2} />
-                </View>
-                <View style={[styles.cardTagBadge, { backgroundColor: `${palette.secondary}15`, borderColor: `${palette.secondary}40` }]}>
-                  <Text style={[styles.cardTagText, { color: palette.secondary }]}>INTERACTIVO</Text>
-                </View>
-              </View>
-
-              <View style={styles.cardBody}>
-                <Text style={styles.cardTitle}>Armar en Simulador</Text>
-                <Text style={styles.cardDesc}>
-                  Coloca las 3 bolas libremente en la mesa virtual, ajusta efecto, fuerza y ángulo de ataque para practicar.
-                </Text>
-              </View>
-
-              <View style={styles.cardFooter}>
-                <Text style={[styles.cardActionCue, { color: palette.secondary }]}>Abrir Mesa Virtual</Text>
-                <IconArrowRight size={16} color={palette.secondary} strokeWidth={2.5} />
-              </View>
-            </TouchableOpacity>
-
-            {/* Option 3: Camera / Snapshot */}
-            <TouchableOpacity
-              style={[styles.actionCard, { borderColor: `${palette.tertiary}35` }]}
-              activeOpacity={0.85}
-              onPress={() => {
-                onClose();
-                onCapturePhoto();
-              }}
-            >
-              <View style={styles.cardHeaderRow}>
-                <View style={[styles.cardIconCircle, { backgroundColor: `${palette.tertiary}18` }]}>
-                  <IconCamera size={24} color={palette.tertiary} strokeWidth={2} />
-                </View>
-                <View style={[styles.cardTagBadge, { backgroundColor: `${palette.tertiary}15`, borderColor: `${palette.tertiary}40` }]}>
-                  <Text style={[styles.cardTagText, { color: palette.tertiary }]}>VISIÓN AI</Text>
-                </View>
-              </View>
-
-              <View style={styles.cardBody}>
-                <Text style={styles.cardTitle}>Escanear con Foto</Text>
-                <Text style={styles.cardDesc}>
-                  Toma una foto de tu mesa física o pega una captura de YouTube para clonar la posición con calibración proyectiva.
-                </Text>
-              </View>
-
-              <View style={styles.cardFooter}>
-                <Text style={[styles.cardActionCue, { color: palette.tertiary }]}>Escanear Mesa</Text>
-                <IconArrowRight size={16} color={palette.tertiary} strokeWidth={2.5} />
-              </View>
-            </TouchableOpacity>
-          </View>
+          </ScrollView>
         </Pressable>
       </Pressable>
     </Modal>
   );
 }
 
-const getStyles = (palette: ReturnType<typeof getPalette>, isDesktop: boolean) =>
+const getStyles = (palette: ReturnType<typeof getPalette>, isDesktop: boolean, bottomInset: number) =>
   StyleSheet.create({
     overlay: {
       flex: 1,
@@ -202,16 +214,33 @@ const getStyles = (palette: ReturnType<typeof getPalette>, isDesktop: boolean) =
       borderTopRightRadius: theme.radius.xl,
       borderWidth: 1,
       borderColor: isDesktop ? 'rgba(255, 255, 255, 0.12)' : palette.border,
-      padding: isDesktop ? 28 : theme.spacing.lg,
-      gap: 18,
       width: isDesktop ? '100%' : undefined,
       maxWidth: isDesktop ? 840 : undefined,
-      maxHeight: isDesktop ? '90%' : '90%',
+      maxHeight: isDesktop ? '90%' : '88%',
+      overflow: 'hidden',
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 16 },
       shadowOpacity: 0.65,
       shadowRadius: 30,
       elevation: 25,
+    },
+    sheetHandle: {
+      width: 36,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: 'rgba(255, 255, 255, 0.25)',
+      alignSelf: 'center',
+      marginTop: 8,
+      marginBottom: 2,
+    },
+    sheetScroll: {
+      flexGrow: 0,
+      maxHeight: '100%',
+    },
+    sheetScrollContent: {
+      padding: isDesktop ? 28 : 16,
+      paddingBottom: isDesktop ? 28 : Math.max(18, bottomInset + 12),
+      gap: isDesktop ? 18 : 14,
     },
     header: {
       flexDirection: 'row',
@@ -221,13 +250,13 @@ const getStyles = (palette: ReturnType<typeof getPalette>, isDesktop: boolean) =
     headerLeft: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 14,
+      gap: isDesktop ? 14 : 10,
       flex: 1,
     },
     headerIconCircle: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
+      width: isDesktop ? 44 : 36,
+      height: isDesktop ? 44 : 36,
+      borderRadius: isDesktop ? 22 : 18,
       backgroundColor: `${palette.primary}18`,
       borderWidth: 1,
       borderColor: `${palette.primary}35`,
@@ -243,7 +272,7 @@ const getStyles = (palette: ReturnType<typeof getPalette>, isDesktop: boolean) =
       alignItems: 'center',
     },
     headerTag: {
-      fontSize: 10,
+      fontSize: 9.5,
       fontWeight: '800',
       letterSpacing: 0.7,
       color: palette.primary,
@@ -251,15 +280,15 @@ const getStyles = (palette: ReturnType<typeof getPalette>, isDesktop: boolean) =
     },
     title: {
       color: palette.text,
-      fontSize: isDesktop ? 22 : 18,
+      fontSize: isDesktop ? 22 : 16,
       fontWeight: '800',
       letterSpacing: -0.2,
     },
     subtitle: {
       color: palette.muted,
-      fontSize: isDesktop ? 13 : 12,
+      fontSize: isDesktop ? 13 : 11.5,
       marginTop: 2,
-      lineHeight: 18,
+      lineHeight: isDesktop ? 18 : 15,
     },
     closeBtn: {
       padding: 6,
@@ -269,35 +298,35 @@ const getStyles = (palette: ReturnType<typeof getPalette>, isDesktop: boolean) =
     quoteCard: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 10,
+      gap: 8,
       backgroundColor: `${palette.primary}10`,
       borderWidth: 1,
       borderColor: `${palette.primary}25`,
       borderRadius: theme.radius.md,
-      paddingHorizontal: 14,
-      paddingVertical: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
     },
     quoteText: {
       color: palette.text,
-      fontSize: 12,
+      fontSize: 11.5,
       fontWeight: '600',
       flex: 1,
       fontStyle: 'italic',
-      lineHeight: 17,
+      lineHeight: 16,
     },
     cardsGrid: {
       flexDirection: isDesktop ? 'row' : 'column',
-      gap: isDesktop ? 16 : 12,
-      marginTop: 4,
+      gap: isDesktop ? 16 : 10,
+      marginTop: 2,
     },
     actionCard: {
       flex: isDesktop ? 1 : undefined,
       backgroundColor: palette.surfaceLow,
       borderWidth: 1,
       borderRadius: theme.radius.lg,
-      padding: isDesktop ? 20 : 16,
+      padding: isDesktop ? 20 : 12,
       justifyContent: 'space-between',
-      gap: 14,
+      gap: isDesktop ? 14 : 8,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.25,
@@ -310,47 +339,47 @@ const getStyles = (palette: ReturnType<typeof getPalette>, isDesktop: boolean) =
       justifyContent: 'space-between',
     },
     cardIconCircle: {
-      width: 48,
-      height: 48,
-      borderRadius: 12,
+      width: isDesktop ? 48 : 36,
+      height: isDesktop ? 48 : 36,
+      borderRadius: isDesktop ? 12 : 10,
       alignItems: 'center',
       justifyContent: 'center',
     },
     cardTagBadge: {
-      paddingHorizontal: 8,
-      paddingVertical: 3,
+      paddingHorizontal: 7,
+      paddingVertical: 2.5,
       borderRadius: 6,
       borderWidth: 1,
     },
     cardTagText: {
-      fontSize: 9.5,
+      fontSize: 9,
       fontWeight: '800',
       letterSpacing: 0.5,
     },
     cardBody: {
-      gap: 6,
+      gap: 4,
       flex: 1,
     },
     cardTitle: {
       color: palette.text,
-      fontSize: 16,
+      fontSize: isDesktop ? 16 : 14,
       fontWeight: '700',
     },
     cardDesc: {
       color: palette.muted,
-      fontSize: 12,
-      lineHeight: 17,
+      fontSize: isDesktop ? 12 : 11,
+      lineHeight: isDesktop ? 17 : 15,
     },
     cardFooter: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingTop: 10,
+      paddingTop: isDesktop ? 10 : 7,
       borderTopWidth: 1,
       borderTopColor: 'rgba(255, 255, 255, 0.06)',
     },
     cardActionCue: {
-      fontSize: 12,
+      fontSize: isDesktop ? 12 : 11,
       fontWeight: '700',
     },
   });

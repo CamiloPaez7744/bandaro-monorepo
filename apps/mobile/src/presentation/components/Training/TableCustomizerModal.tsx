@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View,
   Image,
+  useWindowDimensions,
 } from 'react-native';
 import {
   IconCheck,
@@ -22,14 +23,22 @@ import {
   CLOTH_SKIN_PRESETS,
   DEFAULT_TABLE_PREFERENCES,
   TABLE_ARENA_SKINS,
+  CUE_SKIN_PRESETS,
   applyArenaSkin,
   type CornerMetalStyle,
+  type CueSkinId,
   type DiamondCount,
   type DiamondShape,
   type TablePreferences,
   type WoodFinish,
 } from './tablePreferences';
 import { TABLE_DECAL_DEFS } from './tableDecals';
+import {
+  type BreakFormat,
+  type PbaFormationId,
+  PBA_BREAK_FORMATIONS,
+  getRandomPbaBreak,
+} from '@bandaro/core';
 
 interface TableCustomizerModalProps {
   visible: boolean;
@@ -53,6 +62,9 @@ function TableCustomizerModalBase({
   onClose,
   onChangePreferences,
 }: TableCustomizerModalProps) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+
   const [customHex, setCustomHex] = useState(
     preferences.clothColor.startsWith('#') ? preferences.clothColor : '#0f766e'
   );
@@ -74,27 +86,27 @@ function TableCustomizerModalBase({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={s.overlay}>
-        <View style={s.modalContainer}>
+      <View style={[s.overlay, isMobile && { padding: 8 }]}>
+        <View style={[s.modalContainer, isMobile && { width: '96%', maxHeight: '92%', borderRadius: 16 }]}>
           {/* Header */}
-          <View style={s.header}>
+          <View style={[s.header, isMobile && { paddingHorizontal: 12, paddingVertical: 12 }]}>
             <View style={s.headerTitleRow}>
               <View style={s.headerIconBadge}>
-                <IconSettings size={20} color="#10b981" strokeWidth={2.2} />
+                <IconSettings size={18} color="#10b981" strokeWidth={2.2} />
               </View>
-              <View>
-                <Text style={s.headerTitle}>Personalizar Mesa Canónica</Text>
-                <Text style={s.headerSubtitle}>
-                  Configura skins, tipo de miras, esquinas y cuadrícula
+              <View style={{ flex: 1 }}>
+                <Text style={[s.headerTitle, isMobile && { fontSize: 14 }]}>Personalizar Mesa Canónica</Text>
+                <Text style={[s.headerSubtitle, isMobile && { fontSize: 10.5 }]} numberOfLines={1}>
+                  Configura skins, tipo de miras y paño
                 </Text>
               </View>
             </View>
             <TouchableOpacity style={s.closeBtn} onPress={onClose} activeOpacity={0.7}>
-              <IconX size={20} color="#94a39d" />
+              <IconX size={18} color="#94a39d" />
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent}>
+          <ScrollView style={s.scroll} contentContainerStyle={[s.scrollContent, isMobile && { padding: 12, gap: 14 }]}>
             {/* SECCIÓN 0: SKINS OFICIALES DE ARENA (ESTILO 8-BALL POOL & TORNEO) */}
             <View style={s.section}>
               <Text style={s.sectionTitle}>Skins Temáticas de Arena (Estilo Torneo)</Text>
@@ -165,7 +177,155 @@ function TableCustomizerModalBase({
               </ScrollView>
             </View>
 
-            {/* 1. SECCIÓN: COLOR & SKINS DEL PAÑO */}
+            {/* SECCIÓN 1: POSICIÓN DE SALIDA OFICIAL (BREAK SHOT: UMB VS PBA) */}
+            <View style={s.section}>
+              <View style={s.sectionHeaderWithBadge}>
+                <Text style={s.sectionTitle}>1. Posición de Salida Canónica</Text>
+                <View
+                  style={[
+                    s.badgePill,
+                    {
+                      backgroundColor:
+                        preferences.breakFormat === 'umb' ? '#0284c7' : '#d97706',
+                    },
+                  ]}>
+                  <Text style={s.badgePillText}>
+                    {preferences.breakFormat === 'umb' ? 'UMB MUNDIAL' : 'PBA TOUR'}
+                  </Text>
+                </View>
+              </View>
+              <Text style={s.sectionDesc}>
+                Configura la posición oficial de salida por defecto al reiniciar o iniciar entrenamientos:
+              </Text>
+
+              <View style={s.optionsRow}>
+                {/* Opción UMB */}
+                <Pressable
+                  style={[
+                    s.shapeCard,
+                    preferences.breakFormat === 'umb' && s.shapeCardActive,
+                  ]}
+                  onPress={() => update({ breakFormat: 'umb' })}>
+                  <View style={s.shapeIconBox}>
+                    <Text style={{ fontSize: 18 }}>🌍</Text>
+                  </View>
+                  <Text
+                    style={[
+                      s.shapeCardTitle,
+                      preferences.breakFormat === 'umb' && s.shapeCardTitleActive,
+                    ]}>
+                    UMB Mundial
+                  </Text>
+                  <Text style={s.shapeCardSub}>
+                    Salida tradicional: Roja en pie (3/4), Amarilla en salida (1/4) y Blanca a 18.25 cm
+                  </Text>
+                </Pressable>
+
+                {/* Opción PBA */}
+                <Pressable
+                  style={[
+                    s.shapeCard,
+                    preferences.breakFormat === 'pba' && s.shapeCardActive,
+                  ]}
+                  onPress={() => update({ breakFormat: 'pba' })}>
+                  <View style={s.shapeIconBox}>
+                    <Text style={{ fontSize: 18 }}>🇰🇷</Text>
+                  </View>
+                  <Text
+                    style={[
+                      s.shapeCardTitle,
+                      preferences.breakFormat === 'pba' && s.shapeCardTitleActive,
+                    ]}>
+                    PBA Pro Tour
+                  </Text>
+                  <Text style={s.shapeCardSub}>
+                    Grilla de 9 spots con formaciones por sorteo (1-5-9, 3-5-7, 2-5-8...)
+                  </Text>
+                </Pressable>
+              </View>
+
+              {/* Sub-configuración según el formato elegido */}
+              {preferences.breakFormat === 'umb' ? (
+                <View style={s.subOptionBox}>
+                  <Text style={s.subOptionTitle}>Lado de la Bola Blanca Tiradora (UMB):</Text>
+                  <View style={s.subOptionRow}>
+                    <TouchableOpacity
+                      style={[
+                        s.subOptionBtn,
+                        preferences.umbSide === 'right' && s.subOptionBtnActive,
+                      ]}
+                      onPress={() => update({ umbSide: 'right' })}>
+                      <Text
+                        style={[
+                          s.subOptionBtnText,
+                          preferences.umbSide === 'right' && s.subOptionBtnTextActive,
+                        ]}>
+                        Lado Derecho (Estándar 18.25 cm)
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        s.subOptionBtn,
+                        preferences.umbSide === 'left' && s.subOptionBtnActive,
+                      ]}
+                      onPress={() => update({ umbSide: 'left' })}>
+                      <Text
+                        style={[
+                          s.subOptionBtnText,
+                          preferences.umbSide === 'left' && s.subOptionBtnTextActive,
+                        ]}>
+                        Lado Izquierdo (18.25 cm)
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                <View style={s.subOptionBox}>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: 8,
+                    }}>
+                    <Text style={s.subOptionTitle}>Formación Táctica PBA (9 Spots):</Text>
+                    <TouchableOpacity
+                      style={s.randomPbaBtn}
+                      onPress={() => {
+                        const rnd = getRandomPbaBreak();
+                        if (rnd.formationId) {
+                          update({ pbaFormation: rnd.formationId });
+                        }
+                      }}
+                      activeOpacity={0.7}>
+                      <IconRefresh size={12} color="#ffffff" />
+                      <Text style={s.randomPbaBtnText}>Sortear (Azar)</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={s.pbaFormationsGrid}>
+                    {(['159', '357', '258', '248', '268', '257', '259'] as PbaFormationId[]).map((fId) => {
+                      const isSelected = preferences.pbaFormation === fId;
+                      return (
+                        <TouchableOpacity
+                          key={fId}
+                          style={[s.pbaCard, isSelected && s.pbaCardActive]}
+                          onPress={() => update({ pbaFormation: fId })}
+                          activeOpacity={0.8}>
+                          <Text style={[s.pbaCardTitle, isSelected && s.pbaCardTitleActive]}>
+                            {fId}
+                          </Text>
+                          <Text style={s.pbaCardName} numberOfLines={1}>
+                            {fId === '159' ? 'Canónica' : fId === '357' ? 'Invertida' : fId === '258' ? 'Central' : fId}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+            </View>
+
+            {/* 2. SECCIÓN: COLOR & SKINS DEL PAÑO */}
             <View style={s.section}>
               <Text style={s.sectionTitle}>1. Skin & Color del Paño Individual</Text>
               <Text style={s.sectionDesc}>
@@ -558,6 +718,46 @@ function TableCustomizerModalBase({
                   )}
                 </>
               )}
+            </View>
+
+            {/* 6. SECCIÓN: MODELO DE TACO DE BILLAR */}
+            <View style={s.section}>
+              <Text style={s.sectionTitle}>Taco de Billar Oficial (Cue Skin)</Text>
+              <Text style={s.sectionDesc}>
+                Elige el modelo y acabado estético de tu taco de competición:
+              </Text>
+
+              <View style={{ gap: 10, marginTop: 8 }}>
+                {CUE_SKIN_PRESETS.map((cue) => {
+                  const isSelected = (preferences.cueSkin ?? 'venom_azure') === cue.id;
+                  return (
+                    <TouchableOpacity
+                      key={cue.id}
+                      style={[
+                        s.cueCard,
+                        isSelected && { borderColor: cue.accentColor, backgroundColor: 'rgba(2, 132, 199, 0.12)' },
+                      ]}
+                      onPress={() => update({ cueSkin: cue.id })}
+                      activeOpacity={0.8}>
+                      <View style={[s.cueColorIndicator, { backgroundColor: cue.primaryColor, borderColor: cue.accentColor }]} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[s.cueCardTitle, isSelected && { color: cue.accentColor }]}>
+                          {cue.name}
+                        </Text>
+                        <Text style={s.cueCardSub}>{cue.subtitle}</Text>
+                        <Text style={s.cueCardDesc} numberOfLines={2}>
+                          {cue.description}
+                        </Text>
+                      </View>
+                      {isSelected && (
+                        <View style={[s.cueCheckBadge, { backgroundColor: cue.accentColor }]}>
+                          <IconCheck size={12} color="#020617" strokeWidth={3} />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             </View>
           </ScrollView>
 
@@ -961,18 +1161,20 @@ const s = StyleSheet.create({
   },
   woodRow: {
     flexDirection: 'row',
-    gap: 10,
+    flexWrap: 'wrap',
+    gap: 8,
     marginTop: 4,
   },
   woodBtn: {
     flex: 1,
+    minWidth: 95,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
     backgroundColor: '#14231c',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
     borderRadius: 10,
     borderWidth: 1.5,
     borderColor: '#1d3329',
@@ -1134,5 +1336,150 @@ const s = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: '#0a100d',
+  },
+  cueCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    borderWidth: 1.5,
+    borderColor: '#1e293b',
+  },
+  cueColorIndicator: {
+    width: 22,
+    height: 48,
+    borderRadius: 6,
+    borderWidth: 1.5,
+  },
+  cueCardTitle: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#f8fafc',
+  },
+  cueCardSub: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#94a3b8',
+    marginTop: 1,
+  },
+  cueCardDesc: {
+    fontSize: 10.5,
+    color: '#64748b',
+    marginTop: 2,
+    lineHeight: 14,
+  },
+  cueCheckBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sectionHeaderWithBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  badgePill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  badgePillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#ffffff',
+    letterSpacing: 0.5,
+  },
+  subOptionBox: {
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    borderWidth: 1,
+    borderColor: '#1e293b',
+  },
+  subOptionTitle: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#94a3b8',
+    marginBottom: 6,
+  },
+  subOptionRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  subOptionBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    backgroundColor: '#0f172a',
+    borderWidth: 1.5,
+    borderColor: '#334155',
+    alignItems: 'center',
+  },
+  subOptionBtnActive: {
+    borderColor: '#38bdf8',
+    backgroundColor: 'rgba(56, 189, 248, 0.12)',
+  },
+  subOptionBtnText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#94a3b8',
+    textAlign: 'center',
+  },
+  subOptionBtnTextActive: {
+    color: '#38bdf8',
+    fontWeight: '700',
+  },
+  randomPbaBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    backgroundColor: '#0284c7',
+  },
+  randomPbaBtnText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  pbaFormationsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  pbaCard: {
+    minWidth: 64,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    backgroundColor: '#0f172a',
+    borderWidth: 1.5,
+    borderColor: '#334155',
+    alignItems: 'center',
+  },
+  pbaCardActive: {
+    borderColor: '#f59e0b',
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+  },
+  pbaCardTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#cbd5e1',
+  },
+  pbaCardTitleActive: {
+    color: '#fbbf24',
+  },
+  pbaCardName: {
+    fontSize: 9.5,
+    color: '#64748b',
+    marginTop: 1,
   },
 });

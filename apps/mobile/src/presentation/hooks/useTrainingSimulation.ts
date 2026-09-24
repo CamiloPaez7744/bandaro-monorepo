@@ -20,7 +20,15 @@ import {
     vec2Normalize,
     vec2Sub,
     isBallMoving,
+    calculateShotVelocity,
 } from '@bandaro/core';
+
+export interface CollisionPulse {
+    id: string;
+    pos: Vec2;
+    type: 'ball' | 'cushion';
+    timestamp: number;
+}
 
 export interface TrainingState {
     balls: Ball[];
@@ -33,6 +41,7 @@ export interface TrainingState {
     trajectory: TrajectoryPrediction | null;
     validation: ShotValidation | null;
     dynamicTrails: Record<BallId, { pos: Vec2; timestamp?: number }[]> | null;
+    collisionPulses: CollisionPulse[];
     liveCushionCount: number;
     liveBallHits: { first: boolean; second: boolean };
 }
@@ -50,6 +59,7 @@ export interface UseTrainingSimulationReturn {
     resetBalls: (positions: { white: Vec2; yellow: Vec2; red: Vec2 }) => void;
     stopSimulation: () => void;
     clearTrails: () => void;
+    dismissValidation: () => void;
 }
 
 export function useTrainingSimulation(
@@ -67,11 +77,11 @@ export function useTrainingSimulation(
     const [powerPercentage, setPowerPercentageState] = useState<number>(60);
     const [aimDirection, setAimDirectionState] = useState<Vec2>(vec2(1, 0));
     const [isSimulating, setIsSimulating] = useState<boolean>(false);
-    const [trajectory, setTrajectory] = useState<TrajectoryPrediction | null>(null);
     const [validation, setValidation] = useState<ShotValidation | null>(null);
     const [dynamicTrails, setDynamicTrails] = useState<Record<BallId, { pos: Vec2; timestamp?: number }[]> | null>(null);
     const [liveCushionCount, setLiveCushionCount] = useState<number>(0);
     const [liveBallHits, setLiveBallHits] = useState<{ first: boolean; second: boolean }>({ first: false, second: false });
+    const [collisionPulses, setCollisionPulses] = useState<CollisionPulse[]>([]);
 
     const simulationRef = useRef<number | null>(null);
     const rafRef = useRef<(callback: FrameRequestCallback) => number>(
@@ -141,21 +151,33 @@ export function useTrainingSimulation(
         setValidation(null);
         setLiveCushionCount(0);
         setLiveBallHits({ first: false, second: false });
+        setSpinState({ x: 0, y: 0, magnitude: 0 });
     }, []);
 
-    const updateTrajectory = useCallback(() => {
-        const power = 15 + (powerPercentage / 100) * 75;
-        const prediction = predictTrajectory(
+    const dismissValidation = useCallback(() => {
+        setValidation(null);
+    }, []);
+
+    const trajectory = useMemo<TrajectoryPrediction | null>(() => {
+        if (isSimulating) return null;
+        // Si hay potencia activa seleccionada (> 0), usarla; si está en 0 (apuntando sin jalar aún),
+        // previsualizar con potencia de referencia 50% para ver la línea canónica de la jugada.
+        const effectivePower = powerPercentage > 0 ? powerPercentage : 50;
+        const velocity = calculateShotVelocity(effectivePower);
+        return predictTrajectory(
             balls,
             cueBallId,
             aimDirection,
-            power,
+            velocity,
             spin,
-            500,
+            350,
             DEFAULT_TABLE
         );
-        setTrajectory(prediction);
-    }, [balls, cueBallId, aimDirection, powerPercentage, spin]);
+    }, [balls, cueBallId, aimDirection, powerPercentage, spin, isSimulating]);
+
+    const updateTrajectory = useCallback(() => {
+        // Trajectory is reactively computed during render via useMemo
+    }, []);
 
     const executeShot = useCallback((customPowerPercentage?: number) => {
         if (isSimulating) return;
@@ -178,7 +200,7 @@ export function useTrainingSimulation(
         // Reiniciar el valor del taco y potencia a cero de inmediato para la siguiente jugada
         setPowerPercentage(0);
 
-        const power = 15 + (effectivePct / 100) * 75;
+        const velocity = calculateShotVelocity(effectivePct);
 
         const cueBall = currentBallsList.find((b) => b.id === currentCueBallId);
         if (!cueBall) {
@@ -191,7 +213,7 @@ export function useTrainingSimulation(
                 const normalizedDir = vec2Normalize(currentAimDir);
                 return {
                     ...ball,
-                    vel: { x: normalizedDir.x * power, y: normalizedDir.y * power },
+                    vel: { x: normalizedDir.x * velocity, y: normalizedDir.y * velocity },
                     spin: vec2(currentSpin.x * currentSpin.magnitude, currentSpin.y * currentSpin.magnitude),
                 };
             }
@@ -200,7 +222,7 @@ export function useTrainingSimulation(
 
         let currentBalls = shotBalls;
         const allEvents: any[] = [];
-        const stepsPerFrame = 4;
+        const stepsPerFrame = 1; // 1 paso por frame de 60fps para animación fluida, realista y visible
 
         // Inicializar recolector de estelas continuas
         const trailsCollector: Record<BallId, { pos: Vec2; timestamp?: number }[]> = {
@@ -222,21 +244,56 @@ export function useTrainingSimulation(
                 const shotValidation = validateThreeCushionShot(allEvents, cueBallId);
                 setValidation(shotValidation);
                 setIsSimulating(false);
-                setTrajectory(null);
-                // Eliminar los trazos de la jugada anterior una vez que las bolas se detienen
+                // Eliminar / reiniciar los trazos al detenerse las bolas
                 setDynamicTrails(null);
+                setCollisionPulses([]);
+                // Reiniciar el efecto a cero (mitad / centro de la bola)
+                setSpinState({ x: 0, y: 0, magnitude: 0 });
                 return;
             }
+
+            const framePulses: CollisionPulse[] = [];
+            const now = Date.now();
 
             for (let i = 0; i < stepsPerFrame; i++) {
                 const { balls: newBalls, events } = simulateStep(currentBalls, DEFAULT_TABLE);
                 currentBalls = newBalls;
                 allEvents.push(...events);
+
+                // Capturar impactos de bolas y bandas para ondas de choque 3D inmediatas
+                for (const ev of events) {
+                    if (ev.type === 'ball_collision' && ev.data && 'position' in ev.data) {
+                        framePulses.push({
+                            id: `hit-${now}-${Math.random()}`,
+                            pos: { ...ev.data.position },
+                            type: 'ball',
+                            timestamp: now,
+                        });
+                    } else if (ev.type === 'cushion' && ev.data && 'position' in ev.data) {
+                        framePulses.push({
+                            id: `cushion-${now}-${Math.random()}`,
+                            pos: { ...ev.data.position },
+                            type: 'cushion',
+                            timestamp: now,
+                        });
+                    }
+                }
             }
 
-            // Registrar paso de la estela para cada bola
+            if (framePulses.length > 0) {
+                setCollisionPulses((prev) => {
+                    const recent = prev.filter((p) => now - p.timestamp < 360);
+                    return [...recent, ...framePulses];
+                });
+            }
+
+            // Registrar paso de la estela para cada bola en movimiento
             for (const b of currentBalls) {
-                trailsCollector[b.id].push({ pos: { ...b.pos } });
+                const lastPt = trailsCollector[b.id][trailsCollector[b.id].length - 1];
+                const d = Math.hypot(b.pos.x - lastPt.pos.x, b.pos.y - lastPt.pos.y);
+                if (d >= 1.2 || isBallMoving(b)) {
+                    trailsCollector[b.id].push({ pos: { ...b.pos } });
+                }
             }
             setDynamicTrails({
                 white: [...trailsCollector.white],
@@ -277,9 +334,9 @@ export function useTrainingSimulation(
             createBall('yellow', positions.yellow.x, positions.yellow.y),
             createBall('red', positions.red.x, positions.red.y),
         ]);
-        setTrajectory(null);
         setValidation(null);
         setDynamicTrails(null);
+        setCollisionPulses([]);
         setLiveCushionCount(0);
         setLiveBallHits({ first: false, second: false });
         setIsSimulating(false);
@@ -292,6 +349,7 @@ export function useTrainingSimulation(
         }
         setIsSimulating(false);
         setDynamicTrails(null);
+        setCollisionPulses([]);
     }, []);
 
     const state: TrainingState = useMemo(
@@ -306,6 +364,7 @@ export function useTrainingSimulation(
             trajectory,
             validation,
             dynamicTrails,
+            collisionPulses,
             liveCushionCount,
             liveBallHits,
         }),
@@ -320,6 +379,7 @@ export function useTrainingSimulation(
             trajectory,
             validation,
             dynamicTrails,
+            collisionPulses,
             liveCushionCount,
             liveBallHits,
         ]
@@ -338,5 +398,6 @@ export function useTrainingSimulation(
         resetBalls,
         stopSimulation,
         clearTrails,
+        dismissValidation,
     };
 }

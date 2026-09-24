@@ -304,6 +304,6 @@ const styles = StyleSheet.create({
     bodyText: { fontSize: 14, lineHeight: 21 },
     simulateBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 12, marginTop: 8 } as ViewStyle,
     simulateBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
-    webOverlay: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' } as ViewStyle,
-    webModal: { width: '90vw', maxWidth: 800, maxHeight: '90vh', borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 20 } as any,
+    webOverlay: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, backdropFilter: 'blur(4px)', padding: 8 } as ViewStyle,
+    webModal: { width: '95vw', maxWidth: 800, maxHeight: '92vh', borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 20 } as any,
 });

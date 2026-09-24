@@ -3,3 +3,4 @@ export * from './physics/physics';
 export * from './physics/trajectory';
 export * from './physics/snapshotAdapter';
 export * from './rules/threeCushion';
+export * from './rules/breakPositions';

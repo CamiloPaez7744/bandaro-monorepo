@@ -1,15 +1,12 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
     IconPencil,
     IconTarget,
     IconRefresh,
-    IconX,
-    IconCircle,
-    IconBolt,
     IconTargetArrow,
     IconRuler2,
     IconNumbers,
@@ -17,32 +14,49 @@ import {
     IconLoader2,
     IconPalette,
     IconTrash,
+    IconArrowLeft,
+    IconEye,
+    IconSettings,
 } from '@/src/presentation/components/icons';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { useI18n } from '@/components/useLanguage';
 import { getPalette, theme } from '@/constants/theme';
-import { EffectBallSelector } from '@/src/presentation/components/Training/EffectBallSelector';
 import { InteractiveBilliardsTable } from '@/src/presentation/components/Training/InteractiveBilliardsTable';
-import { SystemNumberingControl, NumberAnchor, Formula } from '@/src/presentation/components/Training/SystemNumberingControl';
+import { NumberAnchor, Formula } from '@/src/presentation/components/Training/SystemNumberingControl';
+import { SystemNumberingModal } from '@/src/presentation/components/Training/SystemNumberingModal';
 import { TableCustomizerModal } from '@/src/presentation/components/Training/TableCustomizerModal';
+import { CaromBallStudioModal } from '@/src/presentation/components/Training/CaromBallStudioModal';
 import { CaromRefereeBanner } from '@/src/presentation/components/Training/CaromRefereeBanner';
 import { CaromPowerMeter } from '@/src/presentation/components/Training/CaromPowerMeter';
 import { CaromAimFineTuner } from '@/src/presentation/components/Training/CaromAimFineTuner';
+import { CaromSpinBallWidget } from '@/src/presentation/components/Training/CaromSpinBallWidget';
+import { CaromProEffectModal } from '@/src/presentation/components/Training/CaromProEffectModal';
+import { CaromTomeDeBolaEclipse } from '@/src/presentation/components/Training/CaromTomeDeBolaEclipse';
 import {
     DEFAULT_TABLE_PREFERENCES,
+    BALL_SKIN_PRESETS,
     loadTablePreferences,
     saveTablePreferences,
     type TablePreferences,
 } from '@/src/presentation/components/Training/tablePreferences';
 import { useTrainingSimulation } from '@/src/presentation/hooks/useTrainingSimulation';
 import { getTrainingSystemById } from '@/src/presentation/screens/Training/trainingData';
-import { container } from '@/src/presentation/container';
-import { BallId, Vec2, vec2, vec2Sub, SpinEffect, DEFAULT_TABLE, SnapshotBall, snapshotToBalls } from '@bandaro/core';
+import {
+    BallId,
+    Vec2,
+    vec2,
+    vec2Sub,
+    SpinEffect,
+    SnapshotBall,
+    snapshotToBalls,
+    BreakFormat,
+    getBreakPosition,
+    getDefaultBreakAim,
+} from '@bandaro/core';
 import { ApiSnapshotRepository } from '@/src/infrastructure/repositories/ApiSnapshotRepository';
 
 type Orientation = 'horizontal' | 'vertical';
-type ActivePanel = 'none' | 'ball' | 'power' | 'effect' | 'numbering';
 
 const EFFECT_SPIN_PRESETS: Record<string, SpinEffect> = {
     center: { x: 0, y: 0, magnitude: 0 },
@@ -60,50 +74,6 @@ function getInitialPowerLevel(recommendedPower: number) {
     return Math.min(5, Math.max(1, Math.round(recommendedPower / 20)));
 }
 
-interface SidebarButtonProps {
-    icon: React.ReactNode;
-    label: string;
-    isActive: boolean;
-    onPress: () => void;
-    palette: ReturnType<typeof getPalette>;
-}
-
-function SidebarButton({ icon, label, isActive, onPress, palette }: SidebarButtonProps) {
-    return (
-        <TouchableOpacity
-            style={[
-                sidebarStyles.button,
-                {
-                    backgroundColor: isActive ? palette.primary : `${palette.primary}15`,
-                    borderColor: isActive ? palette.primary : `${palette.primary}30`,
-                },
-            ]}
-            onPress={onPress}
-            activeOpacity={0.7}>
-            {icon}
-            <Text style={[sidebarStyles.label, { color: isActive ? '#fff' : palette.primary }]}>{label}</Text>
-        </TouchableOpacity>
-    );
-}
-
-const sidebarStyles = StyleSheet.create({
-    button: {
-        width: 60,
-        height: 60,
-        borderRadius: 14,
-        borderWidth: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 3,
-    },
-    label: {
-        fontSize: 9,
-        fontWeight: '700',
-        textTransform: 'uppercase',
-        letterSpacing: 0.4,
-    },
-});
-
 // eslint-disable-next-line sonarjs/cognitive-complexity
 export function TrainingSimulationScreen() {
     const router = useRouter();
@@ -120,9 +90,11 @@ export function TrainingSimulationScreen() {
     }>();
     const insets = useSafeAreaInsets();
     const { width } = useWindowDimensions();
+    const isMobile = width < 768;
+
     const { t } = useI18n();
     const palette = getPalette(useColorScheme());
-    const styles = getStyles(palette);
+    const styles = getStyles(palette, isMobile);
 
     const system = useMemo(
         () => (params.systemId ? getTrainingSystemById(params.systemId) : null),
@@ -130,6 +102,21 @@ export function TrainingSimulationScreen() {
     );
 
     const [snapshotBalls, setSnapshotBalls] = useState<SnapshotBall[] | null>(null);
+
+    const [tablePreferences, setTablePreferences] = useState<TablePreferences>(DEFAULT_TABLE_PREFERENCES);
+    const [showCustomizer, setShowCustomizer] = useState(false);
+    const [showEffectModal, setShowEffectModal] = useState(false);
+    const [showNumberingModal, setShowNumberingModal] = useState(false);
+    const [showBallStudioModal, setShowBallStudioModal] = useState(false);
+
+    useEffect(() => {
+        loadTablePreferences().then(setTablePreferences).catch(() => {});
+    }, []);
+
+    const handlePreferencesChange = useCallback((newPrefs: TablePreferences) => {
+        setTablePreferences(newPrefs);
+        saveTablePreferences(newPrefs).catch(() => {});
+    }, []);
 
     useEffect(() => {
         if (params.snapshotId) {
@@ -145,19 +132,19 @@ export function TrainingSimulationScreen() {
     const initialPositions = useMemo(() => {
         if (params.whiteX && params.whiteY) {
             return {
-                white: vec2(Number(params.whiteX) || 50, Number(params.whiteY) || 71),
-                yellow: vec2(Number(params.yellowX) || 142, Number(params.yellowY) || 71),
-                red: vec2(Number(params.redX) || 220, Number(params.redY) || 71),
+                white: vec2(Number(params.whiteX) || 71, Number(params.whiteY) || 52.75),
+                yellow: vec2(Number(params.yellowX) || 71, Number(params.yellowY) || 71),
+                red: vec2(Number(params.redX) || 213, Number(params.redY) || 71),
             };
         }
 
         if (snapshotBalls && snapshotBalls.length > 0) {
             const balls = snapshotToBalls(snapshotBalls);
-            const result: { white: Vec2; yellow: Vec2; red: Vec2 } = {
-                white: vec2(50, 71),
-                yellow: vec2(200, 50),
-                red: vec2(234, 92),
-            };
+            const defaultBreak = getBreakPosition(tablePreferences.breakFormat, {
+                pbaFormation: tablePreferences.pbaFormation,
+                umbSide: tablePreferences.umbSide,
+            });
+            const result: { white: Vec2; yellow: Vec2; red: Vec2 } = { ...defaultBreak };
             for (const ball of balls) {
                 result[ball.id] = ball.pos;
             }
@@ -165,11 +152,10 @@ export function TrainingSimulationScreen() {
         }
 
         if (!system || system.positions.length === 0) {
-            return {
-                white: vec2(50, 71),
-                yellow: vec2(200, 50),
-                red: vec2(234, 92),
-            };
+            return getBreakPosition(tablePreferences.breakFormat, {
+                pbaFormation: tablePreferences.pbaFormation,
+                umbSide: tablePreferences.umbSide,
+            });
         }
         const pos = system.positions[0];
         return {
@@ -177,7 +163,19 @@ export function TrainingSimulationScreen() {
             yellow: vec2(pos.yellow.x, pos.yellow.y),
             red: vec2(pos.red.x, pos.red.y),
         };
-    }, [system, snapshotBalls, params.whiteX, params.whiteY, params.yellowX, params.yellowY, params.redX, params.redY]);
+    }, [
+        system,
+        snapshotBalls,
+        params.whiteX,
+        params.whiteY,
+        params.yellowX,
+        params.yellowY,
+        params.redX,
+        params.redY,
+        tablePreferences.breakFormat,
+        tablePreferences.pbaFormation,
+        tablePreferences.umbSide,
+    ]);
 
     const {
         state,
@@ -191,23 +189,14 @@ export function TrainingSimulationScreen() {
         executeShot,
         resetBalls,
         clearTrails,
+        dismissValidation,
     } = useTrainingSimulation(initialPositions);
 
-    const [tablePreferences, setTablePreferences] = useState<TablePreferences>(DEFAULT_TABLE_PREFERENCES);
-    const [showCustomizer, setShowCustomizer] = useState(false);
-
-    useEffect(() => {
-        loadTablePreferences().then(setTablePreferences).catch(() => {});
-    }, []);
-
-    const handlePreferencesChange = useCallback((newPrefs: TablePreferences) => {
-        setTablePreferences(newPrefs);
-        saveTablePreferences(newPrefs).catch(() => {});
-    }, []);
-
+    const snapshotLoadedRef = useRef(false);
     // Reset balls when snapshot loads asynchronously
     useEffect(() => {
-        if (snapshotBalls && snapshotBalls.length > 0) {
+        if (snapshotBalls && snapshotBalls.length > 0 && !snapshotLoadedRef.current) {
+            snapshotLoadedRef.current = true;
             resetBalls(initialPositions);
         }
     }, [snapshotBalls, resetBalls, initialPositions]);
@@ -218,21 +207,26 @@ export function TrainingSimulationScreen() {
     const [isEditMode, setIsEditMode] = useState(!params.systemId);
     const [showGuides, setShowGuides] = useState(true);
     const [showRuler, setShowRuler] = useState(false);
-    const [activePanel, setActivePanel] = useState<ActivePanel>('none');
     const [numberingAnchors, setNumberingAnchors] = useState<NumberAnchor[]>([]);
     const [numberingFormula, setNumberingFormula] = useState<Formula | null>(null);
     const [showNumbering, setShowNumbering] = useState(false);
-    const panelAnimation = useMemo(() => new Animated.Value(0), []);
-    const isWideLayout = width >= 1100;
 
     useEffect(() => {
-        setTableOrientation(width >= 900 ? 'horizontal' : 'vertical');
+        const next: Orientation = width >= 900 ? 'horizontal' : 'vertical';
+        setTableOrientation((prev) => (prev !== next ? next : prev));
     }, [width]);
+
+    const systemLoadedRef = useRef<string | null>(null);
 
     useEffect(() => {
         if (!system || system.positions.length === 0 || params.snapshotId) {
             return;
         }
+
+        if (systemLoadedRef.current === system.id) {
+            return;
+        }
+        systemLoadedRef.current = system.id;
 
         const firstPosition = system.positions[0];
         const presetSpin = EFFECT_SPIN_PRESETS[system.recommendedEffect] ?? EFFECT_SPIN_PRESETS.center;
@@ -252,18 +246,6 @@ export function TrainingSimulationScreen() {
         setShowGuides(true);
     }, [initialPositions, resetBalls, setAimDirection, setCueBall, setPowerLevel, setSpin, system]);
 
-    useEffect(() => {
-        updateTrajectory();
-    }, [state.balls, state.cueBallId, state.aimDirection, state.powerLevel, state.spin, updateTrajectory]);
-
-    useEffect(() => {
-        Animated.timing(panelAnimation, {
-            toValue: activePanel === 'none' ? 0 : 1,
-            duration: 250,
-            useNativeDriver: true,
-        }).start();
-    }, [activePanel, panelAnimation]);
-
     const handleBallMove = useCallback(
         (ballId: BallId, position: Vec2) => {
             setBallPosition(ballId, position);
@@ -279,25 +261,65 @@ export function TrainingSimulationScreen() {
     );
 
     const handleReset = useCallback(() => {
+        if (!system && (!snapshotBalls || snapshotBalls.length === 0) && !params.whiteX) {
+            const breakPos = getBreakPosition(tablePreferences.breakFormat, {
+                pbaFormation: tablePreferences.pbaFormation,
+                umbSide: tablePreferences.umbSide,
+            });
+            resetBalls(breakPos);
+            setAimDirection(getDefaultBreakAim(breakPos));
+            return;
+        }
         resetBalls(initialPositions);
-    }, [resetBalls, initialPositions]);
+    }, [
+        resetBalls,
+        initialPositions,
+        system,
+        snapshotBalls,
+        params.whiteX,
+        tablePreferences.breakFormat,
+        tablePreferences.pbaFormation,
+        tablePreferences.umbSide,
+        setAimDirection,
+    ]);
 
-    const togglePanel = useCallback(
-        (panel: ActivePanel) => {
-            setActivePanel((prev) => (prev === panel ? 'none' : panel));
-        },
-        []
-    );
+    // Sincronizar posición de salida cuando cambia el formato (UMB vs PBA) en entrenamiento libre
+    useEffect(() => {
+        if (!system && (!snapshotBalls || snapshotBalls.length === 0) && !params.whiteX) {
+            const breakPos = getBreakPosition(tablePreferences.breakFormat, {
+                pbaFormation: tablePreferences.pbaFormation,
+                umbSide: tablePreferences.umbSide,
+            });
+            resetBalls(breakPos);
+            setAimDirection(getDefaultBreakAim(breakPos));
+        }
+    }, [
+        tablePreferences.breakFormat,
+        tablePreferences.pbaFormation,
+        tablePreferences.umbSide,
+        resetBalls,
+        setAimDirection,
+        system,
+        snapshotBalls,
+        params.whiteX,
+    ]);
 
-    const panelOpacity = panelAnimation.interpolate({
-        inputRange: [0, 1],
-        outputRange: [0, 1],
-    });
-
-    const panelScale = panelAnimation.interpolate({
-        inputRange: [0, 1],
-        outputRange: [0.95, 1],
-    });
+    const handleSetToCurrentBreak = useCallback(() => {
+        if (state.isSimulating) return;
+        const breakPos = getBreakPosition(tablePreferences.breakFormat, {
+            pbaFormation: tablePreferences.pbaFormation,
+            umbSide: tablePreferences.umbSide,
+        });
+        resetBalls(breakPos);
+        setAimDirection(getDefaultBreakAim(breakPos));
+    }, [
+        state.isSimulating,
+        tablePreferences.breakFormat,
+        tablePreferences.pbaFormation,
+        tablePreferences.umbSide,
+        resetBalls,
+        setAimDirection,
+    ]);
 
     if (params.systemId && !system) {
         return (
@@ -310,29 +332,48 @@ export function TrainingSimulationScreen() {
         );
     }
 
+    const titleText = system?.name ?? params.customName ?? (params.snapshotId ? 'Snapshot' : 'Simulador Carambola');
+
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
             <View
                 style={[
                     styles.container,
                     {
-                        paddingTop: insets.top + 8,
-                        paddingBottom: insets.bottom + 8,
+                        paddingTop: insets.top + (isMobile ? 4 : 6),
+                        paddingBottom: insets.bottom + (isMobile ? 4 : 6),
                     },
                 ]}>
                 
-                <View style={styles.headerRow}>
-                    <Text style={styles.title}>
-                        {system?.name ?? params.customName ?? (params.snapshotId ? 'Snapshot' : 'Simulador Libre de Carambola')}
-                    </Text>
-                    <View style={styles.headerButtonsRow}>
+                {/* BARRA SUPERIOR HUD DE JUEGO AAA */}
+                <View style={styles.topHudBar}>
+                    {/* Sección Izquierda: Salir y Título con Badge */}
+                    <View style={styles.headerLeft}>
                         <TouchableOpacity
-                            style={[
-                                styles.trainButton,
-                                {
-                                    backgroundColor: palette.primary,
-                                },
-                            ]}
+                            style={styles.circleIconBtn}
+                            onPress={() => router.back()}
+                            accessibilityRole="button"
+                            accessibilityLabel="Volver">
+                            <IconArrowLeft size={isMobile ? 16 : 18} color="#f8fafc" strokeWidth={2.2} />
+                        </TouchableOpacity>
+
+                        <View style={styles.titleColumn}>
+                            <View style={styles.systemTagRow}>
+                                <Text style={styles.systemTag}>3-BANDAS</Text>
+                                <View style={styles.systemDot} />
+                                <Text style={styles.modeTag}>{isEditMode ? 'EDITAR' : 'TIRO'}</Text>
+                            </View>
+                            <Text style={styles.title} numberOfLines={1}>
+                                {titleText}
+                            </Text>
+                        </View>
+                    </View>
+
+                    {/* Sección Derecha: Botonería de herramientas con estética gaming */}
+                    <View style={styles.headerToolsRow}>
+                        {/* Botón Entrenar Destacado */}
+                        <TouchableOpacity
+                            style={styles.trainHighlightBtn}
                             onPress={() => {
                                 const whiteB = state.balls.find((b) => b.id === 'white');
                                 const yellowB = state.balls.find((b) => b.id === 'yellow');
@@ -351,379 +392,448 @@ export function TrainingSimulationScreen() {
                                 });
                             }}
                             disabled={state.isSimulating}>
-                            <IconTarget size={16} color="#fff" strokeWidth={2.2} />
-                            <Text style={styles.trainButtonText}>Entrenar</Text>
+                            <IconTarget size={14} color="#fff" strokeWidth={2.5} />
+                            {!isMobile && <Text style={styles.trainBtnText}>Entrenar</Text>}
                         </TouchableOpacity>
+
+                        {/* Alternar Modo Edición / Puntería */}
                         <TouchableOpacity
                             style={[
-                                styles.iconButton,
-                                {
-                                    backgroundColor: isEditMode ? '#fbbf24' : `${palette.primary}22`,
-                                },
+                                styles.toolIconOnlyBtn,
+                                isEditMode && styles.toolPillBtnActiveAmber,
                             ]}
                             onPress={() => setIsEditMode((prev) => !prev)}
-                            disabled={state.isSimulating}>
+                            disabled={state.isSimulating}
+                            accessibilityLabel="Modo Edición">
                             {isEditMode ? (
-                                <IconPencil size={18} color="#78350f" strokeWidth={2} />
+                                <IconPencil size={isMobile ? 14 : 15} color="#fbbf24" strokeWidth={2.2} />
                             ) : (
-                                <IconTarget size={18} color={palette.primary} strokeWidth={2} />
+                                <IconTarget size={isMobile ? 14 : 15} color="#94a3b8" strokeWidth={2} />
                             )}
                         </TouchableOpacity>
+
+                        {/* Personalizar Mesa */}
                         <TouchableOpacity
-                            style={[styles.iconButton, { backgroundColor: `${palette.primary}22` }]}
+                            style={styles.toolIconOnlyBtn}
                             onPress={() => setShowCustomizer(true)}
-                            disabled={state.isSimulating}>
-                            <IconPalette size={18} color={palette.primary} strokeWidth={2} />
+                            disabled={state.isSimulating}
+                            accessibilityLabel="Personalizar Mesa">
+                            <IconPalette size={isMobile ? 14 : 16} color="#94a3b8" strokeWidth={2} />
                         </TouchableOpacity>
+
+                        {/* Alternar Regla de Bandas */}
                         <TouchableOpacity
-                            style={[styles.iconButton, { backgroundColor: `${palette.primary}22` }]}
+                            style={[
+                                styles.toolIconOnlyBtn,
+                                showRuler && styles.toolPillBtnActiveCyan,
+                            ]}
+                            onPress={() => setShowRuler((prev) => !prev)}
+                            disabled={state.isSimulating}
+                            accessibilityLabel="Regla de Bandas">
+                            <IconRuler2 size={isMobile ? 14 : 16} color={showRuler ? '#00d2ff' : '#94a3b8'} strokeWidth={2} />
+                        </TouchableOpacity>
+
+                        {/* Sistemas y Numeración */}
+                        <TouchableOpacity
+                            style={[
+                                styles.toolIconOnlyBtn,
+                                showNumbering && styles.toolPillBtnActiveCyan,
+                            ]}
+                            onPress={() => setShowNumberingModal(true)}
+                            disabled={state.isSimulating}
+                            accessibilityLabel="Sistemas de Bandas">
+                            <IconNumbers size={isMobile ? 14 : 16} color={showNumbering ? '#00d2ff' : '#94a3b8'} strokeWidth={2} />
+                        </TouchableOpacity>
+
+                        {/* Reiniciar Posición */}
+                        <TouchableOpacity
+                            style={styles.toolIconOnlyBtn}
                             onPress={handleReset}
-                            disabled={state.isSimulating}>
-                            <IconRefresh size={18} color={palette.primary} strokeWidth={2} />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={[styles.iconButton, { backgroundColor: `${palette.primary}22` }]}
-                            onPress={() => router.back()}>
-                            <IconX size={18} color={palette.primary} strokeWidth={2} />
+                            disabled={state.isSimulating}
+                            accessibilityLabel="Reiniciar Mesa">
+                            <IconRefresh size={isMobile ? 14 : 16} color="#94a3b8" strokeWidth={2} />
                         </TouchableOpacity>
                     </View>
                 </View>
 
-                <View style={styles.mainLayout}>
-                    <View style={styles.sidebar}>
-                        <SidebarButton
-                            icon={<IconCircle size={20} color={activePanel === 'ball' ? '#fff' : palette.primary} strokeWidth={2} />}
-                            label="Bola"
-                            isActive={activePanel === 'ball'}
-                            onPress={() => togglePanel('ball')}
-                            palette={palette}
-                        />
-                        <SidebarButton
-                            icon={<IconBolt size={20} color={activePanel === 'power' ? '#fff' : palette.primary} strokeWidth={2} />}
-                            label="Potencia"
-                            isActive={activePanel === 'power'}
-                            onPress={() => togglePanel('power')}
-                            palette={palette}
-                        />
-                        <SidebarButton
-                            icon={<IconTargetArrow size={20} color={activePanel === 'effect' ? '#fff' : palette.primary} strokeWidth={2} />}
-                            label="Efecto"
-                            isActive={activePanel === 'effect'}
-                            onPress={() => togglePanel('effect')}
-                            palette={palette}
-                        />
-                        <SidebarButton
-                            icon={<IconRuler2 size={20} color={showRuler ? '#fff' : palette.primary} strokeWidth={2} />}
-                            label="Regla"
-                            isActive={showRuler}
-                            onPress={() => setShowRuler((prev) => !prev)}
-                            palette={palette}
-                        />
-                        <SidebarButton
-                            icon={<IconNumbers size={20} color={activePanel === 'numbering' ? '#fff' : palette.primary} strokeWidth={2} />}
-                            label="Sistema"
-                            isActive={activePanel === 'numbering'}
-                            onPress={() => togglePanel('numbering')}
-                            palette={palette}
-                        />
-                    </View>
-
-                    <View style={styles.tablePane}>
-                        {/* HUD Oficial de Torneo UMB y Árbitro de 3 Bandas */}
+                {/* ESCENARIO PRINCIPAL: LA MESA SE MANTIENE 100% FIJA Y ESTABLE */}
+                <View style={styles.arenaContainer}>
+                    {/* Banner de Árbitro: FLOATING OVERLAY (Nunca desplaza la mesa al aparecer o cerrarse) */}
+                    <View style={styles.floatingRefereeBannerWrap} pointerEvents="box-none">
                         <CaromRefereeBanner
                             validation={state.validation}
                             isSimulating={state.isSimulating}
                             cushionCountLive={state.liveCushionCount}
                             ballHitsLive={state.liveBallHits}
-                            onDismiss={clearTrails}
+                            onDismiss={dismissValidation}
                         />
+                    </View>
 
-                        {/* Escenario de Mesa y Medidor de Potencia Dockeado */}
-                        <View style={styles.tableWithPowerRow}>
-                            <View style={styles.tableWrap}>
-                                <InteractiveBilliardsTable
-                                    orientation={tableOrientation}
-                                    style={styles.tableStage}
-                                    balls={state.balls}
+                    {/* Escenario de Mesa y Taco de Potencia Dockeado */}
+                    <View style={[styles.tableAndPowerRow, isMobile && { gap: 6 }]}>
+                        <View style={styles.fixedTableWrap}>
+                            <InteractiveBilliardsTable
+                                orientation={tableOrientation}
+                                style={styles.tableStage}
+                                balls={state.balls}
+                                cueBallId={state.cueBallId}
+                                trajectory={state.trajectory}
+                                dynamicTrails={state.dynamicTrails ?? undefined}
+                                collisionPulses={state.collisionPulses}
+                                aimDirection={state.aimDirection}
+                                powerLevel={state.powerPercentage}
+                                tablePreferences={tablePreferences}
+                                showCueStick={true}
+                                showGhostBall={true}
+                                onBallMove={handleBallMove}
+                                onAimChange={handleAimChange}
+                                onPowerChange={setPowerPercentage}
+                                onShoot={(power) => executeShot(power)}
+                                isSimulating={state.isSimulating}
+                                isEditMode={isEditMode}
+                                showGuides={showGuides}
+                                showRuler={showRuler}
+                                numberingAnchors={numberingAnchors}
+                                numberingFormula={numberingFormula}
+                                showNumbering={showNumbering}
+                                onNumberingAnchorsChange={setNumberingAnchors}
+                            />
+                        </View>
+
+                        {/* Medidor vertical de taco estilo 8 Ball Pool */}
+                        <View style={[styles.powerMeterDock, isMobile && { width: 38 }]}>
+                            <CaromPowerMeter
+                                powerLevel={state.powerPercentage}
+                                onPowerChange={setPowerPercentage}
+                                onShoot={(power) => executeShot(power)}
+                                disabled={state.isSimulating}
+                            />
+                        </View>
+                    </View>
+                </View>
+
+                {/* BARRA INFERIOR HUD DE CONTROL TÁCTICO */}
+                {isMobile ? (
+                    /* Mobile 2-Tier Tactical HUD (Fits all mobile screens without any overflow) */
+                    <View style={styles.bottomHudMobileContainer}>
+                        {/* Tier 1: Instrumentos Tácticos (Efecto y Tome Eclipse) */}
+                        <View style={styles.bottomHudMobileTier1}>
+                            <View style={{ flex: 1 }}>
+                                <CaromSpinBallWidget
+                                    spin={state.spin}
                                     cueBallId={state.cueBallId}
-                                    trajectory={state.trajectory}
-                                    dynamicTrails={state.dynamicTrails ?? undefined}
-                                    aimDirection={state.aimDirection}
-                                    powerLevel={state.powerPercentage}
-                                    tablePreferences={tablePreferences}
-                                    showCueStick={true}
-                                    showGhostBall={true}
-                                    onBallMove={handleBallMove}
-                                    onAimChange={handleAimChange}
-                                    onPowerChange={setPowerPercentage}
-                                    onShoot={(power) => executeShot(power)}
-                                    isSimulating={state.isSimulating}
-                                    isEditMode={isEditMode}
-                                    showGuides={showGuides}
-                                    showRuler={showRuler}
-                                    numberingAnchors={numberingAnchors}
-                                    numberingFormula={numberingFormula}
-                                    showNumbering={showNumbering}
-                                    onNumberingAnchorsChange={setNumberingAnchors}
+                                    onPress={() => setShowEffectModal(true)}
+                                    disabled={state.isSimulating}
+                                    compact={true}
                                 />
                             </View>
 
-                            <View style={styles.powerMeterContainer}>
-                                <CaromPowerMeter
-                                    powerLevel={state.powerPercentage}
-                                    onPowerChange={setPowerPercentage}
-                                    onShoot={(power) => executeShot(power)}
+                            <View style={{ flex: 1.15 }}>
+                                <CaromTomeDeBolaEclipse
+                                    balls={state.balls}
+                                    cueBallId={state.cueBallId}
+                                    aimDirection={state.aimDirection}
+                                    spin={state.spin}
+                                    trajectory={state.trajectory}
+                                    onAimChange={handleAimChange}
                                     disabled={state.isSimulating}
+                                    compact={true}
                                 />
                             </View>
                         </View>
 
-                        <View style={styles.actionBar}>
-                            {/* Dial milimétrico de puntería */}
+                        {/* Tier 2: Controles de Juego, Micro-Puntería y Disparador */}
+                        <View style={styles.bottomHudMobileTier2}>
+                            {/* Módulo de Bolas: Selector Rápido + Acceso a Estudio Oficial (Skins & Break) */}
+                            <View style={styles.ballModuleContainerMobile}>
+                                <View style={styles.cueBallSelectorPillMobile}>
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.ballOptionBtnMobile,
+                                            state.cueBallId === 'white' && styles.ballOptionBtnActive,
+                                        ]}
+                                        onPress={() => setCueBall('white')}
+                                        disabled={state.isSimulating}>
+                                        <View style={styles.whiteBallIcon}>
+                                            {tablePreferences.showBallDots !== false && (
+                                                <View
+                                                    style={[
+                                                        styles.ballMiniDot,
+                                                        { backgroundColor: tablePreferences.ballSkin === 'cosmo_helix_pba' ? '#00e5ff' : '#dc2626' },
+                                                    ]}
+                                                />
+                                            )}
+                                        </View>
+                                        <Text style={[styles.ballOptionText, state.cueBallId === 'white' && styles.ballOptionTextActive]}>
+                                            Blanca
+                                        </Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.ballOptionBtnMobile,
+                                            state.cueBallId === 'yellow' && styles.ballOptionBtnActive,
+                                        ]}
+                                        onPress={() => setCueBall('yellow')}
+                                        disabled={state.isSimulating}>
+                                        <View style={styles.yellowBallIcon}>
+                                            {tablePreferences.showBallDots !== false && (
+                                                <View
+                                                    style={[
+                                                        styles.ballMiniDot,
+                                                        { backgroundColor: tablePreferences.ballSkin === 'cosmo_helix_pba' ? '#1e3a8a' : '#dc2626' },
+                                                    ]}
+                                                />
+                                            )}
+                                        </View>
+                                        <Text style={[styles.ballOptionText, state.cueBallId === 'yellow' && styles.ballOptionTextActive]}>
+                                            Amarilla
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                <TouchableOpacity
+                                    style={[
+                                        styles.ballStudioTriggerMobile,
+                                        tablePreferences.breakFormat === 'umb' ? styles.ballStudioUmbMobile : styles.ballStudioPbaMobile,
+                                    ]}
+                                    onPress={() => setShowBallStudioModal(true)}
+                                    disabled={state.isSimulating}
+                                    accessibilityLabel="Módulo de Bolas y Salida Oficial">
+                                    <Text style={styles.ballStudioBadgeFlag}>
+                                        {tablePreferences.breakFormat === 'umb' ? '🌍' : '🇰🇷'}
+                                    </Text>
+                                    <Text style={styles.ballStudioBadgeText}>
+                                        {tablePreferences.breakFormat === 'umb' ? 'UMB' : `PBA ${tablePreferences.pbaFormation ?? '159'}`}
+                                    </Text>
+                                    <IconSettings size={12} color="#38bdf8" strokeWidth={2.2} />
+                                </TouchableOpacity>
+                            </View>
+
+                            {/* Micro-ajuste fino de puntería */}
                             <CaromAimFineTuner
                                 aimDirection={state.aimDirection}
                                 onAimChange={handleAimChange}
                                 disabled={state.isSimulating}
+                                compact={true}
                             />
 
-                            <View style={styles.actionButtonsRight}>
+                            {/* Trazas & Alternador de Guías */}
+                            <View style={styles.utilityActionsRow}>
                                 {state.dynamicTrails && (
                                     <TouchableOpacity
-                                        style={[
-                                            styles.guideToggle,
-                                            {
-                                                backgroundColor: 'rgba(239, 68, 68, 0.15)',
-                                                borderWidth: 1,
-                                                borderColor: 'rgba(239, 68, 68, 0.35)',
-                                                flexDirection: 'row',
-                                                alignItems: 'center',
-                                                gap: 4,
-                                            },
-                                        ]}
-                                        onPress={clearTrails}>
-                                        <IconTrash size={14} color="#ef4444" strokeWidth={2} />
-                                        <Text style={{ fontSize: 11, color: '#ef4444', fontWeight: '700' }}>
-                                            Trazas
-                                        </Text>
+                                        style={styles.clearTrailsBtn}
+                                        onPress={clearTrails}
+                                        accessibilityLabel="Limpiar Trazas">
+                                        <IconTrash size={12} color="#ef4444" strokeWidth={2} />
                                     </TouchableOpacity>
                                 )}
 
                                 <TouchableOpacity
-                                    style={[
-                                        styles.guideToggle,
-                                        {
-                                            backgroundColor: showGuides ? palette.primary : `${palette.primary}22`,
-                                        },
-                                    ]}
+                                    style={[styles.guidePill, showGuides && styles.guidePillActive]}
                                     onPress={() => setShowGuides((prev) => !prev)}>
-                                    <Text style={{ fontSize: 11, color: showGuides ? '#fff' : palette.primary, fontWeight: '700' }}>
-                                        {showGuides ? 'Guías ON' : 'Guías OFF'}
+                                    <IconEye size={12} color={showGuides ? '#00d2ff' : '#64748b'} strokeWidth={2.2} />
+                                </TouchableOpacity>
+                            </View>
+
+                            {/* Botón Disparo Primario */}
+                            <TouchableOpacity
+                                style={[
+                                    styles.fireButtonMobile,
+                                    state.isSimulating && styles.fireButtonDisabled,
+                                ]}
+                                onPress={() => executeShot()}
+                                disabled={state.isSimulating}
+                                accessibilityLabel="Tirar">
+                                {state.isSimulating ? (
+                                    <IconLoader2 size={16} color="#ffffff" strokeWidth={2.5} />
+                                ) : (
+                                    <IconPlayerPlay size={16} color="#ffffff" strokeWidth={2.5} />
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                ) : (
+                    /* Desktop panoramic single-row HUD */
+                    <View style={styles.bottomHudBar}>
+                        {/* Módulo de Bolas: Selector Rápido + Acceso a Estudio Oficial (Skins & Break) */}
+                        <View style={styles.ballModuleContainerDesktop}>
+                            <View style={styles.cueBallSelectorPill}>
+                                <TouchableOpacity
+                                    style={[
+                                        styles.ballOptionBtn,
+                                        state.cueBallId === 'white' && styles.ballOptionBtnActive,
+                                    ]}
+                                    onPress={() => setCueBall('white')}
+                                    disabled={state.isSimulating}>
+                                    <View style={styles.whiteBallIcon}>
+                                        {tablePreferences.showBallDots !== false && (
+                                            <View
+                                                style={[
+                                                    styles.ballMiniDot,
+                                                    { backgroundColor: tablePreferences.ballSkin === 'cosmo_helix_pba' ? '#00e5ff' : '#dc2626' },
+                                                ]}
+                                            />
+                                        )}
+                                    </View>
+                                    <Text style={[styles.ballOptionText, state.cueBallId === 'white' && styles.ballOptionTextActive]}>
+                                        Blanca
                                     </Text>
                                 </TouchableOpacity>
 
                                 <TouchableOpacity
                                     style={[
-                                        styles.executeButton,
-                                        state.isSimulating && styles.executeButtonDisabled,
-                                        { backgroundColor: palette.primary },
+                                        styles.ballOptionBtn,
+                                        state.cueBallId === 'yellow' && styles.ballOptionBtnActive,
                                     ]}
-                                    onPress={() => executeShot()}
+                                    onPress={() => setCueBall('yellow')}
                                     disabled={state.isSimulating}>
-                                    {state.isSimulating ? (
-                                        <IconLoader2 size={16} color="#fff" strokeWidth={2.5} />
-                                    ) : (
-                                        <IconPlayerPlay size={16} color="#fff" strokeWidth={2.5} />
-                                    )}
+                                    <View style={styles.yellowBallIcon}>
+                                        {tablePreferences.showBallDots !== false && (
+                                            <View
+                                                style={[
+                                                    styles.ballMiniDot,
+                                                    { backgroundColor: tablePreferences.ballSkin === 'cosmo_helix_pba' ? '#1e3a8a' : '#dc2626' },
+                                                ]}
+                                            />
+                                        )}
+                                    </View>
+                                    <Text style={[styles.ballOptionText, state.cueBallId === 'yellow' && styles.ballOptionTextActive]}>
+                                        Amarilla
+                                    </Text>
                                 </TouchableOpacity>
                             </View>
+
+                            <TouchableOpacity
+                                style={[
+                                    styles.ballStudioTriggerDesktop,
+                                    tablePreferences.breakFormat === 'umb' ? styles.ballStudioUmbDesktop : styles.ballStudioPbaDesktop,
+                                ]}
+                                onPress={() => setShowBallStudioModal(true)}
+                                disabled={state.isSimulating}
+                                accessibilityLabel="Módulo de Bolas, Skins y Salida">
+                                <View style={styles.ballStudioTriggerInner}>
+                                    <Text style={styles.ballStudioTriggerBadge}>
+                                        {tablePreferences.breakFormat === 'umb' ? '🌍 UMB' : `🇰🇷 PBA ${tablePreferences.pbaFormation ?? '159'}`}
+                                    </Text>
+                                    <Text style={styles.ballStudioSkinBadge} numberOfLines={1}>
+                                        {BALL_SKIN_PRESETS.find((s) => s.id === tablePreferences.ballSkin)?.name ?? 'Aramith'}
+                                    </Text>
+                                </View>
+                                <IconSettings size={14} color="#38bdf8" strokeWidth={2.2} />
+                            </TouchableOpacity>
                         </View>
-                    </View>
 
-                    {activePanel !== 'none' && (
-                        <Animated.View
-                            style={[
-                                styles.panelOverlay,
-                                {
-                                    opacity: panelOpacity,
-                                    transform: [{ scale: panelScale }],
-                                },
-                            ]}>
-                            <View style={styles.panelHeader}>
-                                <Text style={[styles.panelTitle, { color: palette.text }]}>
-                                    {activePanel === 'ball' && 'Seleccionar Bola'}
-                                    {activePanel === 'power' && 'Potencia del Tiro'}
-                                    {activePanel === 'effect' && 'Efecto de la Bola'}
-                                    {activePanel === 'numbering' && 'Sistema de Numeración'}
-                                </Text>
+                        <CaromSpinBallWidget
+                            spin={state.spin}
+                            cueBallId={state.cueBallId}
+                            onPress={() => setShowEffectModal(true)}
+                            disabled={state.isSimulating}
+                        />
+
+                        <CaromTomeDeBolaEclipse
+                            balls={state.balls}
+                            cueBallId={state.cueBallId}
+                            aimDirection={state.aimDirection}
+                            spin={state.spin}
+                            trajectory={state.trajectory}
+                            onAimChange={handleAimChange}
+                            disabled={state.isSimulating}
+                        />
+
+                        <CaromAimFineTuner
+                            aimDirection={state.aimDirection}
+                            onAimChange={handleAimChange}
+                            disabled={state.isSimulating}
+                        />
+
+                        <View style={styles.utilityActionsRow}>
+                            {state.dynamicTrails && (
                                 <TouchableOpacity
-                                    style={[styles.closeButton, { backgroundColor: `${palette.primary}22` }]}
-                                    onPress={() => setActivePanel('none')}>
-                                    <IconX size={18} color={palette.primary} strokeWidth={2} />
+                                    style={styles.clearTrailsBtn}
+                                    onPress={clearTrails}
+                                    accessibilityLabel="Limpiar Trazas">
+                                    <IconTrash size={14} color="#ef4444" strokeWidth={2} />
+                                    <Text style={styles.clearTrailsText}>Trazas</Text>
                                 </TouchableOpacity>
-                            </View>
+                            )}
 
-                            <ScrollView 
-                                style={styles.panelScroll}
-                                contentContainerStyle={styles.panelContent}
-                                showsVerticalScrollIndicator={false}>
-                                {activePanel === 'ball' && (
-                                    <View style={styles.controlGroup}>
-                                        <Text style={styles.controlLabel}>Bola de Ataque</Text>
-                                        <View style={styles.ballSelector}>
-                                            <TouchableOpacity
-                                                style={[
-                                                    styles.ballButton,
-                                                    {
-                                                        backgroundColor: state.cueBallId === 'white' ? '#f8fafc' : `${palette.primary}15`,
-                                                        borderColor: state.cueBallId === 'white' ? '#cbd5e1' : `${palette.primary}30`,
-                                                    },
-                                                ]}
-                                                onPress={() => setCueBall('white')}
-                                                disabled={state.isSimulating}>
-                                                <Text style={{ fontSize: 24 }}>⚪</Text>
-                                            </TouchableOpacity>
-                                            <TouchableOpacity
-                                                style={[
-                                                    styles.ballButton,
-                                                    {
-                                                        backgroundColor: state.cueBallId === 'yellow' ? '#facc15' : `${palette.primary}15`,
-                                                        borderColor: state.cueBallId === 'yellow' ? '#ca8a04' : `${palette.primary}30`,
-                                                    },
-                                                ]}
-                                                onPress={() => setCueBall('yellow')}
-                                                disabled={state.isSimulating}>
-                                                <Text style={{ fontSize: 24 }}>🟡</Text>
-                                            </TouchableOpacity>
-                                        </View>
-                                    </View>
-                                )}
+                            <TouchableOpacity
+                                style={[styles.guidePill, showGuides && styles.guidePillActive]}
+                                onPress={() => setShowGuides((prev) => !prev)}>
+                                <IconEye size={13} color={showGuides ? '#00d2ff' : '#64748b'} strokeWidth={2.2} />
+                                <Text style={[styles.guidePillText, showGuides && styles.guidePillTextActive]}>
+                                    {showGuides ? 'Guías ON' : 'Guías OFF'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
 
-                                {activePanel === 'power' && (
-                                    <View style={styles.controlGroup}>
-                                        <Text style={styles.controlLabel}>Nivel de Potencia</Text>
-                                        <View style={styles.powerSelector}>
-                                            {[1, 2, 3, 4, 5].map((level) => (
-                                                <TouchableOpacity
-                                                    key={level}
-                                                    style={[
-                                                        styles.powerButton,
-                                                        {
-                                                            backgroundColor: state.powerLevel === level ? palette.primary : `${palette.primary}15`,
-                                                        },
-                                                    ]}
-                                                    onPress={() => setPowerLevel(level)}
-                                                    disabled={state.isSimulating}>
-                                                    <Text
-                                                        style={{
-                                                            fontSize: 16,
-                                                            fontWeight: '700',
-                                                            color: state.powerLevel === level ? '#fff' : palette.primary,
-                                                        }}>
-                                                        {level}
-                                                    </Text>
-                                                </TouchableOpacity>
-                                            ))}
-                                        </View>
-                                    </View>
-                                )}
+                        <TouchableOpacity
+                            style={[
+                                styles.fireButton,
+                                state.isSimulating && styles.fireButtonDisabled,
+                            ]}
+                            onPress={() => executeShot()}
+                            disabled={state.isSimulating}
+                            accessibilityLabel="Tirar">
+                            {state.isSimulating ? (
+                                <IconLoader2 size={18} color="#ffffff" strokeWidth={2.5} />
+                            ) : (
+                                <IconPlayerPlay size={18} color="#ffffff" strokeWidth={2.5} />
+                            )}
+                        </TouchableOpacity>
+                    </View>
+                )}
 
-                                {activePanel === 'effect' && (
-                                    <View style={styles.controlGroup}>
-                                        <EffectBallSelector
-                                            spin={state.spin}
-                                            onSpinChange={setSpin}
-                                            disabled={state.isSimulating}
-                                            size={280}
-                                            initialGuidesVisible
-                                        />
-                                    </View>
-                                )}
+                {/* MODALES FLOTANTES (OVERLAYS - CERO REFLOW SOBRE LA MESA) */}
+                <CaromProEffectModal
+                    visible={showEffectModal}
+                    spin={state.spin}
+                    cueBallId={state.cueBallId}
+                    onSpinChange={setSpin}
+                    onClose={() => setShowEffectModal(false)}
+                />
 
-                                {activePanel === 'numbering' && (
-                                    <View style={styles.controlGroup}>
-                                        <View style={styles.numberingToggle}>
-                                            <TouchableOpacity
-                                                style={[
-                                                    styles.toggleButton,
-                                                    showNumbering && { backgroundColor: palette.primary },
-                                                ]}
-                                                onPress={() => setShowNumbering((prev) => !prev)}>
-                                                <Text
-                                                    style={[
-                                                        styles.toggleButtonText,
-                                                        { color: showNumbering ? '#fff' : palette.primary },
-                                                    ]}>
-                                                    {showNumbering ? 'Ocultar Números' : 'Mostrar Números'}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        </View>
+                <SystemNumberingModal
+                    visible={showNumberingModal}
+                    showNumbering={showNumbering}
+                    anchors={numberingAnchors}
+                    formula={numberingFormula}
+                    isEditMode={isEditMode}
+                    onToggleShowNumbering={() => setShowNumbering((prev) => !prev)}
+                    onAnchorsChange={setNumberingAnchors}
+                    onFormulaChange={setNumberingFormula}
+                    onClose={() => setShowNumberingModal(false)}
+                />
 
-                                        {showNumbering && (
-                                            <View style={styles.numberingActions}>
-                                                <TouchableOpacity
-                                                    style={[styles.quickAddButton, { backgroundColor: palette.primary }]}
-                                                    onPress={() => {
-                                                        const newAnchor: NumberAnchor = {
-                                                            id: Date.now().toString(),
-                                                            x: 150,
-                                                            y: 80,
-                                                            value: String(numberingAnchors.length + 1),
-                                                            color: ['#3b82f6', '#ef4444', '#10b981', '#f59e0b'][numberingAnchors.length % 4],
-                                                            variableType: (['arrival', 'attack', 'departure', 'custom'] as const)[numberingAnchors.length % 4],
-                                                        };
-                                                        setNumberingAnchors([...numberingAnchors, newAnchor]);
-                                                    }}>
-                                                    <Text style={styles.quickAddButtonText}>+ Agregar Número</Text>
-                                                </TouchableOpacity>
-                                                {numberingAnchors.length > 0 && (
-                                                    <TouchableOpacity
-                                                        style={[styles.clearButton, { backgroundColor: '#ef4444' }]}
-                                                        onPress={() => setNumberingAnchors([])}>
-                                                        <Text style={styles.clearButtonText}>Limpiar Todo</Text>
-                                                    </TouchableOpacity>
-                                                )}
-                                            </View>
-                                        )}
-
-                                        {showNumbering && isEditMode && (
-                                            <View style={[styles.editHint, { backgroundColor: `${palette.primary}15`, borderColor: `${palette.primary}30` }]}>
-                                                <Text style={[styles.editHintText, { color: palette.primary }]}>
-                                                    Arrastra los números para posicionarlos
-                                                </Text>
-                                            </View>
-                                        )}
-
-                                        <SystemNumberingControl
-                                            anchors={numberingAnchors}
-                                            formula={numberingFormula}
-                                            onAnchorsChange={setNumberingAnchors}
-                                            onFormulaChange={setNumberingFormula}
-                                        />
-                                    </View>
-                                )}
-                            </ScrollView>
-                        </Animated.View>
-                    )}
-                </View>
-
-                {/* Modal de Personalización de Mesa y Skins */}
                 <TableCustomizerModal
                     visible={showCustomizer}
                     preferences={tablePreferences}
                     onClose={() => setShowCustomizer(false)}
                     onChangePreferences={handlePreferencesChange}
                 />
+
+                <CaromBallStudioModal
+                    visible={showBallStudioModal}
+                    cueBallId={state.cueBallId}
+                    tablePreferences={tablePreferences}
+                    onCueBallChange={setCueBall}
+                    onPreferencesChange={handlePreferencesChange}
+                    onResetToBreakPosition={handleSetToCurrentBreak}
+                    onClose={() => setShowBallStudioModal(false)}
+                />
             </View>
         </GestureHandlerRootView>
     );
 }
 
-const getStyles = (palette: ReturnType<typeof getPalette>) =>
+const getStyles = (palette: ReturnType<typeof getPalette>, isMobile: boolean) =>
     StyleSheet.create({
         container: {
             flex: 1,
-            backgroundColor: palette.background,
-            paddingHorizontal: theme.spacing.md,
+            backgroundColor: '#070b0e',
+            paddingHorizontal: isMobile ? 6 : 12,
+            gap: isMobile ? 4 : 6,
         },
         notFound: {
             flex: 1,
@@ -747,246 +857,393 @@ const getStyles = (palette: ReturnType<typeof getPalette>) =>
             color: '#fff',
             fontWeight: '800',
         },
-        headerRow: {
+
+        /* BARRA SUPERIOR HUD */
+        topHudBar: {
             flexDirection: 'row',
             justifyContent: 'space-between',
             alignItems: 'center',
-            gap: 8,
-            marginBottom: 8,
+            gap: isMobile ? 6 : 12,
+            backgroundColor: 'rgba(15, 23, 42, 0.75)',
+            borderRadius: isMobile ? 14 : 18,
+            borderWidth: 1,
+            borderColor: 'rgba(255, 255, 255, 0.08)',
+            paddingHorizontal: isMobile ? 8 : 12,
+            paddingVertical: isMobile ? 4 : 6,
+            userSelect: 'none',
         },
-        title: {
-            color: palette.text,
-            fontSize: 16,
-            fontWeight: '900',
-        },
-        headerButtonsRow: {
+        headerLeft: {
             flexDirection: 'row',
-            gap: 6,
+            alignItems: 'center',
+            gap: isMobile ? 6 : 10,
+            flex: 1,
         },
-        iconButton: {
-            width: 36,
-            height: 36,
-            borderRadius: 18,
+        circleIconBtn: {
+            width: isMobile ? 28 : 34,
+            height: isMobile ? 28 : 34,
+            borderRadius: isMobile ? 14 : 17,
+            backgroundColor: 'rgba(255, 255, 255, 0.08)',
+            borderWidth: 1,
+            borderColor: 'rgba(255, 255, 255, 0.12)',
             alignItems: 'center',
             justifyContent: 'center',
         },
-        trainButton: {
+        titleColumn: {
+            gap: 1,
+            flex: 1,
+        },
+        systemTagRow: {
             flexDirection: 'row',
             alignItems: 'center',
-            justifyContent: 'center',
-            height: 36,
-            paddingHorizontal: 12,
-            borderRadius: 18,
             gap: 4,
         },
-        trainButtonText: {
-            color: '#fff',
-            fontSize: 12,
-            fontWeight: '700',
+        systemTag: {
+            fontSize: isMobile ? 7.5 : 8.5,
+            fontWeight: '800',
+            color: '#00d2ff',
+            letterSpacing: 0.8,
         },
-        mainLayout: {
-            flex: 1,
+        systemDot: {
+            width: 3,
+            height: 3,
+            borderRadius: 1.5,
+            backgroundColor: '#64748b',
+        },
+        modeTag: {
+            fontSize: isMobile ? 7.5 : 8.5,
+            fontWeight: '800',
+            color: '#fbbf24',
+            letterSpacing: 0.6,
+        },
+        title: {
+            color: '#f8fafc',
+            fontSize: isMobile ? 12 : 14,
+            fontWeight: '900',
+            letterSpacing: 0.2,
+        },
+        headerToolsRow: {
             flexDirection: 'row',
-            gap: 8,
+            alignItems: 'center',
+            gap: isMobile ? 4 : 6,
         },
-        sidebar: {
-            width: 70,
-            gap: 8,
-            paddingTop: 4,
+        trainHighlightBtn: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 4,
+            backgroundColor: '#0d5e2f',
+            borderRadius: 14,
+            paddingHorizontal: isMobile ? 8 : 12,
+            paddingVertical: isMobile ? 5 : 6,
+            borderWidth: 1,
+            borderColor: 'rgba(20, 184, 166, 0.5)',
+            boxShadow: '0 0 10px rgba(13, 94, 47, 0.5)',
         },
-        tablePane: {
+        trainBtnText: {
+            color: '#ffffff',
+            fontSize: 11,
+            fontWeight: '800',
+        },
+        toolPillBtnActiveAmber: {
+            backgroundColor: 'rgba(251, 191, 36, 0.18)',
+            borderColor: '#fbbf24',
+        },
+        toolPillBtnActiveCyan: {
+            backgroundColor: 'rgba(0, 210, 255, 0.18)',
+            borderColor: '#00d2ff',
+        },
+        toolIconOnlyBtn: {
+            width: isMobile ? 28 : 32,
+            height: isMobile ? 28 : 32,
+            borderRadius: isMobile ? 14 : 16,
+            backgroundColor: 'rgba(255, 255, 255, 0.06)',
+            borderWidth: 1,
+            borderColor: 'rgba(255, 255, 255, 0.1)',
+            alignItems: 'center',
+            justifyContent: 'center',
+        },
+
+        /* ESCENARIO DE LA MESA FIJA */
+        arenaContainer: {
             flex: 1,
-            gap: 8,
+            position: 'relative',
+            justifyContent: 'center',
+            overflow: 'visible',
         },
-        tableWithPowerRow: {
+        floatingRefereeBannerWrap: {
+            position: 'absolute',
+            top: isMobile ? 2 : 6,
+            left: 8,
+            right: isMobile ? 44 : 60,
+            zIndex: 40,
+            alignItems: 'center',
+        },
+        tableAndPowerRow: {
             flex: 1,
             flexDirection: 'row',
             alignItems: 'center',
             gap: 8,
             overflow: 'visible',
         },
-        tableWrap: {
-            borderRadius: 18,
-            overflow: 'visible',
+        fixedTableWrap: {
             flex: 1,
             height: '100%',
-        },
-        powerMeterContainer: {
-            justifyContent: 'center',
-            alignItems: 'center',
-            paddingVertical: 4,
+            borderRadius: 16,
+            overflow: 'visible',
         },
         tableStage: {
             width: '100%',
             height: '100%',
         },
-        validationCard: {
-            borderRadius: 8,
-            borderWidth: 1.5,
-            padding: 8,
-        },
-        validationText: {
-            fontSize: 11,
-            fontWeight: '700',
-            textAlign: 'center',
-        },
-        actionBar: {
-            flexDirection: 'row',
-            gap: 8,
-            alignItems: 'center',
-            justifyContent: 'space-between',
-        },
-        actionButtonsRight: {
-            flexDirection: 'row',
-            gap: 8,
-            alignItems: 'center',
-            flex: 1,
-            justifyContent: 'flex-end',
-        },
-        guideToggle: {
-            borderRadius: 999,
-            paddingHorizontal: 12,
-            paddingVertical: 8,
-        },
-        executeButton: {
-            flex: 1,
-            borderRadius: 12,
-            paddingVertical: 10,
-            alignItems: 'center',
-        },
-        executeButtonDisabled: {
-            opacity: 0.5,
-        },
-        executeButtonText: {
-            color: '#fff',
-            fontSize: 16,
-            fontWeight: '800',
-        },
-        panelOverlay: {
-            position: 'absolute',
-            top: 0,
-            right: 0,
-            bottom: 0,
-            width: 340,
-            backgroundColor: palette.card,
-            borderLeftWidth: 1,
-            borderColor: palette.border,
-            boxShadow: '-4px 0px 12px rgba(0, 0, 0, 0.15)',
-            elevation: 8,
-            zIndex: 100,
-        },
-        panelHeader: {
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            padding: theme.spacing.sm,
-            borderBottomWidth: 1,
-            borderColor: palette.border,
-        },
-        panelTitle: {
-            fontSize: 16,
-            fontWeight: '800',
-        },
-        closeButton: {
-            width: 32,
-            height: 32,
-            borderRadius: 16,
+        powerMeterDock: {
+            width: 44,
             alignItems: 'center',
             justifyContent: 'center',
         },
-        panelScroll: {
-            flex: 1,
-        },
-        panelContent: {
-            padding: theme.spacing.md,
-        },
-        controlGroup: {
-            gap: 12,
-        },
-        controlLabel: {
-            color: palette.muted,
-            fontSize: 11,
-            fontWeight: '800',
-            letterSpacing: 0.4,
-            textTransform: 'uppercase',
-        },
-        ballSelector: {
-            flexDirection: 'row',
-            gap: 12,
-            justifyContent: 'center',
-        },
-        ballButton: {
-            width: 64,
-            height: 64,
-            borderRadius: 32,
-            borderWidth: 2,
-            alignItems: 'center',
-            justifyContent: 'center',
-        },
-        powerSelector: {
-            flexDirection: 'row',
-            gap: 8,
-            justifyContent: 'center',
-        },
-        powerButton: {
-            width: 48,
-            height: 48,
-            borderRadius: 24,
-            alignItems: 'center',
-            justifyContent: 'center',
-        },
-        numberingToggle: {
-            marginBottom: 16,
-        },
-        toggleButton: {
-            paddingVertical: 10,
-            paddingHorizontal: 16,
-            borderRadius: 8,
-            backgroundColor: `${palette.primary}15`,
+
+        /* MOBILE 2-TIER BOTTOM HUD */
+        bottomHudMobileContainer: {
+            backgroundColor: 'rgba(15, 23, 42, 0.85)',
+            borderRadius: 18,
             borderWidth: 1,
-            borderColor: `${palette.primary}30`,
-            alignItems: 'center',
+            borderColor: 'rgba(255, 255, 255, 0.08)',
+            padding: 6,
+            gap: 5,
+            userSelect: 'none',
         },
-        toggleButtonText: {
-            fontSize: 13,
-            fontWeight: '700',
-        },
-        numberingActions: {
+        bottomHudMobileTier1: {
             flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 4,
+        },
+        bottomHudMobileTier2: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
             gap: 6,
-            marginBottom: 8,
+            paddingTop: 4,
+            borderTopWidth: 1,
+            borderTopColor: 'rgba(255, 255, 255, 0.06)',
         },
-        quickAddButton: {
-            flex: 1,
-            paddingVertical: 8,
-            borderRadius: 6,
-            alignItems: 'center',
-        },
-        quickAddButtonText: {
-            color: '#fff',
-            fontSize: 12,
-            fontWeight: '700',
-        },
-        clearButton: {
-            paddingVertical: 8,
-            paddingHorizontal: 12,
-            borderRadius: 6,
-            alignItems: 'center',
-        },
-        clearButtonText: {
-            color: '#fff',
-            fontSize: 12,
-            fontWeight: '700',
-        },
-        editHint: {
-            padding: 8,
-            borderRadius: 6,
+        cueBallSelectorPillMobile: {
+            flexDirection: 'row',
+            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+            borderRadius: 14,
             borderWidth: 1,
-            marginBottom: 8,
+            borderColor: 'rgba(255, 255, 255, 0.12)',
+            padding: 2,
+            gap: 2,
         },
-        editHintText: {
-            fontSize: 11,
+        ballOptionBtnMobile: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 3,
+            paddingHorizontal: 6,
+            paddingVertical: 3,
+            borderRadius: 10,
+        },
+        fireButtonMobile: {
+            width: 48,
+            height: 32,
+            borderRadius: 12,
+            backgroundColor: '#0d5e2f',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 0 10px rgba(13, 94, 47, 0.6)',
+        },
+
+        /* DESKTOP PANORAMIC BOTTOM HUD */
+        bottomHudBar: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 8,
+            backgroundColor: 'rgba(15, 23, 42, 0.75)',
+            borderRadius: 22,
+            borderWidth: 1,
+            borderColor: 'rgba(255, 255, 255, 0.08)',
+            paddingHorizontal: 8,
+            paddingVertical: 4,
+            userSelect: 'none',
+        },
+        cueBallSelectorPill: {
+            flexDirection: 'row',
+            backgroundColor: 'rgba(15, 23, 42, 0.85)',
+            borderRadius: 18,
+            borderWidth: 1,
+            borderColor: 'rgba(255, 255, 255, 0.12)',
+            padding: 2,
+            gap: 2,
+        },
+        ballOptionBtn: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 5,
+            paddingHorizontal: 8,
+            paddingVertical: 5,
+            borderRadius: 14,
+        },
+        ballOptionBtnActive: {
+            backgroundColor: 'rgba(255, 255, 255, 0.12)',
+        },
+        whiteBallIcon: {
+            width: 11,
+            height: 11,
+            borderRadius: 6,
+            backgroundColor: '#ffffff',
+            borderWidth: 1,
+            borderColor: '#94a3b8',
+            position: 'relative',
+        },
+        yellowBallIcon: {
+            width: 11,
+            height: 11,
+            borderRadius: 6,
+            backgroundColor: '#facc15',
+            borderWidth: 1,
+            borderColor: '#ca8a04',
+            position: 'relative',
+        },
+        ballMiniDot: {
+            position: 'absolute',
+            top: 1,
+            right: 1,
+            width: 3,
+            height: 3,
+            borderRadius: 1.5,
+        },
+        ballOptionText: {
+            fontSize: 9,
+            fontWeight: '700',
+            color: '#64748b',
+        },
+        ballOptionTextActive: {
+            color: '#f8fafc',
+            fontWeight: '800',
+        },
+        utilityActionsRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 5,
+        },
+        clearTrailsBtn: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 3,
+            backgroundColor: 'rgba(239, 68, 68, 0.15)',
+            borderWidth: 1,
+            borderColor: 'rgba(239, 68, 68, 0.35)',
+            borderRadius: 14,
+            paddingHorizontal: 7,
+            paddingVertical: 4,
+        },
+        clearTrailsText: {
+            fontSize: 9,
+            color: '#ef4444',
+            fontWeight: '800',
+        },
+        guidePill: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 4,
+            backgroundColor: 'rgba(255, 255, 255, 0.05)',
+            borderWidth: 1,
+            borderColor: 'rgba(255, 255, 255, 0.1)',
+            borderRadius: 14,
+            paddingHorizontal: 7,
+            paddingVertical: 4,
+        },
+        guidePillActive: {
+            backgroundColor: 'rgba(0, 210, 255, 0.15)',
+            borderColor: 'rgba(0, 210, 255, 0.4)',
+        },
+        guidePillText: {
+            fontSize: 9,
+            fontWeight: '700',
+            color: '#64748b',
+        },
+        guidePillTextActive: {
+            color: '#00d2ff',
+            fontWeight: '800',
+        },
+        fireButton: {
+            width: 44,
+            height: 38,
+            borderRadius: 16,
+            backgroundColor: '#0d5e2f',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 0 12px rgba(13, 94, 47, 0.6)',
+        },
+        fireButtonDisabled: {
+            opacity: 0.4,
+        },
+        ballModuleContainerMobile: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 4,
+        },
+        ballStudioTriggerMobile: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 3.5,
+            paddingHorizontal: 6,
+            paddingVertical: 3.5,
+            borderRadius: 12,
+            borderWidth: 1,
+        },
+        ballStudioUmbMobile: {
+            backgroundColor: 'rgba(2, 132, 199, 0.15)',
+            borderColor: 'rgba(56, 189, 248, 0.35)',
+        },
+        ballStudioPbaMobile: {
+            backgroundColor: 'rgba(217, 119, 6, 0.15)',
+            borderColor: 'rgba(245, 158, 11, 0.35)',
+        },
+        ballStudioBadgeFlag: {
+            fontSize: 10,
+        },
+        ballStudioBadgeText: {
+            fontSize: 9.5,
+            fontWeight: '800',
+            color: '#f8fafc',
+            letterSpacing: 0.2,
+        },
+        ballModuleContainerDesktop: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+        },
+        ballStudioTriggerDesktop: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+            paddingHorizontal: 9,
+            paddingVertical: 3.5,
+            borderRadius: 16,
+            borderWidth: 1,
+        },
+        ballStudioUmbDesktop: {
+            backgroundColor: 'rgba(2, 132, 199, 0.14)',
+            borderColor: 'rgba(56, 189, 248, 0.35)',
+        },
+        ballStudioPbaDesktop: {
+            backgroundColor: 'rgba(217, 119, 6, 0.14)',
+            borderColor: 'rgba(245, 158, 11, 0.35)',
+        },
+        ballStudioTriggerInner: {
+            alignItems: 'flex-start',
+        },
+        ballStudioTriggerBadge: {
+            fontSize: 10,
+            fontWeight: '800',
+            color: '#f8fafc',
+            letterSpacing: 0.3,
+        },
+        ballStudioSkinBadge: {
+            fontSize: 8.5,
             fontWeight: '600',
-            textAlign: 'center',
+            color: '#94a3b8',
+            maxWidth: 120,
         },
     });
