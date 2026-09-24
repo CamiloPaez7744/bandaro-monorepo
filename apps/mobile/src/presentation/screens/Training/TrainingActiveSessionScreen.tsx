@@ -246,16 +246,27 @@ export function TrainingActiveSessionScreen() {
     } else if (params.whiteX && params.whiteY) {
       const customPos: PositionData = {
         id: `custom-${Date.now()}`,
-        name: params.customName || 'Posición Personalizada',
-        category: 'Simulador / Foto',
-        hint: 'Enfócate en la rutina pre-tiro, respiración y penetración del taco.',
+        name: params.customName || 'Mesa Calibrada (Foto)',
+        category: 'Foto / Mesa Calibrada',
+        hint: 'Posición calibrada con visión artificial. Repite los tiros para consolidar tu ejecución y porcentaje de acierto.',
         difficulty: 3,
         white: { x: parseFloat(params.whiteX), y: parseFloat(params.whiteY) },
         yellow: { x: parseFloat(params.yellowX || '142'), y: parseFloat(params.yellowY || '71') },
         red: { x: parseFloat(params.redX || '220'), y: parseFloat(params.redY || '71') },
         trajectory: [],
       };
-      setPositions((prev) => [customPos, ...prev]);
+      setPositions((prev) => {
+        const hasOnlyDefaults =
+          prev.length === DEFAULT_POSITIONS.length &&
+          prev.every((p, i) => p.id === DEFAULT_POSITIONS[i].id);
+
+        if (hasOnlyDefaults) {
+          return [customPos];
+        }
+        const exists = prev.some((p) => p.white.x === customPos.white.x && p.white.y === customPos.white.y);
+        if (exists) return prev;
+        return [customPos, ...prev];
+      });
       setCurrentPosIndex(0);
       setMadeHits(0);
     }

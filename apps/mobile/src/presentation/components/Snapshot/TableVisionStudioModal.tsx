@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   Image,
   Modal,
   PanResponder,
@@ -20,6 +21,7 @@ import { useRouter } from 'expo-router';
 import Svg, { Circle, Line, Polygon, Text as SvgText, Rect, G } from 'react-native-svg';
 import {
   IconAdjustments,
+  IconAlertCircle,
   IconAlertTriangle,
   IconArrowsExchange,
   IconCamera,
@@ -55,6 +57,7 @@ import {
 import {
   CanvasViewSettingsModal,
 } from './CanvasViewSettingsModal';
+import { NeonCornerReticle } from './NeonCornerReticle';
 import {
   type TablePreferences,
   DEFAULT_TABLE_PREFERENCES,
@@ -186,6 +189,106 @@ function applyHomography(H: number[], x: number, y: number): Point2D {
   };
 }
 
+export interface GeometryValidationResult {
+  isValid: boolean;
+  isConvex: boolean;
+  aspectRatio: number;
+  message: string;
+  severity: 'success' | 'warning' | 'error';
+}
+
+export function validateCornersGeometry(corners: Point2D[]): GeometryValidationResult {
+  if (!corners || corners.length !== 4) {
+    return {
+      isValid: false,
+      isConvex: false,
+      aspectRatio: 0,
+      message: 'Faltan esquinas para la calibración',
+      severity: 'error',
+    };
+  }
+
+  // Cross products of consecutive edges to verify strict convexity (no crossed lines or folded corners)
+  const crossProducts: number[] = [];
+  for (let i = 0; i < 4; i++) {
+    const p0 = corners[i];
+    const p1 = corners[(i + 1) % 4];
+    const p2 = corners[(i + 2) % 4];
+    const dx1 = p1.x - p0.x;
+    const dy1 = p1.y - p0.y;
+    const dx2 = p2.x - p1.x;
+    const dy2 = p2.y - p1.y;
+    const cp = dx1 * dy2 - dy1 * dx2;
+    crossProducts.push(cp);
+  }
+
+  // In a valid non-intersecting quadrilateral, all cross products have identical non-zero sign
+  const positive = crossProducts.filter((c) => c > 1e-5).length;
+  const negative = crossProducts.filter((c) => c < -1e-5).length;
+  const isConvex = positive === 4 || negative === 4;
+
+  if (!isConvex) {
+    return {
+      isValid: false,
+      isConvex: false,
+      aspectRatio: 0,
+      message: 'Esquinas cruzadas o invertidas (cuadrilátero no convexo)',
+      severity: 'error',
+    };
+  }
+
+  // Calculate side lengths
+  const d01 = Math.hypot(corners[1].x - corners[0].x, corners[1].y - corners[0].y);
+  const d12 = Math.hypot(corners[2].x - corners[1].x, corners[2].y - corners[1].y);
+  const d23 = Math.hypot(corners[3].x - corners[2].x, corners[3].y - corners[2].y);
+  const d30 = Math.hypot(corners[0].x - corners[3].x, corners[0].y - corners[3].y);
+
+  // Table has 2 long rails and 2 short rails
+  const avgSideA = (d01 + d23) / 2;
+  const avgSideB = (d12 + d30) / 2;
+
+  if (avgSideA <= 1e-4 || avgSideB <= 1e-4) {
+    return {
+      isValid: false,
+      isConvex: false,
+      aspectRatio: 0,
+      message: 'El área de la mesa es demasiado pequeña.',
+      severity: 'error',
+    };
+  }
+
+  const ratio = avgSideA >= avgSideB ? avgSideA / avgSideB : avgSideB / avgSideA;
+
+  // Carom table regulation is 2:1 (284cm x 142cm)
+  if (ratio < 1.15) {
+    return {
+      isValid: true,
+      isConvex: true,
+      aspectRatio: ratio,
+      message: `Proporción cuadrada (~${ratio.toFixed(2)}:1). Revisa esquinas cortas/largas.`,
+      severity: 'warning',
+    };
+  }
+
+  if (ratio > 3.6) {
+    return {
+      isValid: true,
+      isConvex: true,
+      aspectRatio: ratio,
+      message: `Mesa muy alargada (~${ratio.toFixed(2)}:1). Ajusta perspectiva.`,
+      severity: 'warning',
+    };
+  }
+
+  return {
+    isValid: true,
+    isConvex: true,
+    aspectRatio: ratio,
+    message: `Geometría válida (~${ratio.toFixed(2)}:1) • Perspectiva consistente`,
+    severity: 'success',
+  };
+}
+
 function TableVisionStudioModalBase({
   visible,
   onClose,
@@ -214,6 +317,8 @@ function TableVisionStudioModalBase({
   const [visionData, setVisionData] = useState<VisionDetailedResponse | null>(null);
   const [corners, setCorners] = useState<Point2D[]>(DEFAULT_CORNERS);
   const [activeCornerIdx, setActiveCornerIdx] = useState<number>(0);
+  const [nudgeStep, setNudgeStep] = useState<number>(0.004);
+  const initialCornersRef = useRef<Point2D[]>(DEFAULT_CORNERS);
 
   // Dragging and Loupe Magnifier State (CamScanner UX)
   const [isDragging, setIsDragging] = useState(false);
@@ -231,6 +336,27 @@ function TableVisionStudioModalBase({
     }, 2200);
   }, []);
 
+  // Continuous radar pulse animation for the active corner handle
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1700,
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0,
+          duration: 0,
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulseAnim]);
+
   // Visual toggles
   const [showProjectedGrid, setShowProjectedGrid] = useState(true);
   const [showWoodRails, setShowWoodRails] = useState(true);
@@ -240,6 +366,19 @@ function TableVisionStudioModalBase({
   const [whiteImagePos, setWhiteImagePos] = useState<Point2D>({ x: 0.35, y: 0.55 });
   const [yellowImagePos, setYellowImagePos] = useState<Point2D>({ x: 0.65, y: 0.35 });
   const [redImagePos, setRedImagePos] = useState<Point2D>({ x: 0.72, y: 0.68 });
+  const [thirdBallColor, setThirdBallColor] = useState<'red' | 'orange' | 'blue'>('red');
+
+  const thirdBallMeta = useMemo(() => {
+    switch (thirdBallColor) {
+      case 'blue':
+        return { label: 'Azul', color: '#2563eb', accent: '#ffffff', emoji: '🔵' };
+      case 'orange':
+        return { label: 'Naranja', color: '#f97316', accent: '#ffffff', emoji: '🟠' };
+      case 'red':
+      default:
+        return { label: 'Roja', color: '#ef4444', accent: '#ffffff', emoji: '🔴' };
+    }
+  }, [thirdBallColor]);
 
   // Tactical toggles
   const [swapCue, setSwapCue] = useState(false);
@@ -283,6 +422,7 @@ function TableVisionStudioModalBase({
       setCanvasZoom('fit');
       setTableCoverage('full');
       setHalfTableZone('half_1');
+      setThirdBallColor('red');
     }
   }, [visible]);
 
@@ -355,9 +495,9 @@ function TableVisionStudioModalBase({
         rawY = { x: yCan.x * 284, y: yCan.y * 142 };
         rawR = { x: rCan.x * 284, y: rCan.y * 142 };
       } else {
-        rawW = { x: wCan.y * 284, y: wCan.x * 142 };
-        rawY = { x: yCan.y * 284, y: yCan.x * 142 };
-        rawR = { x: rCan.y * 284, y: rCan.x * 142 };
+        rawW = { x: wCan.y * 284, y: (1 - wCan.x) * 142 };
+        rawY = { x: yCan.y * 284, y: (1 - yCan.x) * 142 };
+        rawR = { x: rCan.y * 284, y: (1 - rCan.x) * 142 };
       }
     } else {
       const offset = halfTableZone === 'half_2' ? 142 : 0;
@@ -366,9 +506,9 @@ function TableVisionStudioModalBase({
         rawY = { x: offset + yCan.x * 142, y: yCan.y * 142 };
         rawR = { x: offset + rCan.x * 142, y: rCan.y * 142 };
       } else {
-        rawW = { x: offset + wCan.y * 142, y: wCan.x * 142 };
-        rawY = { x: offset + yCan.y * 142, y: yCan.x * 142 };
-        rawR = { x: offset + rCan.y * 142, y: rCan.x * 142 };
+        rawW = { x: offset + wCan.y * 142, y: (1 - wCan.x) * 142 };
+        rawY = { x: offset + yCan.y * 142, y: (1 - yCan.x) * 142 };
+        rawR = { x: offset + rCan.y * 142, y: (1 - rCan.x) * 142 };
       }
     }
 
@@ -424,6 +564,7 @@ function TableVisionStudioModalBase({
           }));
           setCorners(currentCorners);
         }
+        initialCornersRef.current = currentCorners;
 
         const newH = computeQuadHomography(currentCorners);
 
@@ -431,7 +572,20 @@ function TableVisionStudioModalBase({
         if (res.balls && res.balls.length >= 3) {
           const wB = res.balls.find((b) => b.label === 'white') ?? res.balls[0];
           const yB = res.balls.find((b) => b.label === 'yellow') ?? res.balls[1];
-          const rB = res.balls.find((b) => b.label === 'red') ?? res.balls[2];
+          const rB =
+            res.balls.find((b) => b.label === 'red' || b.label === 'orange' || b.label === 'blue') ??
+            res.balls[2];
+
+          if (rB) {
+            const detectedColor = (rB.ballColor || rB.label || '').toLowerCase();
+            if (detectedColor === 'blue') {
+              setThirdBallColor('blue');
+            } else if (detectedColor === 'orange') {
+              setThirdBallColor('orange');
+            } else {
+              setThirdBallColor('red');
+            }
+          }
 
           // Use image positions directly if detected
           let wImg = { x: wB.imageX ?? 0.35, y: wB.imageY ?? 0.55 };
@@ -451,7 +605,6 @@ function TableVisionStudioModalBase({
           setWhiteImagePos(wImg);
           setYellowImagePos(yImg);
           setRedImagePos(rImg);
-
         }
 
         setStep('calibrate');
@@ -459,9 +612,13 @@ function TableVisionStudioModalBase({
         console.error('[VisionStudio] error:', err);
         // Do NOT kick user back to select step! Open calibrate mode with DEFAULT_CORNERS and user's photo
         setCorners(DEFAULT_CORNERS);
+        initialCornersRef.current = DEFAULT_CORNERS;
         setStep('calibrate');
+        const isNetworkErr = String(err).includes('Failed to fetch') || String(err).includes('NetworkError');
         setErrorMessage(
-          'Detección automática con baja confianza. Puedes ajustar manualmente las 4 esquinas de la mesa y la posición de las bolas usando los tiradores y la lupa.'
+          isNetworkErr
+            ? 'No se pudo conectar con el motor de visión del backend (http://localhost:8181). Puedes ajustar manualmente las 4 cuñas de la mesa y las bolas con la lupa.'
+            : 'Detección automática con baja confianza. Puedes ajustar manualmente las 4 cuñas de la mesa y la posición de las bolas usando los tiradores y la lupa.'
         );
       }
     },
@@ -568,10 +725,56 @@ function TableVisionStudioModalBase({
   }, []);
 
   const handleMirror = useCallback(() => {
-    setWhiteImagePos((p) => ({ x: 1 - p.x, y: p.y }));
-    setYellowImagePos((p) => ({ x: 1 - p.x, y: p.y }));
-    setRedImagePos((p) => ({ x: 1 - p.x, y: p.y }));
-  }, []);
+    if (!homographyH || !homographyHInv) return;
+
+    // Invert sides (left <-> right) on the canonical table, keeping C1..C4 fixed
+    const mirrorPos = (p: Point2D): Point2D => {
+      const can = applyHomography(homographyHInv, p.x, p.y);
+      let mirroredU = can.x;
+      let mirroredV = can.y;
+
+      if (tableOrientation === 'horizontal') {
+        // Horizontal: X is along u (u=0 to u=1). Mirroring sides means u' = 1 - u
+        mirroredU = Math.max(0.005, Math.min(0.995, 1 - can.x));
+        mirroredV = Math.max(0.005, Math.min(0.995, can.y));
+      } else {
+        // Vertical: X is along v (v=0 to v=1). Mirroring sides means v' = 1 - v
+        mirroredU = Math.max(0.005, Math.min(0.995, can.x));
+        mirroredV = Math.max(0.005, Math.min(0.995, 1 - can.y));
+      }
+
+      return applyHomography(homographyH, mirroredU, mirroredV);
+    };
+
+    setWhiteImagePos((p) => mirrorPos(p));
+    setYellowImagePos((p) => mirrorPos(p));
+    setRedImagePos((p) => mirrorPos(p));
+  }, [homographyH, homographyHInv, tableOrientation]);
+
+  const handleRotate180 = useCallback(() => {
+    if (!homographyH || !homographyHInv) return;
+
+    // Rotate 180° on canonical table (opposite end), keeping C1..C4 fixed
+    const rotPos = (p: Point2D): Point2D => {
+      const can = applyHomography(homographyHInv, p.x, p.y);
+      let newU = can.x;
+      let newV = can.y;
+
+      if (tableOrientation === 'horizontal') {
+        newU = Math.max(0.005, Math.min(0.995, 1 - can.x));
+        newV = Math.max(0.005, Math.min(0.995, 1 - can.y));
+      } else {
+        newV = Math.max(0.005, Math.min(0.995, 1 - can.y));
+        newU = Math.max(0.005, Math.min(0.995, 1 - can.x));
+      }
+
+      return applyHomography(homographyH, newU, newV);
+    };
+
+    setWhiteImagePos((p) => rotPos(p));
+    setYellowImagePos((p) => rotPos(p));
+    setRedImagePos((p) => rotPos(p));
+  }, [homographyH, homographyHInv, tableOrientation]);
 
   const handleSwapCue = useCallback(() => {
     setSwapCue((v) => !v);
@@ -584,7 +787,7 @@ function TableVisionStudioModalBase({
     }
   }, [imageUri, corners, processImage]);
 
-  // Confirm and practice
+  // Confirm and practice in Training Session (repetition workstation)
   const handleConfirmTraining = useCallback(() => {
     onClose();
     if (onSelectPosition) {
@@ -592,20 +795,42 @@ function TableVisionStudioModalBase({
         white: whiteBall,
         yellow: yellowBall,
         red: redBall,
-        name: 'Posición de Foto/YouTube',
+        name: 'Mesa Calibrada (Foto)',
       });
-    } else if (visionData?.snapshotId) {
-      router.push(`/training/simulate?snapshotId=${visionData.snapshotId}`);
+    } else {
+      const q = new URLSearchParams({
+        whiteX: String(whiteBall.x),
+        whiteY: String(whiteBall.y),
+        yellowX: String(yellowBall.x),
+        yellowY: String(yellowBall.y),
+        redX: String(redBall.x),
+        redY: String(redBall.y),
+        customName: 'Mesa Calibrada (Foto)',
+      });
+      if (visionData?.snapshotId) {
+        q.set('snapshotId', visionData.snapshotId);
+      }
+      router.push(`/training/session?${q.toString()}`);
     }
   }, [onClose, onSelectPosition, whiteBall, yellowBall, redBall, visionData, router]);
 
   // Open in simulator
   const handleOpenSimulator = useCallback(() => {
     onClose();
+    const q = new URLSearchParams({
+      whiteX: String(whiteBall.x),
+      whiteY: String(whiteBall.y),
+      yellowX: String(yellowBall.x),
+      yellowY: String(yellowBall.y),
+      redX: String(redBall.x),
+      redY: String(redBall.y),
+      customName: 'Mesa Calibrada (Foto)',
+    });
     if (visionData?.snapshotId) {
-      router.push(`/training/simulate?snapshotId=${visionData.snapshotId}`);
+      q.set('snapshotId', visionData.snapshotId);
     }
-  }, [onClose, visionData, router]);
+    router.push(`/training/simulate?${q.toString()}`);
+  }, [onClose, visionData, whiteBall, yellowBall, redBall, router]);
 
   // --- MULTILAYER PROJECTED VIRTUAL TABLE GEOMETRY ---
   const virtualTableGeometry = useMemo(() => {
@@ -843,14 +1068,14 @@ function TableVisionStudioModalBase({
       },
       {
         id: 'red' as const,
-        label: 'Roja',
+        label: thirdBallMeta.label,
         x: imageRect.x + redImagePos.x * imageRect.width,
         y: imageRect.y + redImagePos.y * imageRect.height,
-        color: '#ef4444',
-        accent: '#ffffff',
+        color: thirdBallMeta.color,
+        accent: thirdBallMeta.accent,
       },
     ];
-  }, [whiteImagePos, yellowImagePos, redImagePos, imageRect]);
+  }, [whiteImagePos, yellowImagePos, redImagePos, imageRect, thirdBallMeta]);
 
   // Mutable references for PanResponder so it is never recreated during dragging
   const cornersRef = useRef(corners);
@@ -1120,7 +1345,7 @@ function TableVisionStudioModalBase({
   // Precision Nudge for Active Target (Corner or Ball) with D-Pad
   const nudgeActiveTarget = useCallback(
     (dx: number, dy: number) => {
-      const step = 0.004; // 0.4% fine step
+      const step = nudgeStep;
       if (selectedTargetType === 'corner') {
         setCorners((prev) => {
           const next = [...prev];
@@ -1155,10 +1380,70 @@ function TableVisionStudioModalBase({
       }
       triggerLoupeBriefly();
     },
-    [selectedTargetType, activeCornerIdx, triggerLoupeBriefly]
+    [selectedTargetType, activeCornerIdx, nudgeStep, triggerLoupeBriefly]
   );
 
-  const cornerShortLabels = ['C1 (TL)', 'C2 (TR)', 'C3 (BR)', 'C4 (BL)'];
+  const geomValidation = useMemo(() => validateCornersGeometry(corners), [corners]);
+
+  const cornerShortLabels = useMemo(() => {
+    if (tableOrientation === 'vertical') {
+      return ['Inf-Izq', 'Sup-Izq', 'Sup-Der', 'Inf-Der'];
+    }
+    return ['Sup-Izq', 'Sup-Der', 'Inf-Der', 'Inf-Izq'];
+  }, [tableOrientation]);
+
+  const cornerFullNames = useMemo(() => {
+    if (tableOrientation === 'vertical') {
+      return [
+        'Esquina 1: Inferior Izquierda (Entrada)',
+        'Esquina 2: Superior Izquierda (Fondo)',
+        'Esquina 3: Superior Derecha (Fondo)',
+        'Esquina 4: Inferior Derecha (Entrada)',
+      ];
+    }
+    return [
+      'Esquina 1: Superior Izquierda (Entrada)',
+      'Esquina 2: Superior Derecha (Fondo)',
+      'Esquina 3: Inferior Derecha (Fondo)',
+      'Esquina 4: Inferior Izquierda (Entrada)',
+    ];
+  }, [tableOrientation]);
+
+  const handleResetCorners = useCallback(() => {
+    const orig = initialCornersRef.current;
+    if (orig && orig.length === 4) {
+      setCorners([...orig]);
+      setLoupeCenter({
+        x: Math.max(0, Math.min(1, orig[activeCornerIdx]?.x ?? 0.5)),
+        y: Math.max(0, Math.min(1, orig[activeCornerIdx]?.y ?? 0.5)),
+      });
+      triggerLoupeBriefly();
+    }
+  }, [activeCornerIdx, triggerLoupeBriefly]);
+
+  const handleCycleTarget = useCallback(
+    (direction: -1 | 1) => {
+      if (selectedTargetType === 'corner') {
+        const nextIdx = (activeCornerIdx + direction + 4) % 4;
+        setActiveCornerIdx(nextIdx);
+        setLoupeCenter({
+          x: Math.max(0, Math.min(1, corners[nextIdx].x)),
+          y: Math.max(0, Math.min(1, corners[nextIdx].y)),
+        });
+      } else {
+        const ballKeys: Array<'white' | 'yellow' | 'red'> = ['white', 'yellow', 'red'];
+        const curIdx = ballKeys.indexOf(selectedTargetType);
+        const nextIdx = (curIdx + direction + 3) % 3;
+        const nextTarget = ballKeys[nextIdx];
+        setSelectedTargetType(nextTarget);
+        const targetPos =
+          nextTarget === 'white' ? whiteImagePos : nextTarget === 'yellow' ? yellowImagePos : redImagePos;
+        setLoupeCenter({ x: targetPos.x, y: targetPos.y });
+      }
+      triggerLoupeBriefly();
+    },
+    [selectedTargetType, activeCornerIdx, corners, whiteImagePos, yellowImagePos, redImagePos, triggerLoupeBriefly]
+  );
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -1623,53 +1908,53 @@ function TableVisionStudioModalBase({
                               <Circle
                                 cx={b.x}
                                 cy={b.y}
-                                r={isTarget ? 15 : 13.5}
-                                fill={isTarget ? 'rgba(6, 182, 212, 0.4)' : 'rgba(0,0,0,0.3)'}
+                                r={isTarget ? 11.5 : 9.5}
+                                fill={isTarget ? 'rgba(6, 182, 212, 0.35)' : 'rgba(0,0,0,0.25)'}
                                 stroke={isTarget ? '#ffffff' : b.color}
-                                strokeWidth={isTarget ? 2 : 1.5}
+                                strokeWidth={isTarget ? 1.8 : 1.2}
                               />
                               {/* Ball Body */}
                               <Circle
                                 cx={b.x}
                                 cy={b.y}
-                                r={10.5}
+                                r={7.5}
                                 fill={b.color}
                                 stroke="#0a100d"
-                                strokeWidth={1.5}
+                                strokeWidth={1.2}
                               />
                               {/* Inner Dot for Aramith Cue Ball */}
                               <Circle
                                 cx={b.x}
                                 cy={b.y}
-                                r={2.5}
+                                r={1.8}
                                 fill={b.accent}
                               />
                             </G>
                           );
                         })}
 
-                        {/* LAYER 7: CamScanner 4 Prominent Corner Handles */}
+                        {/* LAYER 7: CamScanner Clean Corner Handles */}
                         {screenCorners.map((p, idx) => {
                           const isActive = selectedTargetType === 'corner' && idx === activeCornerIdx;
                           return (
                             <G key={`cam-corner-${idx}`}>
-                              {/* Large Touch Target Ring */}
+                              {/* Touch Halo */}
                               <Circle
                                 cx={p.x}
                                 cy={p.y}
-                                r={isActive ? 22 : 16}
-                                fill={isActive ? 'rgba(6, 182, 212, 0.35)' : 'rgba(0,0,0,0.35)'}
-                                stroke={isActive ? '#ffffff' : C.accentCyan}
-                                strokeWidth={isActive ? 2.5 : 1.8}
+                                r={isActive ? 9 : 6.5}
+                                fill={isActive ? 'rgba(2, 132, 199, 0.25)' : 'rgba(0, 0, 0, 0.35)'}
+                                stroke={isActive ? '#0284c7' : 'rgba(255, 255, 255, 0.65)'}
+                                strokeWidth={isActive ? 1.6 : 1.0}
                               />
                               {/* Solid Center Pin */}
                               <Circle
                                 cx={p.x}
                                 cy={p.y}
-                                r={7}
-                                fill={isActive ? C.accentCyan : '#ffffff'}
+                                r={isActive ? 3.5 : 2.5}
+                                fill={isActive ? '#0284c7' : '#ffffff'}
                                 stroke="#0a100d"
-                                strokeWidth={1.5}
+                                strokeWidth={1.0}
                               />
                             </G>
                           );
@@ -1678,52 +1963,94 @@ function TableVisionStudioModalBase({
                       </View>
                     )}
 
-                    {/* CamScanner Floating Magnifying Loupe (2.8x Precision Zoom) */}
-                    {(isDragging || isLoupeActive) && imageUri && (
-                      <View
-                        style={[
-                          s.loupeFloatCard,
-                          loupeCenter.x > 0.55 && loupeCenter.y < 0.45 && s.loupeFloatCardLeft,
-                        ]}
-                      >
-                        <View style={s.loupeCircle}>
-                          <Image
-                            source={{ uri: imageUri }}
-                            style={{
-                              position: 'absolute',
-                              width: imageRect.width * 2.8,
-                              height: imageRect.height * 2.8,
-                              left: 50 - loupeCenter.x * (imageRect.width * 2.8),
-                              top: 50 - loupeCenter.y * (imageRect.height * 2.8),
-                            }}
-                            resizeMode="stretch"
-                          />
-                          {/* Crosshair Target */}
-                          <View style={s.loupeCrosshairH} />
-                          <View style={s.loupeCrosshairV} />
-                          <View style={s.loupeCenterRing} />
+                    {/* Centered Top Tactical Precision Scope (2.8x Optical Zoom) */}
+                    {(isDragging || isLoupeActive) && imageUri && (() => {
+                      const activeScopeColor =
+                        selectedTargetType === 'corner'
+                          ? '#0284c7'
+                          : selectedTargetType === 'yellow'
+                          ? '#d97706'
+                          : selectedTargetType === 'red'
+                          ? thirdBallMeta.color
+                          : '#0284c7';
+                      const centerDotColor =
+                        (dragTarget || selectedTargetType) === 'red'
+                          ? '#38bdf8'
+                          : '#ef4444';
+                      return (
+                        <View style={s.loupeTopCenterCard}>
+                          {/* 1. Standalone Precision Optical Reticle (Circular) */}
+                          <View style={s.loupeCircle}>
+                            <Image
+                              source={{ uri: imageUri }}
+                              style={{
+                                position: 'absolute',
+                                width: imageRect.width * 2.8,
+                                height: imageRect.height * 2.8,
+                                left: 52 - loupeCenter.x * (imageRect.width * 2.8),
+                                top: 52 - loupeCenter.y * (imageRect.height * 2.8),
+                              }}
+                              resizeMode="stretch"
+                            />
+                            {/* Simplified Tactical Precision Scope Reticle (Includes outer concentric bezel rim) */}
+                            <NeonCornerReticle
+                              size={104}
+                              color={activeScopeColor}
+                              postColor="#0a100d"
+                              centerDotColor={centerDotColor}
+                              showVignette={true}
+                            />
+                          </View>
+
+                          {/* 2. Independent Detached Tooltip / Label Badge */}
+                          <View style={[s.loupeTooltipBadge, { borderColor: `${activeScopeColor}66` }]}>
+                            <View style={[s.loupeStatusDot, { backgroundColor: activeScopeColor }]} />
+                            <Text style={s.loupeTooltipText}>
+                              {dragTarget === 'corner' || (!dragTarget && selectedTargetType === 'corner')
+                                ? `Esquina ${cornerShortLabels[activeCornerIdx]}`
+                                : (dragTarget || selectedTargetType) === 'red'
+                                ? `Bola ${thirdBallMeta.label.toUpperCase()}`
+                                : `Bola ${(dragTarget || selectedTargetType)?.toUpperCase()}`}
+                            </Text>
+                          </View>
                         </View>
-                        <Text style={s.loupeTag}>
-                          {dragTarget === 'corner' || (!dragTarget && selectedTargetType === 'corner')
-                            ? `Esquina ${cornerShortLabels[activeCornerIdx]}`
-                            : `Bola ${(dragTarget || selectedTargetType)?.toUpperCase()}`}
-                        </Text>
-                      </View>
-                    )}
+                      );
+                    })()}
                   </View>
 
                   {/* Corner & Ball Precision D-Pad & Fine-Tuning Bar (Collapsible) */}
                   {showFineControls ? (
                     <View style={s.fineControlsCard}>
-                      {/* Header */}
+                      {/* Header with Title, Step Speed Pills, and Close */}
                       <View style={s.fineControlsHeader}>
                         <View style={s.fineControlsHeaderLeft}>
                           <IconDeviceGamepad2 size={16} color={C.accentCyan} strokeWidth={2} />
                           <Text style={s.fineControlsTitle} numberOfLines={1}>
-                            Ajuste Fino Milimétrico
+                            Ajuste de Puntos
                           </Text>
-                          <View style={s.fineStepBadge}>
-                            <Text style={s.fineStepBadgeText}>±0.4%</Text>
+                          {/* Step Speed / Precision Pills */}
+                          <View style={s.stepPillsGroup}>
+                            {[
+                              { val: 0.001, label: '0.1% Fino' },
+                              { val: 0.004, label: '0.4% Normal' },
+                              { val: 0.012, label: '1.2% Rápido' },
+                            ].map((opt) => (
+                              <TouchableOpacity
+                                key={`step-${opt.val}`}
+                                style={[s.stepPill, nudgeStep === opt.val && s.stepPillActive]}
+                                onPress={() => setNudgeStep(opt.val)}
+                                activeOpacity={0.7}
+                              >
+                                <Text
+                                  style={[
+                                    s.stepPillText,
+                                    nudgeStep === opt.val && s.stepPillTextActive,
+                                  ]}
+                                >
+                                  {opt.label}
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
                           </View>
                         </View>
                         <TouchableOpacity
@@ -1739,15 +2066,33 @@ function TableVisionStudioModalBase({
                       {/* Selectors */}
                       <View style={s.fineControlsBody}>
                         <View style={s.targetSelectorWrap}>
-                          {/* Corner Tabs */}
+                          {/* Corner Tabs with Quick Cycler (◀ Ant. | Sig. ▶) */}
                           <View style={s.selectorSection}>
                             <View style={s.selectorSectionHeader}>
-                              <Text style={s.selectorSectionLabel}>Esquinas</Text>
-                              {selectedTargetType === 'corner' && (
-                                <Text style={s.selectorActiveTag}>
-                                  Activa: C{activeCornerIdx + 1}
+                              <View style={s.selectorHeaderLeft}>
+                                <Text style={s.selectorSectionLabel}>Esquinas</Text>
+                                <Text style={s.selectorActiveTag} numberOfLines={1}>
+                                  {selectedTargetType === 'corner'
+                                    ? cornerFullNames[activeCornerIdx]
+                                    : 'Selecciona una esquina'}
                                 </Text>
-                              )}
+                              </View>
+                              <View style={s.navArrowGroup}>
+                                <TouchableOpacity
+                                  style={s.navArrowBtn}
+                                  onPress={() => handleCycleTarget(-1)}
+                                  activeOpacity={0.7}
+                                >
+                                  <Text style={s.navArrowText}>◀ Ant.</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  style={s.navArrowBtn}
+                                  onPress={() => handleCycleTarget(1)}
+                                  activeOpacity={0.7}
+                                >
+                                  <Text style={s.navArrowText}>Sig. ▶</Text>
+                                </TouchableOpacity>
+                              </View>
                             </View>
                             <View style={s.cornerGridRow}>
                               {cornerShortLabels.map((lbl, idx) => (
@@ -1775,11 +2120,50 @@ function TableVisionStudioModalBase({
                                     ]}
                                     numberOfLines={1}
                                   >
-                                    {lbl}
+                                    {`${idx + 1}. ${lbl}`}
                                   </Text>
                                 </TouchableOpacity>
                               ))}
                             </View>
+                          </View>
+
+                          {/* Real-Time Geometric Validation Card */}
+                          <View
+                            style={[
+                              s.geomValidationCard,
+                              geomValidation.severity === 'success' && s.geomValidationCardSuccess,
+                              geomValidation.severity === 'warning' && s.geomValidationCardWarning,
+                              geomValidation.severity === 'error' && s.geomValidationCardError,
+                            ]}
+                          >
+                            <View style={s.geomValidationLeft}>
+                              {geomValidation.severity === 'success' ? (
+                                <IconCheck size={14} color="#10b981" strokeWidth={2.5} />
+                              ) : geomValidation.severity === 'warning' ? (
+                                <IconAlertTriangle size={14} color="#f59e0b" strokeWidth={2} />
+                              ) : (
+                                <IconAlertCircle size={14} color="#ef4444" strokeWidth={2} />
+                              )}
+                              <Text
+                                style={[
+                                  s.geomValidationText,
+                                  geomValidation.severity === 'success' && s.geomValidationTextSuccess,
+                                  geomValidation.severity === 'warning' && s.geomValidationTextWarning,
+                                  geomValidation.severity === 'error' && s.geomValidationTextError,
+                                ]}
+                                numberOfLines={1}
+                              >
+                                {geomValidation.message}
+                              </Text>
+                            </View>
+                            <TouchableOpacity
+                              style={s.resetCornersBtn}
+                              onPress={handleResetCorners}
+                              activeOpacity={0.7}
+                            >
+                              <IconRotateClockwise size={12} color={C.textMuted} strokeWidth={2} />
+                              <Text style={s.resetCornersText}>Restablecer</Text>
+                            </TouchableOpacity>
                           </View>
 
                           {/* Ball Tabs */}
@@ -1788,7 +2172,7 @@ function TableVisionStudioModalBase({
                               <Text style={s.selectorSectionLabel}>Bolas</Text>
                               {selectedTargetType !== 'corner' && (
                                 <Text style={s.selectorActiveTag}>
-                                  Activa: {selectedTargetType === 'white' ? 'Blanca' : selectedTargetType === 'yellow' ? 'Amarilla' : 'Roja'}
+                                  Activa: {selectedTargetType === 'white' ? 'Blanca' : selectedTargetType === 'yellow' ? 'Amarilla' : thirdBallMeta.label}
                                 </Text>
                               )}
                             </View>
@@ -1796,7 +2180,7 @@ function TableVisionStudioModalBase({
                               {[
                                 { id: 'white' as const, label: 'Blanca', color: '#ffffff', pos: whiteImagePos },
                                 { id: 'yellow' as const, label: 'Amarilla', color: '#fbbf24', pos: yellowImagePos },
-                                { id: 'red' as const, label: 'Roja', color: '#ef4444', pos: redImagePos },
+                                { id: 'red' as const, label: thirdBallMeta.label, color: thirdBallMeta.color, pos: redImagePos },
                               ].map((b) => (
                                 <TouchableOpacity
                                   key={`btab-${b.id}`}
@@ -1823,6 +2207,41 @@ function TableVisionStudioModalBase({
                                   </Text>
                                 </TouchableOpacity>
                               ))}
+                            </View>
+
+                            {/* Selector rápido para color de la tercera bola (Roja, Naranja, Azul) */}
+                            <View style={s.thirdBallColorRow}>
+                              <Text style={s.thirdBallColorPrompt}>Color Bola 3:</Text>
+                              {(['red', 'orange', 'blue'] as const).map((cOption) => {
+                                const isCurrent = thirdBallColor === cOption;
+                                const optMeta =
+                                  cOption === 'blue'
+                                    ? { label: 'Azul (PBA)', color: '#2563eb' }
+                                    : cOption === 'orange'
+                                    ? { label: 'Naranja', color: '#f97316' }
+                                    : { label: 'Roja (UMB)', color: '#ef4444' };
+                                return (
+                                  <TouchableOpacity
+                                    key={`color-opt-${cOption}`}
+                                    style={[
+                                      s.thirdBallColorPill,
+                                      isCurrent && s.thirdBallColorPillActive,
+                                    ]}
+                                    onPress={() => setThirdBallColor(cOption)}
+                                    activeOpacity={0.7}
+                                  >
+                                    <View style={[s.colorBadgeDot, { backgroundColor: optMeta.color }]} />
+                                    <Text
+                                      style={[
+                                        s.thirdBallColorText,
+                                        isCurrent && s.thirdBallColorTextActive,
+                                      ]}
+                                    >
+                                      {optMeta.label}
+                                    </Text>
+                                  </TouchableOpacity>
+                                );
+                              })}
                             </View>
                           </View>
                         </View>
@@ -1876,8 +2295,8 @@ function TableVisionStudioModalBase({
                             </TouchableOpacity>
                             <Text style={s.dpadHelperText}>
                               {selectedTargetType === 'corner'
-                                ? `Mueve C${activeCornerIdx + 1}`
-                                : `Mueve bola ${selectedTargetType === 'white' ? 'blanca' : selectedTargetType === 'yellow' ? 'amarilla' : 'roja'}`}
+                                ? `Moviendo ${cornerShortLabels[activeCornerIdx]} (±${(nudgeStep * 100).toFixed(1)}%)`
+                                : `Moviendo bola ${selectedTargetType === 'white' ? 'blanca' : selectedTargetType === 'yellow' ? 'amarilla' : thirdBallMeta.label.toLowerCase()} (±${(nudgeStep * 100).toFixed(1)}%)`}
                             </Text>
                           </View>
                         </View>
@@ -1926,6 +2345,7 @@ function TableVisionStudioModalBase({
                       whiteBall={whiteBall}
                       yellowBall={yellowBall}
                       redBall={redBall}
+                      redBallColor={thirdBallColor}
                       preferences={tablePrefs}
                     />
                   </View>
@@ -1935,6 +2355,11 @@ function TableVisionStudioModalBase({
                     <TouchableOpacity style={s.toolBtn} onPress={handleRotate90}>
                       <IconRotateClockwise size={16} color={C.text} strokeWidth={2} />
                       <Text style={s.toolBtnText}>Rotar 90°</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={s.toolBtn} onPress={handleRotate180}>
+                      <IconRotateClockwise size={16} color={C.accentCyan} strokeWidth={2} />
+                      <Text style={s.toolBtnText}>Rotar 180°</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity style={s.toolBtn} onPress={handleMirror}>
@@ -1951,6 +2376,23 @@ function TableVisionStudioModalBase({
                       />
                       <Text style={s.toolBtnText}>Cambiar Tacador</Text>
                     </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={s.toolBtn}
+                      onPress={() =>
+                        setThirdBallColor((prev) =>
+                          prev === 'red' ? 'orange' : prev === 'orange' ? 'blue' : 'red'
+                        )
+                      }
+                    >
+                      <View
+                        style={[
+                          s.cueDot,
+                          { backgroundColor: thirdBallMeta.color },
+                        ]}
+                      />
+                      <Text style={s.toolBtnText}>Bola 3: {thirdBallMeta.label}</Text>
+                    </TouchableOpacity>
                   </View>
 
                   {/* Position Coordinates Summary */}
@@ -1962,7 +2404,7 @@ function TableVisionStudioModalBase({
                       🟡 Amarilla: <Text style={s.coordVal}>{yellowBall.x}cm, {yellowBall.y}cm</Text>
                     </Text>
                     <Text style={s.coordsItem}>
-                      🔴 Roja: <Text style={s.coordVal}>{redBall.x}cm, {redBall.y}cm</Text>
+                      {thirdBallMeta.emoji} {thirdBallMeta.label}: <Text style={s.coordVal}>{redBall.x}cm, {redBall.y}cm</Text>
                     </Text>
                   </View>
                 </View>
@@ -2390,68 +2832,57 @@ const s = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  loupeFloatCard: {
+  loupeTopCenterCard: {
     position: 'absolute',
-    top: 10,
-    right: 10,
+    top: 8,
+    left: 0,
+    right: 0,
     alignItems: 'center',
+    justifyContent: 'center',
     pointerEvents: 'none',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.6,
-    shadowRadius: 10,
-    elevation: 10,
     zIndex: 99,
   },
-  loupeFloatCardLeft: {
-    right: undefined,
-    left: 10,
-  },
   loupeCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    borderWidth: 3,
-    borderColor: C.accentCyan,
+    width: 104,
+    height: 104,
+    borderRadius: 52,
     overflow: 'hidden',
     backgroundColor: '#050a08',
     position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.75,
+    shadowRadius: 10,
+    elevation: 10,
   },
-  loupeCrosshairH: {
-    position: 'absolute',
-    top: 49.5,
-    left: 0,
-    width: 100,
-    height: 1,
-    backgroundColor: 'rgba(239, 68, 68, 0.9)',
+  loupeTooltipBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    backgroundColor: 'rgba(10, 16, 13, 0.90)',
+    paddingHorizontal: 10,
+    paddingVertical: 3.5,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(2, 132, 199, 0.35)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.6,
+    shadowRadius: 6,
+    elevation: 6,
   },
-  loupeCrosshairV: {
-    position: 'absolute',
-    top: 0,
-    left: 49.5,
-    width: 1,
-    height: 100,
-    backgroundColor: 'rgba(239, 68, 68, 0.9)',
+  loupeStatusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 6,
   },
-  loupeCenterRing: {
-    position: 'absolute',
-    top: 46,
-    left: 46,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    borderWidth: 1.5,
-    borderColor: '#ffffff',
-  },
-  loupeTag: {
-    marginTop: 4,
-    fontSize: 10.5,
+  loupeTooltipText: {
+    fontSize: 10,
     fontWeight: '700',
-    color: '#0a100d',
-    backgroundColor: C.accentCyan,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
+    color: '#f1f5f3',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
   },
   dpadBar: {
     flexDirection: 'row',
@@ -2499,17 +2930,32 @@ const s = StyleSheet.create({
     color: C.text,
     flexShrink: 1,
   },
-  fineStepBadge: {
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 4,
-    backgroundColor: 'rgba(6, 182, 212, 0.15)',
-    flexShrink: 0,
+  stepPillsGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    padding: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
-  fineStepBadgeText: {
-    fontSize: 10,
+  stepPill: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  stepPillActive: {
+    backgroundColor: C.accentCyan,
+  },
+  stepPillText: {
+    fontSize: 9.5,
+    fontWeight: '600',
+    color: C.textMuted,
+  },
+  stepPillTextActive: {
+    color: '#0a100d',
     fontWeight: '700',
-    color: C.accentCyan,
   },
   fineControlsCloseBtn: {
     flexDirection: 'row',
@@ -2546,6 +2992,33 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     width: '100%',
+    gap: 8,
+  },
+  selectorHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+    minWidth: 0,
+  },
+  navArrowGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flexShrink: 0,
+  },
+  navArrowBtn: {
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  navArrowText: {
+    fontSize: 9.5,
+    fontWeight: '600',
+    color: C.text,
   },
   selectorSectionLabel: {
     fontSize: 10.5,
@@ -2553,11 +3026,14 @@ const s = StyleSheet.create({
     color: C.textMuted,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+    flexShrink: 0,
   },
   selectorActiveTag: {
     fontSize: 10,
     fontWeight: '600',
     color: C.accentCyan,
+    flex: 1,
+    minWidth: 0,
   },
   cornerGridRow: {
     flexDirection: 'row',
@@ -2581,6 +3057,73 @@ const s = StyleSheet.create({
     fontSize: 11,
     color: C.textMuted,
     fontWeight: '600',
+  },
+  geomValidationCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    gap: 6,
+    width: '100%',
+  },
+  geomValidationCardSuccess: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  geomValidationCardWarning: {
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    borderColor: 'rgba(245, 158, 11, 0.35)',
+  },
+  geomValidationCardError: {
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    borderColor: 'rgba(239, 68, 68, 0.4)',
+  },
+  geomValidationLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+    minWidth: 0,
+  },
+  geomValidationText: {
+    fontSize: 10.5,
+    color: C.textMuted,
+    fontWeight: '500',
+    flex: 1,
+  },
+  geomValidationTextSuccess: {
+    color: '#34d399',
+    fontWeight: '600',
+  },
+  geomValidationTextWarning: {
+    color: '#fbbf24',
+    fontWeight: '600',
+  },
+  geomValidationTextError: {
+    color: '#f87171',
+    fontWeight: '600',
+  },
+  resetCornersBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    flexShrink: 0,
+  },
+  resetCornersText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: C.textMuted,
   },
   ballGridRow: {
     flexDirection: 'row',
@@ -2606,6 +3149,49 @@ const s = StyleSheet.create({
     fontSize: 11,
     color: C.textMuted,
     fontWeight: '600',
+  },
+  thirdBallColorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 6,
+    flexWrap: 'wrap',
+  },
+  thirdBallColorPrompt: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: C.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  thirdBallColorPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 3,
+    paddingHorizontal: 7,
+    borderRadius: 5,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  thirdBallColorPillActive: {
+    backgroundColor: 'rgba(6, 182, 212, 0.15)',
+    borderColor: C.accentCyan,
+  },
+  colorBadgeDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+  },
+  thirdBallColorText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: C.textMuted,
+  },
+  thirdBallColorTextActive: {
+    color: C.text,
+    fontWeight: '700',
   },
   selectorPillActiveCorner: {
     backgroundColor: C.accentCyan,

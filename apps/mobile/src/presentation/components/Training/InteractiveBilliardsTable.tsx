@@ -1518,16 +1518,16 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                     const showDots = tablePreferences.showBallDots !== false;
                     const quat = ballRotationsRef.current[ball.id] ?? INITIAL_BALL_QUATERNION;
                     const isVertical = orientation === 'vertical';
-                    const ballRadiusSvg = 3.075;
+                    const ballRadiusSvg = 2.75;
 
                     return (
                         <G key={ball.id}>
                             {/* Sombra de oclusión y contacto volumétrica sobre el paño */}
                             <Ellipse
-                                cx={mapped.x + 0.55}
-                                cy={mapped.y + 0.65}
-                                rx={3.45}
-                                ry={3.2}
+                                cx={mapped.x + 0.5}
+                                cy={mapped.y + 0.6}
+                                rx={3.1}
+                                ry={2.9}
                                 fill="url(#ballDropShadow)"
                             />
 

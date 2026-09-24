@@ -23,6 +23,7 @@ export interface PythonBall {
     apparentRadius?: number;
     depthTier?: 'cercana' | 'media' | 'lejana';
     relativeDepth?: number;
+    ballColor?: string;
 }
 
 export interface DetectedDiamond {

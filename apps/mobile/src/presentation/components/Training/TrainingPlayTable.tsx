@@ -24,6 +24,7 @@ export interface TrainingPlayTableProps {
   whiteBall: TablePoint;
   yellowBall: TablePoint;
   redBall: TablePoint;
+  redBallColor?: 'red' | 'orange' | 'blue';
   trajectory?: TablePoint[]; // Optional solution path
   isSimulating?: boolean;
   onSimulationEnd?: () => void;
@@ -39,7 +40,7 @@ export interface TrainingPlayTableProps {
 
 const TABLE_W = 284;
 const TABLE_H = 142;
-const BALL_R = 3.2; // Visual radius in scale
+const BALL_R = 2.8; // Visual radius in scale (more proportional and tournament-accurate)
 const RAIL_T = 11;   // Outer wood rail thickness
 const CUSHION_T = 5; // Rubber cushion thickness
 
@@ -53,6 +54,7 @@ function TrainingPlayTableBase({
   whiteBall,
   yellowBall,
   redBall,
+  redBallColor = 'red',
   trajectory = [],
   isSimulating = false,
   onSimulationEnd,
@@ -222,6 +224,20 @@ function TrainingPlayTableBase({
             <Stop offset="45%" stopColor="#dc2626" />
             <Stop offset="80%" stopColor="#b91c1c" />
             <Stop offset="100%" stopColor="#7f1d1d" />
+          </RadialGradient>
+
+          <RadialGradient id="orangeBallGrad" cx="35%" cy="35%" rx="65%" ry="65%">
+            <Stop offset="0%" stopColor="#fdba74" />
+            <Stop offset="45%" stopColor="#ea580c" />
+            <Stop offset="80%" stopColor="#c2410c" />
+            <Stop offset="100%" stopColor="#7c2d12" />
+          </RadialGradient>
+
+          <RadialGradient id="blueBallGrad" cx="35%" cy="35%" rx="65%" ry="65%">
+            <Stop offset="0%" stopColor="#93c5fd" />
+            <Stop offset="45%" stopColor="#2563eb" />
+            <Stop offset="80%" stopColor="#1d4ed8" />
+            <Stop offset="100%" stopColor="#1e3a8a" />
           </RadialGradient>
 
           <RadialGradient id="ballShadow" cx="50%" cy="50%" rx="50%" ry="50%">
@@ -575,7 +591,13 @@ function TrainingPlayTableBase({
             cx={safeRed.x + PLAY_OFFSET_X}
             cy={safeRed.y + PLAY_OFFSET_Y}
             r={BALL_R}
-            fill="url(#redBallGrad)"
+            fill={
+              redBallColor === 'blue'
+                ? 'url(#blueBallGrad)'
+                : redBallColor === 'orange'
+                ? 'url(#orangeBallGrad)'
+                : 'url(#redBallGrad)'
+            }
           />
           {/* Specular glint highlight */}
           <Circle

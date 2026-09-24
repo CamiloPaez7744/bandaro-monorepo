@@ -1,5 +1,6 @@
 import { Router, type Router as RouterType } from 'express';
 import multer from 'multer';
+import { v4 as uuid } from 'uuid';
 
 import { db } from '../db/index.js';
 import { ballPosition, tableSnapshot } from '../db/schema.js';
@@ -68,26 +69,34 @@ visionRouter.post('/table-snapshot', upload.single('image'), async (req, res) =>
         // Take only the first 3 balls (e.g., if extras were detected)
         const threeBalls = normalized.slice(0, 3);
 
-        const [snapshot] = await db
-            .insert(tableSnapshot)
-            .values({ sourceImageUrl: null })
-            .returning({ id: tableSnapshot.id });
+        let snapshotId = uuid();
+        try {
+            const [snapshot] = await db
+                .insert(tableSnapshot)
+                .values({ sourceImageUrl: null })
+                .returning({ id: tableSnapshot.id });
 
-        await db.insert(ballPosition).values(
-            threeBalls.map((b) => ({
-                snapshotId: snapshot.id,
-                ballLabel: b.label,
-                posX: String(b.x),
-                posY: String(b.y),
-            })),
-        );
+            if (snapshot) {
+                snapshotId = snapshot.id;
+                await db.insert(ballPosition).values(
+                    threeBalls.map((b) => ({
+                        snapshotId: snapshot.id,
+                        ballLabel: b.label,
+                        posX: String(b.x),
+                        posY: String(b.y),
+                    })),
+                );
+            }
+        } catch (dbErr) {
+            console.warn('[vision] database save warning (continuing with generated snapshotId):', dbErr);
+        }
 
         console.log(
-            `[vision] snapshot ${snapshot.id}: method=${visionResult.detectionMethod}, detected=${visionResult.totalDetected}, valid=${visionResult.totalValid}`,
+            `[vision] snapshot ${snapshotId}: method=${visionResult.detectionMethod}, detected=${visionResult.totalDetected}, valid=${visionResult.totalValid}`,
         );
 
         res.json({
-            snapshotId: snapshot.id,
+            snapshotId,
             balls: threeBalls,
             warning: countCheck.warning,
             topDownImage: visionResult.topDownImage,

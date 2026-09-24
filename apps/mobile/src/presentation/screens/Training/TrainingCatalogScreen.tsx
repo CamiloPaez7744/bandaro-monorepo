@@ -463,10 +463,23 @@ export function TrainingCatalogScreen() {
         onCapturePhoto={() => setShowCameraModal(true)}
       />
 
-      {/* Camera Capture Modal */}
+      {/* Camera Capture & Calibration Studio Modal */}
       <CameraCaptureModal
         visible={showCameraModal}
         onClose={() => setShowCameraModal(false)}
+        onSelectPosition={(pos) => {
+          setShowCameraModal(false);
+          const q = new URLSearchParams({
+            whiteX: String(pos.white.x),
+            whiteY: String(pos.white.y),
+            yellowX: String(pos.yellow.x),
+            yellowY: String(pos.yellow.y),
+            redX: String(pos.red.x),
+            redY: String(pos.red.y),
+            customName: pos.name || 'Mesa Calibrada (Foto)',
+          });
+          router.push(`/training/session?${q.toString()}`);
+        }}
       />
 
       {/* Biomechanical Theory Modal (José María Quetglas) */}

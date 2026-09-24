@@ -37,6 +37,7 @@ export interface VisionDetailedBall {
     apparentRadius?: number;
     depthTier?: 'cercana' | 'media' | 'lejana';
     relativeDepth?: number;
+    ballColor?: 'red' | 'orange' | 'blue' | 'yellow' | 'white' | string;
 }
 
 export interface VisionDetailedResponse {

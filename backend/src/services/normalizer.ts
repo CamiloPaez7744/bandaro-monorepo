@@ -11,6 +11,7 @@ export interface NormalizedBall {
     apparentRadius?: number;
     depthTier?: 'cercana' | 'media' | 'lejana';
     relativeDepth?: number;
+    ballColor?: string;
 }
 
 interface VisionBall {
@@ -26,14 +27,16 @@ interface VisionBall {
     apparentRadius?: number;
     depthTier?: 'cercana' | 'media' | 'lejana';
     relativeDepth?: number;
+    ballColor?: string;
 }
 
 // Map detected colors to standard simulator colors (white, yellow, red)
+// Note: 3rd carom target ball can be red (traditional), orange (Aramith tournament), or blue (PBA tour)
 const COLOR_MAP: Record<string, string> = {
     white: 'white',
     habana: 'white',
     yellow: 'yellow',
-    orange: 'yellow',
+    orange: 'red',
     red: 'red',
     blue: 'red',
 };
@@ -46,6 +49,7 @@ export function normalizeBalls(balls: VisionBall[]): NormalizedBall[] {
     const mapped: NormalizedBall[] = balls.map((b) => ({
         ...b,
         label: mapColor(b.label),
+        ...(b.ballColor ? { ballColor: b.ballColor } : {}),
         x: clamp(b.x, 0, 1),
         y: clamp(b.y, 0, 1),
     }));
