@@ -10,6 +10,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useColorScheme } from '@/components/useColorScheme';
+import { getPalette } from '@/constants/theme';
 import {
   IconAdjustments,
   IconArrowsExchange,
@@ -50,18 +52,18 @@ export interface CanvasViewSettingsModalProps {
 
 const isWeb = Platform.OS === 'web';
 
-const C = {
-  bg: '#0a100d',
-  surface: '#13201b',
-  surfaceHigh: '#1a2c26',
-  surfaceBorder: '#29443b',
+const getC = (palette: ReturnType<typeof getPalette>, isDark: boolean) => ({
+  bg: isDark ? '#0a100d' : palette.background,
+  surface: isDark ? '#13201b' : palette.card,
+  surfaceHigh: isDark ? '#1a2c26' : palette.surfaceLow,
+  surfaceBorder: isDark ? '#29443b' : palette.border,
   primary: '#10b981',
-  primaryDim: 'rgba(16, 185, 129, 0.15)',
-  text: '#f1f5f3',
-  textMuted: '#94a39d',
-  accentCyan: '#06b6d4',
-  accentYellow: '#eab308',
-};
+  primaryDim: isDark ? 'rgba(16, 185, 129, 0.15)' : 'rgba(16, 185, 129, 0.12)',
+  text: isDark ? '#f1f5f3' : palette.text,
+  textMuted: isDark ? '#94a39d' : palette.muted,
+  accentCyan: isDark ? '#06b6d4' : '#0284c7',
+  accentYellow: isDark ? '#eab308' : '#d97706',
+});
 
 function CanvasViewSettingsModalBase({
   visible,
@@ -84,6 +86,11 @@ function CanvasViewSettingsModalBase({
   onChangeCanvasZoom,
   onOpenTableCustomizer,
 }: CanvasViewSettingsModalProps) {
+  const colorScheme = useColorScheme();
+  const palette = getPalette(colorScheme);
+  const isDark = colorScheme === 'dark';
+  const C = getC(palette, isDark);
+  const s = getStyles(C, isDark);
   return (
     <Modal
       visible={visible}
@@ -128,7 +135,7 @@ function CanvasViewSettingsModalBase({
                 <Switch
                   value={showWoodRails}
                   onValueChange={onToggleWoodRails}
-                  trackColor={{ false: '#243b32', true: C.primary }}
+                  trackColor={{ false: isDark ? '#243b32' : '#cbd5e1', true: C.primary }}
                   thumbColor="#ffffff"
                 />
               </View>
@@ -146,7 +153,7 @@ function CanvasViewSettingsModalBase({
                 <Switch
                   value={showProjectedGrid}
                   onValueChange={onToggleProjectedGrid}
-                  trackColor={{ false: '#243b32', true: C.primary }}
+                  trackColor={{ false: isDark ? '#243b32' : '#cbd5e1', true: C.primary }}
                   thumbColor="#ffffff"
                 />
               </View>
@@ -162,7 +169,7 @@ function CanvasViewSettingsModalBase({
                 <Switch
                   value={showDiamonds}
                   onValueChange={onToggleDiamonds}
-                  trackColor={{ false: '#243b32', true: C.primary }}
+                  trackColor={{ false: isDark ? '#243b32' : '#cbd5e1', true: C.primary }}
                   thumbColor="#ffffff"
                 />
               </View>
@@ -178,7 +185,7 @@ function CanvasViewSettingsModalBase({
                 <Switch
                   value={showCornerDiamonds}
                   onValueChange={onToggleCornerDiamonds}
-                  trackColor={{ false: '#243b32', true: C.primary }}
+                  trackColor={{ false: isDark ? '#243b32' : '#cbd5e1', true: C.primary }}
                   thumbColor="#ffffff"
                 />
               </View>
@@ -386,181 +393,182 @@ function CanvasViewSettingsModalBase({
 export const CanvasViewSettingsModal = memo(CanvasViewSettingsModalBase);
 export default CanvasViewSettingsModal;
 
-const s = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(5, 10, 8, 0.85)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  modalBox: {
-    width: '100%',
-    maxWidth: 480,
-    maxHeight: '90%',
-    backgroundColor: C.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: C.surfaceBorder,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.6,
-    shadowRadius: 24,
-    elevation: 20,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: C.surfaceBorder,
-    backgroundColor: C.surfaceHigh,
-  },
-  headerTitleWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  headerIconWrap: {
-    width: 30,
-    height: 30,
-    borderRadius: 8,
-    backgroundColor: C.primaryDim,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: C.text,
-  },
-  closeBtn: {
-    padding: 6,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-  },
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 18,
-    gap: 18,
-  },
-  section: {
-    backgroundColor: C.surfaceHigh,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: C.surfaceBorder,
-    padding: 14,
-    gap: 12,
-  },
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: C.primary,
-    letterSpacing: 0.8,
-  },
-  switchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 6,
-  },
-  switchLabelWrap: {
-    flex: 1,
-    paddingRight: 12,
-  },
-  switchTitle: {
-    fontSize: 13.5,
-    fontWeight: '600',
-    color: C.text,
-    marginBottom: 2,
-  },
-  switchSub: {
-    fontSize: 11,
-    color: C.textMuted,
-  },
-  subLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: C.textMuted,
-    marginBottom: 4,
-  },
-  segmentedRow: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  segBtn: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 6,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 1,
-    borderColor: C.surfaceBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  segBtnActive: {
-    backgroundColor: C.primary,
-    borderColor: C.primary,
-  },
-  segBtnText: {
-    fontSize: 11.5,
-    fontWeight: '600',
-    color: C.textMuted,
-    textAlign: 'center',
-  },
-  segBtnTextActive: {
-    color: '#0a100d',
-    fontWeight: '700',
-  },
-  customizerShortcutBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 10,
-    borderRadius: 8,
-    backgroundColor: C.primaryDim,
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
-  },
-  customizerShortcutTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: C.primary,
-  },
-  customizerShortcutSub: {
-    fontSize: 11,
-    color: C.textMuted,
-    marginTop: 2,
-  },
-  footer: {
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: C.surfaceBorder,
-    backgroundColor: C.surfaceHigh,
-    alignItems: 'flex-end',
-  },
-  doneBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: C.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  doneBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#0a100d',
-  },
-});
+const getStyles = (C: ReturnType<typeof getC>, isDark: boolean) =>
+  StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: isDark ? 'rgba(5, 10, 8, 0.85)' : 'rgba(15, 23, 42, 0.55)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 16,
+    },
+    backdrop: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    modalBox: {
+      width: '100%',
+      maxWidth: 480,
+      maxHeight: '90%',
+      backgroundColor: C.surface,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: C.surfaceBorder,
+      overflow: 'hidden',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 12 },
+      shadowOpacity: isDark ? 0.6 : 0.15,
+      shadowRadius: 24,
+      elevation: 20,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 18,
+      paddingVertical: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: C.surfaceBorder,
+      backgroundColor: C.surfaceHigh,
+    },
+    headerTitleWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    headerIconWrap: {
+      width: 30,
+      height: 30,
+      borderRadius: 8,
+      backgroundColor: C.primaryDim,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    headerTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: C.text,
+    },
+    closeBtn: {
+      padding: 6,
+      borderRadius: 8,
+      backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#e2e8f0',
+    },
+    scroll: {
+      flex: 1,
+    },
+    scrollContent: {
+      padding: 18,
+      gap: 18,
+    },
+    section: {
+      backgroundColor: C.surfaceHigh,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: C.surfaceBorder,
+      padding: 14,
+      gap: 12,
+    },
+    sectionTitle: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: C.primary,
+      letterSpacing: 0.8,
+    },
+    switchRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 6,
+    },
+    switchLabelWrap: {
+      flex: 1,
+      paddingRight: 12,
+    },
+    switchTitle: {
+      fontSize: 13.5,
+      fontWeight: '600',
+      color: C.text,
+      marginBottom: 2,
+    },
+    switchSub: {
+      fontSize: 11,
+      color: C.textMuted,
+    },
+    subLabel: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: C.textMuted,
+      marginBottom: 4,
+    },
+    segmentedRow: {
+      flexDirection: 'row',
+      gap: 6,
+    },
+    segBtn: {
+      flex: 1,
+      paddingVertical: 8,
+      paddingHorizontal: 6,
+      borderRadius: 8,
+      backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#f1f5f9',
+      borderWidth: 1,
+      borderColor: C.surfaceBorder,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    segBtnActive: {
+      backgroundColor: C.primary,
+      borderColor: C.primary,
+    },
+    segBtnText: {
+      fontSize: 11.5,
+      fontWeight: '600',
+      color: C.textMuted,
+      textAlign: 'center',
+    },
+    segBtnTextActive: {
+      color: '#0a100d',
+      fontWeight: '700',
+    },
+    customizerShortcutBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      padding: 10,
+      borderRadius: 8,
+      backgroundColor: C.primaryDim,
+      borderWidth: 1,
+      borderColor: 'rgba(16, 185, 129, 0.3)',
+    },
+    customizerShortcutTitle: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: C.primary,
+    },
+    customizerShortcutSub: {
+      fontSize: 11,
+      color: C.textMuted,
+      marginTop: 2,
+    },
+    footer: {
+      paddingHorizontal: 18,
+      paddingVertical: 12,
+      borderTopWidth: 1,
+      borderTopColor: C.surfaceBorder,
+      backgroundColor: C.surfaceHigh,
+      alignItems: 'flex-end',
+    },
+    doneBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: C.primary,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 8,
+    },
+    doneBtnText: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: '#0a100d',
+    },
+  });

@@ -9,6 +9,8 @@ import {
     useWindowDimensions,
 } from 'react-native';
 import { IconX, IconPlus, IconTrash, IconNumbers } from '@/src/presentation/components/icons';
+import { useColorScheme } from '@/components/useColorScheme';
+import { getPalette } from '@/constants/theme';
 import {
     SystemNumberingControl,
     NumberAnchor,
@@ -40,6 +42,10 @@ export const SystemNumberingModal = memo(function SystemNumberingModal({
 }: SystemNumberingModalProps) {
     const { width } = useWindowDimensions();
     const isMobile = width < 768;
+    const colorScheme = useColorScheme();
+    const palette = getPalette(colorScheme);
+    const isDark = colorScheme === 'dark';
+    const styles = getStyles(palette, isDark);
 
     const handleQuickAdd = () => {
         const newAnchor: NumberAnchor = {
@@ -141,10 +147,10 @@ export const SystemNumberingModal = memo(function SystemNumberingModal({
     );
 });
 
-const styles = StyleSheet.create({
+const getStyles = (palette: ReturnType<typeof getPalette>, isDark: boolean) => StyleSheet.create({
     modalBackdrop: {
         flex: 1,
-        backgroundColor: 'rgba(2, 6, 23, 0.88)',
+        backgroundColor: isDark ? 'rgba(2, 6, 23, 0.88)' : 'rgba(15, 23, 42, 0.60)',
         justifyContent: 'center',
         alignItems: 'center',
         padding: 12,
@@ -153,15 +159,15 @@ const styles = StyleSheet.create({
         width: '100%',
         maxWidth: 480,
         maxHeight: '90%',
-        backgroundColor: '#0f172a',
+        backgroundColor: palette.card,
         borderRadius: 22,
         borderWidth: 1,
-        borderColor: 'rgba(56, 189, 248, 0.3)',
+        borderColor: isDark ? 'rgba(56, 189, 248, 0.3)' : palette.border,
         padding: 18,
         gap: 10,
-        shadowColor: '#38bdf8',
+        shadowColor: isDark ? '#38bdf8' : '#000000',
         shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.25,
+        shadowOpacity: isDark ? 0.25 : 0.12,
         shadowRadius: 24,
         elevation: 12,
     },
@@ -185,7 +191,7 @@ const styles = StyleSheet.create({
         width: 32,
         height: 32,
         borderRadius: 10,
-        backgroundColor: 'rgba(56, 189, 248, 0.15)',
+        backgroundColor: isDark ? 'rgba(56, 189, 248, 0.15)' : 'rgba(56, 189, 248, 0.1)',
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -198,13 +204,13 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 15,
         fontWeight: '900',
-        color: '#f8fafc',
+        color: palette.text,
     },
     closeBtn: {
         width: 30,
         height: 30,
         borderRadius: 15,
-        backgroundColor: 'rgba(255, 255, 255, 0.06)',
+        backgroundColor: isDark ? 'rgba(255, 255, 255, 0.06)' : palette.surfaceLow,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -220,19 +226,19 @@ const styles = StyleSheet.create({
         paddingVertical: 7,
         paddingHorizontal: 10,
         borderRadius: 8,
-        backgroundColor: 'rgba(255, 255, 255, 0.06)',
+        backgroundColor: isDark ? 'rgba(255, 255, 255, 0.06)' : palette.surfaceLow,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.12)',
+        borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : palette.border,
         alignItems: 'center',
     },
     toggleBtnActive: {
-        backgroundColor: 'rgba(56, 189, 248, 0.18)',
+        backgroundColor: isDark ? 'rgba(56, 189, 248, 0.18)' : 'rgba(56, 189, 248, 0.12)',
         borderColor: '#38bdf8',
     },
     toggleBtnText: {
         fontSize: 11,
         fontWeight: '700',
-        color: '#94a3b8',
+        color: palette.muted,
     },
     toggleBtnTextActive: {
         color: '#38bdf8',
@@ -270,13 +276,13 @@ const styles = StyleSheet.create({
     editHintBox: {
         padding: 6,
         borderRadius: 6,
-        backgroundColor: 'rgba(56, 189, 248, 0.08)',
+        backgroundColor: isDark ? 'rgba(56, 189, 248, 0.08)' : 'rgba(56, 189, 248, 0.12)',
         borderWidth: 1,
-        borderColor: 'rgba(56, 189, 248, 0.2)',
+        borderColor: isDark ? 'rgba(56, 189, 248, 0.2)' : 'rgba(56, 189, 248, 0.3)',
     },
     editHintText: {
         fontSize: 10,
-        color: '#93c5fd',
+        color: isDark ? '#93c5fd' : '#0284c7',
         textAlign: 'center',
     },
     modalScroll: {

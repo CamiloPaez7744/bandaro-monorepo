@@ -29,6 +29,8 @@ import {
     type BallSkinId,
     type TablePreferences,
 } from './tablePreferences';
+import { useColorScheme } from '@/components/useColorScheme';
+import { getPalette } from '@/constants/theme';
 
 interface CaromBallStudioModalProps {
     visible: boolean;
@@ -51,6 +53,10 @@ export const CaromBallStudioModal = memo(function CaromBallStudioModal({
 }: CaromBallStudioModalProps) {
     const { width: windowWidth, height: windowHeight } = useWindowDimensions();
     const isMobile = windowWidth < 768;
+    const colorScheme = useColorScheme();
+    const palette = getPalette(colorScheme);
+    const isDark = colorScheme === 'dark';
+    const s = getStyles(palette, isDark);
 
     const [activeTab, setActiveTab] = useState<'skins' | 'break' | 'tactical'>('skins');
     const studioUid = useMemo(() => `cbs_${Math.random().toString(36).slice(2, 8)}`, []);
@@ -634,23 +640,23 @@ export const CaromBallStudioModal = memo(function CaromBallStudioModal({
     );
 });
 
-const s = StyleSheet.create({
+const getStyles = (palette: ReturnType<typeof getPalette>, isDark: boolean) => StyleSheet.create({
     overlay: {
         flex: 1,
-        backgroundColor: 'rgba(5, 10, 20, 0.85)',
+        backgroundColor: isDark ? 'rgba(5, 10, 20, 0.85)' : 'rgba(15, 23, 42, 0.60)',
         justifyContent: 'center',
         alignItems: 'center',
         padding: 12,
     },
     container: {
-        backgroundColor: '#0f172a',
+        backgroundColor: palette.card,
         borderRadius: 20,
         borderWidth: 1.5,
-        borderColor: 'rgba(56, 189, 248, 0.3)',
+        borderColor: isDark ? 'rgba(56, 189, 248, 0.3)' : palette.border,
         overflow: 'hidden',
-        shadowColor: '#000',
+        shadowColor: isDark ? '#000' : '#000000',
         shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.5,
+        shadowOpacity: isDark ? 0.5 : 0.15,
         shadowRadius: 20,
         elevation: 12,
     },
@@ -661,7 +667,7 @@ const s = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 14,
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+        borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.08)' : palette.border,
     },
     headerLeft: {
         flexDirection: 'row',
@@ -673,37 +679,37 @@ const s = StyleSheet.create({
         width: 36,
         height: 36,
         borderRadius: 18,
-        backgroundColor: 'rgba(56, 189, 248, 0.12)',
+        backgroundColor: isDark ? 'rgba(56, 189, 248, 0.12)' : 'rgba(56, 189, 248, 0.10)',
         borderWidth: 1,
-        borderColor: 'rgba(56, 189, 248, 0.3)',
+        borderColor: isDark ? 'rgba(56, 189, 248, 0.3)' : 'rgba(56, 189, 248, 0.25)',
         alignItems: 'center',
         justifyContent: 'center',
     },
     headerTitle: {
         fontSize: 15,
         fontWeight: '800',
-        color: '#f8fafc',
+        color: palette.text,
         letterSpacing: 0.3,
     },
     headerSub: {
         fontSize: 11,
-        color: '#94a3b8',
+        color: palette.muted,
         marginTop: 1,
     },
     closeBtn: {
         width: 32,
         height: 32,
         borderRadius: 16,
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : palette.surfaceLow,
         alignItems: 'center',
         justifyContent: 'center',
     },
     podiumShowroom: {
-        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+        backgroundColor: isDark ? 'rgba(15, 23, 42, 0.95)' : palette.surfaceLow,
         paddingVertical: 12,
         paddingHorizontal: 16,
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255, 255, 255, 0.06)',
+        borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.06)' : palette.border,
         alignItems: 'center',
     },
     podiumLabel: {
@@ -725,7 +731,7 @@ const s = StyleSheet.create({
         borderRadius: 14,
     },
     ballPodiumItemActive: {
-        backgroundColor: 'rgba(56, 189, 248, 0.1)',
+        backgroundColor: isDark ? 'rgba(56, 189, 248, 0.1)' : 'rgba(56, 189, 248, 0.15)',
         borderWidth: 1,
         borderColor: 'rgba(56, 189, 248, 0.3)',
     },
@@ -736,7 +742,7 @@ const s = StyleSheet.create({
     ballPodiumName: {
         fontSize: 11,
         fontWeight: '700',
-        color: '#cbd5e1',
+        color: palette.text,
     },
     ballPodiumNameActive: {
         color: '#38bdf8',
@@ -762,9 +768,9 @@ const s = StyleSheet.create({
     },
     tabsRow: {
         flexDirection: 'row',
-        backgroundColor: 'rgba(15, 23, 42, 0.8)',
+        backgroundColor: isDark ? 'rgba(15, 23, 42, 0.8)' : palette.surfaceLow,
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+        borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.08)' : palette.border,
     },
     tabBtn: {
         flex: 1,
@@ -775,15 +781,15 @@ const s = StyleSheet.create({
     },
     tabBtnActive: {
         borderBottomColor: '#38bdf8',
-        backgroundColor: 'rgba(56, 189, 248, 0.08)',
+        backgroundColor: isDark ? 'rgba(56, 189, 248, 0.08)' : 'rgba(56, 189, 248, 0.12)',
     },
     tabBtnText: {
         fontSize: 11.5,
         fontWeight: '600',
-        color: '#94a3b8',
+        color: palette.muted,
     },
     tabBtnTextActive: {
-        color: '#f8fafc',
+        color: palette.text,
         fontWeight: '800',
     },
     scrollArea: {
@@ -798,11 +804,11 @@ const s = StyleSheet.create({
     sectionTitle: {
         fontSize: 14,
         fontWeight: '800',
-        color: '#f8fafc',
+        color: palette.text,
     },
     sectionDesc: {
         fontSize: 11.5,
-        color: '#94a3b8',
+        color: palette.muted,
         lineHeight: 16,
         marginBottom: 4,
     },
@@ -810,15 +816,15 @@ const s = StyleSheet.create({
         gap: 8,
     },
     skinCard: {
-        backgroundColor: 'rgba(30, 41, 59, 0.5)',
+        backgroundColor: isDark ? 'rgba(30, 41, 59, 0.5)' : palette.surfaceLow,
         borderWidth: 1.5,
-        borderColor: 'rgba(255, 255, 255, 0.08)',
+        borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : palette.border,
         borderRadius: 14,
         padding: 12,
     },
     skinCardActive: {
         borderColor: '#38bdf8',
-        backgroundColor: 'rgba(56, 189, 248, 0.1)',
+        backgroundColor: isDark ? 'rgba(56, 189, 248, 0.1)' : 'rgba(56, 189, 248, 0.08)',
     },
     skinCardHeader: {
         flexDirection: 'row',
@@ -837,7 +843,7 @@ const s = StyleSheet.create({
     skinName: {
         fontSize: 13,
         fontWeight: '700',
-        color: '#f8fafc',
+        color: palette.text,
     },
     skinNameActive: {
         color: '#38bdf8',
@@ -853,13 +859,13 @@ const s = StyleSheet.create({
     },
     skinSub: {
         fontSize: 10.5,
-        color: '#94a3b8',
+        color: palette.muted,
         fontWeight: '600',
         marginBottom: 4,
     },
     skinDesc: {
         fontSize: 10.5,
-        color: '#64748b',
+        color: palette.muted,
         lineHeight: 14,
     },
     breakFormatSwitchRow: {
@@ -868,21 +874,21 @@ const s = StyleSheet.create({
     },
     formatCard: {
         flex: 1,
-        backgroundColor: 'rgba(30, 41, 59, 0.5)',
+        backgroundColor: isDark ? 'rgba(30, 41, 59, 0.5)' : palette.surfaceLow,
         borderWidth: 1.5,
-        borderColor: 'rgba(255, 255, 255, 0.08)',
+        borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : palette.border,
         borderRadius: 14,
         padding: 12,
         alignItems: 'center',
     },
     formatCardActive: {
         borderColor: '#38bdf8',
-        backgroundColor: 'rgba(56, 189, 248, 0.12)',
+        backgroundColor: isDark ? 'rgba(56, 189, 248, 0.12)' : 'rgba(56, 189, 248, 0.08)',
     },
     formatCardTitle: {
         fontSize: 13,
         fontWeight: '700',
-        color: '#e2e8f0',
+        color: palette.text,
         marginTop: 4,
     },
     formatCardTitleActive: {
@@ -891,14 +897,14 @@ const s = StyleSheet.create({
     },
     formatCardDesc: {
         fontSize: 10,
-        color: '#94a3b8',
+        color: palette.muted,
         textAlign: 'center',
         marginTop: 2,
     },
     breakDetailBox: {
-        backgroundColor: 'rgba(30, 41, 59, 0.4)',
+        backgroundColor: isDark ? 'rgba(30, 41, 59, 0.4)' : palette.surfaceLow,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.06)',
+        borderColor: isDark ? 'rgba(255, 255, 255, 0.06)' : palette.border,
         borderRadius: 12,
         padding: 12,
         marginTop: 4,
@@ -906,7 +912,7 @@ const s = StyleSheet.create({
     breakDetailTitle: {
         fontSize: 11.5,
         fontWeight: '700',
-        color: '#cbd5e1',
+        color: palette.text,
         marginBottom: 8,
     },
     umbSideRow: {
@@ -918,19 +924,19 @@ const s = StyleSheet.create({
         paddingVertical: 8,
         paddingHorizontal: 8,
         borderRadius: 8,
-        backgroundColor: 'rgba(15, 23, 42, 0.8)',
+        backgroundColor: isDark ? 'rgba(15, 23, 42, 0.8)' : palette.card,
         borderWidth: 1.5,
-        borderColor: '#334155',
+        borderColor: isDark ? '#334155' : palette.border,
         alignItems: 'center',
     },
     sideBtnActive: {
         borderColor: '#38bdf8',
-        backgroundColor: 'rgba(56, 189, 248, 0.15)',
+        backgroundColor: isDark ? 'rgba(56, 189, 248, 0.15)' : 'rgba(56, 189, 248, 0.12)',
     },
     sideBtnText: {
         fontSize: 11,
         fontWeight: '600',
-        color: '#94a3b8',
+        color: palette.muted,
     },
     sideBtnTextActive: {
         color: '#38bdf8',
@@ -938,7 +944,7 @@ const s = StyleSheet.create({
     },
     breakNote: {
         fontSize: 10,
-        color: '#64748b',
+        color: palette.muted,
         fontStyle: 'italic',
         marginTop: 8,
         textAlign: 'center',
@@ -973,9 +979,9 @@ const s = StyleSheet.create({
         paddingVertical: 6,
         paddingHorizontal: 8,
         borderRadius: 8,
-        backgroundColor: 'rgba(15, 23, 42, 0.8)',
+        backgroundColor: isDark ? 'rgba(15, 23, 42, 0.8)' : palette.card,
         borderWidth: 1.5,
-        borderColor: '#334155',
+        borderColor: isDark ? '#334155' : palette.border,
         alignItems: 'center',
     },
     pbaCardActive: {
@@ -985,14 +991,14 @@ const s = StyleSheet.create({
     pbaCardNum: {
         fontSize: 12,
         fontWeight: '800',
-        color: '#cbd5e1',
+        color: palette.text,
     },
     pbaCardNumActive: {
         color: '#fbbf24',
     },
     pbaCardLabel: {
         fontSize: 9,
-        color: '#64748b',
+        color: palette.muted,
         marginTop: 1,
     },
     applyBreakBtn: {
@@ -1011,9 +1017,9 @@ const s = StyleSheet.create({
         color: '#0f172a',
     },
     tacticalOptionBox: {
-        backgroundColor: 'rgba(30, 41, 59, 0.4)',
+        backgroundColor: isDark ? 'rgba(30, 41, 59, 0.4)' : palette.surfaceLow,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.06)',
+        borderColor: isDark ? 'rgba(255, 255, 255, 0.06)' : palette.border,
         borderRadius: 12,
         padding: 12,
     },
@@ -1026,19 +1032,19 @@ const s = StyleSheet.create({
     tacticalTitle: {
         fontSize: 12.5,
         fontWeight: '700',
-        color: '#f8fafc',
+        color: palette.text,
     },
     tacticalSub: {
         fontSize: 10.5,
-        color: '#94a3b8',
+        color: palette.muted,
         marginTop: 1,
     },
     cueBallSwitch: {
         flexDirection: 'row',
-        backgroundColor: 'rgba(15, 23, 42, 0.8)',
+        backgroundColor: isDark ? 'rgba(15, 23, 42, 0.8)' : palette.card,
         borderRadius: 8,
         borderWidth: 1,
-        borderColor: '#334155',
+        borderColor: isDark ? '#334155' : palette.border,
         padding: 2,
     },
     cueSwitchBtn: {
@@ -1052,7 +1058,7 @@ const s = StyleSheet.create({
     cueSwitchBtnText: {
         fontSize: 11,
         fontWeight: '600',
-        color: '#94a3b8',
+        color: palette.muted,
     },
     cueSwitchBtnTextActive: {
         color: '#ffffff',
@@ -1062,7 +1068,7 @@ const s = StyleSheet.create({
         width: 44,
         height: 24,
         borderRadius: 12,
-        backgroundColor: '#334155',
+        backgroundColor: isDark ? '#334155' : palette.border,
         padding: 2,
         justifyContent: 'center',
     },
@@ -1082,27 +1088,27 @@ const s = StyleSheet.create({
         marginTop: 8,
         padding: 10,
         borderRadius: 10,
-        backgroundColor: 'rgba(15, 23, 42, 0.5)',
+        backgroundColor: isDark ? 'rgba(15, 23, 42, 0.5)' : palette.surfaceLow,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.05)',
+        borderColor: isDark ? 'rgba(255, 255, 255, 0.05)' : palette.border,
         gap: 3,
     },
     specsTitle: {
         fontSize: 10.5,
         fontWeight: '700',
-        color: '#cbd5e1',
+        color: palette.text,
         marginBottom: 2,
     },
     specsItem: {
         fontSize: 10,
-        color: '#64748b',
+        color: palette.muted,
     },
     footer: {
         paddingHorizontal: 16,
         paddingVertical: 12,
         borderTopWidth: 1,
-        borderTopColor: 'rgba(255, 255, 255, 0.08)',
-        backgroundColor: '#0f172a',
+        borderTopColor: isDark ? 'rgba(255, 255, 255, 0.08)' : palette.border,
+        backgroundColor: palette.card,
         alignItems: 'flex-end',
     },
     doneBtn: {

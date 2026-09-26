@@ -22,6 +22,8 @@ import Svg, {
 } from 'react-native-svg';
 import { BallId, SpinEffect } from '@bandaro/core';
 import { IconRefresh, IconX, IconCheck } from '@/src/presentation/components/icons';
+import { useColorScheme } from '@/components/useColorScheme';
+import { getPalette } from '@/constants/theme';
 import {
     useTablePreferences,
     type TablePreferences,
@@ -53,6 +55,10 @@ export const CaromProEffectModal = memo(function CaromProEffectModal({
 }: CaromProEffectModalProps) {
     const { width: windowWidth, height: windowHeight } = useWindowDimensions();
     const isMobile = windowWidth < 768;
+    const colorScheme = useColorScheme();
+    const palette = getPalette(colorScheme);
+    const isDark = colorScheme === 'dark';
+    const styles = getStyles(palette, isDark);
 
     const { preferences: prefs } = useTablePreferences(propsTablePreferences);
     const modalUid = useMemo(() => `cpe_${Math.random().toString(36).slice(2, 8)}`, []);
@@ -638,10 +644,10 @@ export const CaromProEffectModal = memo(function CaromProEffectModal({
     );
 });
 
-const styles = StyleSheet.create({
+const getStyles = (palette: ReturnType<typeof getPalette>, isDark: boolean) => StyleSheet.create({
     modalBackdrop: {
         flex: 1,
-        backgroundColor: 'rgba(2, 6, 23, 0.88)',
+        backgroundColor: isDark ? 'rgba(2, 6, 23, 0.88)' : 'rgba(15, 23, 42, 0.60)',
         justifyContent: 'center',
         alignItems: 'center',
         padding: 12,
@@ -650,15 +656,15 @@ const styles = StyleSheet.create({
         width: '100%',
         maxWidth: 420,
         maxHeight: '92%',
-        backgroundColor: '#0b131a',
+        backgroundColor: palette.card,
         borderRadius: 22,
         borderWidth: 1,
-        borderColor: 'rgba(0, 210, 255, 0.25)',
+        borderColor: isDark ? 'rgba(0, 210, 255, 0.25)' : palette.border,
         padding: 16,
         gap: 10,
-        shadowColor: '#00d2ff',
+        shadowColor: isDark ? '#00d2ff' : '#000000',
         shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.25,
+        shadowOpacity: isDark ? 0.25 : 0.12,
         shadowRadius: 24,
         elevation: 12,
     },
@@ -673,7 +679,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingBottom: 4,
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+        borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.08)' : palette.border,
     },
     headerSubtitle: {
         fontSize: 8,
@@ -684,14 +690,14 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 14,
         fontWeight: '900',
-        color: '#f8fafc',
+        color: palette.text,
         letterSpacing: 0.4,
     },
     closeBtn: {
         width: 30,
         height: 30,
         borderRadius: 15,
-        backgroundColor: 'rgba(255, 255, 255, 0.06)',
+        backgroundColor: isDark ? 'rgba(255, 255, 255, 0.06)' : palette.surfaceLow,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -737,7 +743,7 @@ const styles = StyleSheet.create({
     legendText: {
         fontSize: 9,
         fontWeight: '700',
-        color: '#94a3b8',
+        color: palette.muted,
         letterSpacing: 0.2,
     },
     svgContainer: {
@@ -747,10 +753,10 @@ const styles = StyleSheet.create({
     },
     metricsCard: {
         flexDirection: 'row',
-        backgroundColor: 'rgba(15, 23, 42, 0.85)',
+        backgroundColor: isDark ? 'rgba(15, 23, 42, 0.85)' : palette.surfaceLow,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.08)',
+        borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : palette.border,
         paddingVertical: 8,
         paddingHorizontal: 10,
         alignItems: 'center',
@@ -763,18 +769,18 @@ const styles = StyleSheet.create({
     metricDivider: {
         width: 1,
         height: 20,
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : palette.border,
     },
     metricLabel: {
         fontSize: 7.5,
         fontWeight: '800',
-        color: '#64748b',
+        color: palette.muted,
         letterSpacing: 0.6,
     },
     metricValue: {
         fontSize: 10.5,
         fontWeight: '800',
-        color: '#f8fafc',
+        color: palette.text,
         fontVariant: ['tabular-nums'],
     },
     presetSection: {
@@ -783,7 +789,7 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 8,
         fontWeight: '800',
-        color: '#94a3b8',
+        color: palette.muted,
         letterSpacing: 0.6,
         textTransform: 'uppercase',
     },
@@ -795,20 +801,20 @@ const styles = StyleSheet.create({
         flex: 1,
         paddingVertical: 6,
         borderRadius: 8,
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : palette.surfaceLow,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
+        borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : palette.border,
         alignItems: 'center',
         justifyContent: 'center',
     },
     pillBtnActive: {
-        backgroundColor: 'rgba(0, 210, 255, 0.18)',
+        backgroundColor: isDark ? 'rgba(0, 210, 255, 0.18)' : 'rgba(0, 210, 255, 0.12)',
         borderColor: '#00d2ff',
     },
     pillText: {
         fontSize: 9.5,
         fontWeight: '700',
-        color: '#94a3b8',
+        color: palette.muted,
     },
     pillTextActive: {
         color: '#00d2ff',
@@ -823,21 +829,21 @@ const styles = StyleSheet.create({
         paddingHorizontal: 8,
         paddingVertical: 5,
         borderRadius: 8,
-        backgroundColor: 'rgba(255, 255, 255, 0.04)',
+        backgroundColor: isDark ? 'rgba(255, 255, 255, 0.04)' : palette.surfaceLow,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.08)',
+        borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : palette.border,
     },
     clockPillText: {
         fontSize: 9,
         fontWeight: '600',
-        color: '#cbd5e1',
+        color: palette.text,
     },
     modalFooter: {
         flexDirection: 'row',
         gap: 8,
         paddingTop: 4,
         borderTopWidth: 1,
-        borderTopColor: 'rgba(255, 255, 255, 0.08)',
+        borderTopColor: isDark ? 'rgba(255, 255, 255, 0.08)' : palette.border,
     },
     resetBtn: {
         flexDirection: 'row',
@@ -847,10 +853,10 @@ const styles = StyleSheet.create({
         paddingVertical: 9,
         paddingHorizontal: 14,
         borderRadius: 10,
-        backgroundColor: 'rgba(255, 255, 255, 0.06)',
+        backgroundColor: isDark ? 'rgba(255, 255, 255, 0.06)' : palette.surfaceLow,
     },
     resetBtnText: {
-        color: '#94a3b8',
+        color: palette.muted,
         fontSize: 11,
         fontWeight: '700',
     },

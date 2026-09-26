@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { useColorScheme } from '@/components/useColorScheme';
+import { getPalette } from '@/constants/theme';
 import { NumberAnchor, Formula } from './SystemNumberingOverlay';
 
 export type { NumberAnchor, Formula };
@@ -31,6 +33,12 @@ export function SystemNumberingControl({
     onAnchorsChange,
     onFormulaChange,
 }: SystemNumberingControlProps) {
+    const colorScheme = useColorScheme();
+    const palette = getPalette(colorScheme);
+    const isDark = colorScheme === 'dark';
+
+    const styles = getStyles(palette, isDark);
+
     const [newAnchorValue, setNewAnchorValue] = useState('');
     const [newAnchorSide, setNewAnchorSide] = useState<'top' | 'bottom' | 'left' | 'right'>('top');
     const [newAnchorIndex, setNewAnchorIndex] = useState('0');
@@ -86,7 +94,7 @@ export function SystemNumberingControl({
                         placeholder="Número"
                         value={newAnchorValue}
                         onChangeText={setNewAnchorValue}
-                        placeholderTextColor="#666"
+                        placeholderTextColor={palette.muted}
                     />
 
                     <View style={styles.row}>
@@ -130,7 +138,7 @@ export function SystemNumberingControl({
                         value={newAnchorIndex}
                         onChangeText={setNewAnchorIndex}
                         keyboardType="numeric"
-                        placeholderTextColor="#666"
+                        placeholderTextColor={palette.muted}
                     />
 
                     <View style={styles.row}>
@@ -188,7 +196,7 @@ export function SystemNumberingControl({
                     placeholder="Ej: {arrival} + {attack} = {departure}"
                     value={formulaExpression}
                     onChangeText={setFormulaExpression}
-                    placeholderTextColor="#666"
+                    placeholderTextColor={palette.muted}
                 />
 
                 <View style={styles.inputGroup}>
@@ -201,7 +209,7 @@ export function SystemNumberingControl({
                             placeholder="Banda de llegada"
                             value={arrivalValue}
                             onChangeText={setArrivalValue}
-                            placeholderTextColor="#666"
+                            placeholderTextColor={palette.muted}
                         />
                     </View>
 
@@ -212,7 +220,7 @@ export function SystemNumberingControl({
                             placeholder="Banda de ataque"
                             value={attackValue}
                             onChangeText={setAttackValue}
-                            placeholderTextColor="#666"
+                            placeholderTextColor={palette.muted}
                         />
                     </View>
 
@@ -223,7 +231,7 @@ export function SystemNumberingControl({
                             placeholder="Banda de salida"
                             value={departureValue}
                             onChangeText={setDepartureValue}
-                            placeholderTextColor="#666"
+                            placeholderTextColor={palette.muted}
                         />
                     </View>
                 </View>
@@ -236,7 +244,7 @@ export function SystemNumberingControl({
     );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (palette: ReturnType<typeof getPalette>, isDark: boolean) => StyleSheet.create({
     container: {
         flex: 1,
         padding: 16,
@@ -248,18 +256,20 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: 'bold',
         marginBottom: 12,
-        color: '#fff',
+        color: palette.text,
     },
     inputGroup: {
         marginBottom: 16,
     },
     input: {
-        backgroundColor: '#2a2a2a',
+        backgroundColor: isDark ? '#2a2a2a' : palette.surfaceLow,
         borderRadius: 8,
         padding: 12,
         marginBottom: 8,
-        color: '#fff',
+        color: palette.text,
         fontSize: 14,
+        borderWidth: 1,
+        borderColor: isDark ? 'transparent' : palette.border,
     },
     formulaInput: {
         fontFamily: 'monospace',
@@ -274,32 +284,39 @@ const styles = StyleSheet.create({
         flex: 1,
         padding: 8,
         borderRadius: 6,
-        backgroundColor: '#2a2a2a',
+        backgroundColor: isDark ? '#2a2a2a' : palette.surfaceLow,
         alignItems: 'center',
+        borderWidth: 1,
+        borderColor: isDark ? 'transparent' : palette.border,
     },
     selectButtonActive: {
         backgroundColor: '#3b82f6',
+        borderColor: '#3b82f6',
     },
     selectText: {
-        color: '#fff',
+        color: isDark ? '#cbd5e1' : palette.text,
         fontSize: 12,
     },
     selectTextActive: {
         fontWeight: 'bold',
+        color: '#ffffff',
     },
     typeButton: {
         flex: 1,
         padding: 8,
         borderRadius: 6,
-        backgroundColor: '#2a2a2a',
+        backgroundColor: isDark ? '#2a2a2a' : palette.surfaceLow,
         alignItems: 'center',
+        borderWidth: 1,
+        borderColor: isDark ? 'transparent' : palette.border,
     },
     typeText: {
-        color: '#fff',
+        color: isDark ? '#cbd5e1' : palette.text,
         fontSize: 11,
     },
     typeTextActive: {
         fontWeight: 'bold',
+        color: '#ffffff',
     },
     addButton: {
         backgroundColor: '#3b82f6',
@@ -319,9 +336,11 @@ const styles = StyleSheet.create({
     anchorItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#2a2a2a',
+        backgroundColor: isDark ? '#2a2a2a' : palette.surfaceLow,
         padding: 12,
         borderRadius: 8,
+        borderWidth: 1,
+        borderColor: isDark ? 'transparent' : palette.border,
     },
     anchorColor: {
         width: 16,
@@ -331,7 +350,7 @@ const styles = StyleSheet.create({
     },
     anchorText: {
         flex: 1,
-        color: '#fff',
+        color: palette.text,
         fontSize: 13,
     },
     removeButton: {
@@ -348,7 +367,7 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     label: {
-        color: '#fff',
+        color: palette.muted,
         fontSize: 13,
         marginBottom: 8,
     },
@@ -365,10 +384,12 @@ const styles = StyleSheet.create({
     },
     variableInput: {
         flex: 1,
-        backgroundColor: '#2a2a2a',
+        backgroundColor: isDark ? '#2a2a2a' : palette.surfaceLow,
         borderRadius: 6,
         padding: 8,
-        color: '#fff',
+        color: palette.text,
         fontSize: 13,
+        borderWidth: 1,
+        borderColor: isDark ? 'transparent' : palette.border,
     },
 });
