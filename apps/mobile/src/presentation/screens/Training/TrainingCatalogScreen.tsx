@@ -34,7 +34,7 @@ import {
 import { useColorScheme } from '@/components/useColorScheme';
 import { useI18n } from '@/components/useLanguage';
 import { getPalette, theme } from '@/constants/theme';
-import { BilliardsTableThumbnail } from '@/src/presentation/components/Training/BilliardsTableThumbnail';
+import { TrainingPlayTable } from '@/src/presentation/components/Training/TrainingPlayTable';
 import { CameraCaptureModal } from '@/src/presentation/components/Snapshot/CameraCaptureModal';
 import { TrainingPositionSelectorModal } from '@/src/presentation/components/Training/TrainingPositionSelectorModal';
 import { getRandomTrainingQuote } from '@/src/presentation/screens/Training/trainingQuotes';
@@ -402,19 +402,19 @@ export function TrainingCatalogScreen() {
               </View>
 
               <View style={styles.thumbnailWrapper}>
-                <BilliardsTableThumbnail
-                  orientation="horizontal"
-                  style={styles.thumbnailTable}
-                  balls={[
-                    { id: 'white', x: 71, y: 105, color: '#f8fafc', border: '#cbd5e1' },
-                    { id: 'yellow', x: 142, y: 71, color: '#facc15', border: '#ca8a04' },
-                    { id: 'red', x: 213, y: 35, color: '#dc2626', border: '#991b1b' },
-                  ]}
-                  path={[
+                <TrainingPlayTable
+                  whiteBall={{ x: 71, y: 105 }}
+                  yellowBall={{ x: 142, y: 71 }}
+                  redBall={{ x: 213, y: 35 }}
+                  trajectory={[
                     { x: 71, y: 105 },
                     { x: 142, y: 71 },
                     { x: 284, y: 35 },
                   ]}
+                  trajectoryColor="#10B981"
+                  showGrid={false}
+                  showDiamondNumbers={false}
+                  style={styles.thumbnailTable}
                 />
               </View>
 
@@ -1161,8 +1161,8 @@ const getStyles = (palette: ReturnType<typeof getPalette>, isWideScreen: boolean
       borderColor: palette.border,
     },
     thumbnailTable: {
-      height: 140,
       width: '100%',
+      aspectRatio: 316 / 174,
     },
     reinforceActionBtn: {
       flexDirection: 'row',

@@ -24,8 +24,9 @@ import { useShotCatalog } from '@/src/presentation/hooks/useShotCatalog';
 import { useColorScheme } from '@/components/useColorScheme';
 import { getPalette, theme } from '@/constants/theme';
 import { useSidebarWidth } from '@/components/LayoutContext';
+import { useI18n } from '@/components/useLanguage';
 import { ShotCatalogCard } from '@/src/presentation/components/Catalog/ShotCatalogCard';
-import type { CatalogShot } from '@/src/infrastructure/catalog/shotAdapter';
+import { getLocalizedCategoryName, type CatalogShot } from '@/src/infrastructure/catalog/shotAdapter';
 
 const CATEGORY_COLORS: Record<string, string> = {
     draw: '#3B82F6',
@@ -80,6 +81,7 @@ export function ShotCatalogScreen({
     const sidebarWidth = useSidebarWidth();
     const insets = useSafeAreaInsets();
     const router = useRouter();
+    const { language } = useI18n();
 
     const isPickerMode = mode === 'picker';
     const contentWidth = isPickerMode ? windowWidth : windowWidth - sidebarWidth;
@@ -239,7 +241,7 @@ export function ShotCatalogScreen({
                                         styles.categoryChipText,
                                         isActive ? styles.categoryChipTextActive : { color: palette.text },
                                     ]}>
-                                    {CATEGORY_NAMES[item.category] ?? item.category} ({item.count})
+                                    {getLocalizedCategoryName(item.category, language === 'en' ? 'en' : 'es')} ({item.count})
                                 </Text>
                             </TouchableOpacity>
                         );

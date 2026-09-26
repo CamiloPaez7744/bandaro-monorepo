@@ -1,11 +1,25 @@
 import type { Point2D } from '@/src/presentation/screens/Training/trainingData';
 
+export type CatalogLanguage = 'es' | 'en' | 'ko';
+
 export interface CatalogShot {
     id: number;
     category: string;
     categoryName: string;
+    nameEs: string;
+    nameEn: string;
+    nameKo: string;
+
     description: string;
+    descriptionEs: string;
+    descriptionEn: string;
+    descriptionKo: string;
+
     tips: string;
+    tipsEs: string;
+    tipsEn: string;
+    tipsKo: string;
+
     playerName: string;
     playerNationality: string;
     clubName: string;
@@ -31,12 +45,12 @@ export interface CatalogShot {
     youtubeUrl: string | null;
 }
 
-const BB_WIDTH = 580;
-const BB_HEIGHT = 290;
+const BB_WIDTH = 500;
+const BB_HEIGHT = 250;
 const TABLE_W = 284;
 const TABLE_H = 142;
 
-const CATEGORY_NAMES: Record<string, string> = {
+export const CATEGORY_NAMES_ES: Record<string, string> = {
     draw: 'Retro',
     side_spin: 'Efecto Lateral',
     follow: 'Seguimiento',
@@ -53,6 +67,79 @@ const CATEGORY_NAMES: Record<string, string> = {
     rescue: 'Rescate',
     ball_choice: 'Selección',
 };
+
+export const CATEGORY_NAMES_EN: Record<string, string> = {
+    draw: 'Draw Shot',
+    side_spin: 'Side Spin',
+    follow: 'Follow Shot',
+    cut: 'Cut Shot',
+    big_spin: 'Big Spin',
+    standing: 'Standing',
+    double_cushion: 'Double Cushion',
+    cross_table: 'Cross Table',
+    reverse: 'Reverse',
+    come_back: 'Come Back',
+    bounce: 'Bounce',
+    bank_shot: 'Bank Shot',
+    basic: 'Basic',
+    rescue: 'Rescue',
+    ball_choice: 'Ball Choice',
+};
+
+export const CATEGORY_NAMES_KO: Record<string, string> = {
+    draw: '뒤돌리기',
+    side_spin: '옆돌리기',
+    follow: '앞돌리기',
+    cut: '비켜치기',
+    big_spin: '대회전',
+    standing: '세워치기',
+    double_cushion: '더블쿠션',
+    cross_table: '횡단',
+    reverse: '리버스',
+    come_back: '되돌아오기',
+    bounce: '바운딩',
+    bank_shot: '뱅크샷',
+    basic: '기본',
+    rescue: '구난구',
+    ball_choice: '구종선택',
+};
+
+export const CATEGORY_NAMES = CATEGORY_NAMES_ES;
+
+export function getLocalizedCategoryName(category: string, lang: CatalogLanguage = 'es'): string {
+    if (lang === 'en') return CATEGORY_NAMES_EN[category] ?? category;
+    if (lang === 'ko') return CATEGORY_NAMES_KO[category] ?? category;
+    return CATEGORY_NAMES_ES[category] ?? category;
+}
+
+export function getLocalizedShot(
+    shot: CatalogShot,
+    lang: CatalogLanguage = 'es'
+): {
+    name: string;
+    description: string;
+    tips: string;
+} {
+    if (lang === 'en') {
+        return {
+            name: shot.nameEn || CATEGORY_NAMES_EN[shot.category] || shot.categoryName,
+            description: shot.descriptionEn || shot.descriptionEs || shot.description,
+            tips: shot.tipsEn || shot.tipsEs || shot.tips,
+        };
+    }
+    if (lang === 'ko') {
+        return {
+            name: shot.nameKo || CATEGORY_NAMES_KO[shot.category] || shot.categoryName,
+            description: shot.descriptionKo || shot.descriptionEs || shot.description,
+            tips: shot.tipsKo || shot.tipsEs || shot.tips,
+        };
+    }
+    return {
+        name: shot.nameEs || CATEGORY_NAMES_ES[shot.category] || shot.categoryName,
+        description: shot.descriptionEs || shot.description,
+        tips: shot.tipsEs || shot.tips,
+    };
+}
 
 export function pixelToTable(x: number, y: number): Point2D {
     return {
@@ -75,8 +162,98 @@ export function parseTrajectory(raw: string): Point2D[] {
         const y = parseFloat(parts[i + 2]);
         if (isNaN(x) || isNaN(y)) continue;
 
-        points.push(pixelToTable(x, y));
+        const pt = pixelToTable(x, y);
+        // Avoid consecutive duplicate points (ball at rest before shot)
+        if (
+            points.length === 0 ||
+            Math.hypot(points[points.length - 1].x - pt.x, points[points.length - 1].y - pt.y) > 0.4
+        ) {
+            points.push(pt);
+        }
     }
+
+    return points;
+}
+
+/**
+ * Generates a realistic projected carom trajectory for shots that don't have
+ * raw multi-point recorded trajectories from Billiard Bible.
+ */
+export function synthesizeCaromTrajectory(
+    white: Point2D,
+    yellow: Point2D,
+    red: Point2D,
+    category: string,
+    thickness: number = 0.5,
+    effectX: number = 0
+): Point2D[] {
+    const points: Point2D[] = [white];
+
+    // Cushion boundaries (taking ball radius ~3.6 into account)
+    const minX = 4.0;
+    const maxX = 280.0;
+    const minY = 4.0;
+    const maxY = 138.0;
+
+    const dx = yellow.x - white.x;
+    const dy = yellow.y - white.y;
+    const dist = Math.hypot(dx, dy);
+
+    if (dist < 1) {
+        return [white, red];
+    }
+
+    // Normal and tangent unit vectors between white and yellow
+    const nx = dx / dist;
+    const ny = dy / dist;
+    const tx = -ny;
+    const ty = nx;
+
+    // Contact point on yellow ball (ball diameter ~ 7.1)
+    const contactX = yellow.x - nx * 6.8;
+    const contactY = yellow.y - ny * 6.8;
+    points.push({
+        x: Math.round(Math.max(minX, Math.min(maxX, contactX)) * 10) / 10,
+        y: Math.round(Math.max(minY, Math.min(maxY, contactY)) * 10) / 10,
+    });
+
+    // Deflection direction after impact
+    const spinFactor = effectX * 0.4;
+    const cutSign = (tx * (white.x - yellow.x) + ty * (white.y - yellow.y)) >= 0 ? 1 : -1;
+    const defX = nx * (1 - Math.abs(thickness)) + tx * cutSign * 0.8 + spinFactor * 0.3;
+    const defY = ny * (1 - Math.abs(thickness)) + ty * cutSign * 0.8;
+    const defLen = Math.hypot(defX, defY) || 1;
+    const dirX = defX / defLen;
+    const dirY = defY / defLen;
+
+    // First cushion rebound
+    let rail1X = contactX + dirX * 70;
+    let rail1Y = dirY < 0 ? minY : maxY;
+    if (dirX > 0 && rail1X > maxX) {
+        rail1X = maxX;
+        rail1Y = contactY + dirY * ((maxX - contactX) / (dirX || 0.1));
+    } else if (dirX < 0 && rail1X < minX) {
+        rail1X = minX;
+        rail1Y = contactY + dirY * ((minX - contactX) / (dirX || 0.1));
+    }
+    points.push({
+        x: Math.round(Math.max(minX, Math.min(maxX, rail1X)) * 10) / 10,
+        y: Math.round(Math.max(minY, Math.min(maxY, rail1Y)) * 10) / 10,
+    });
+
+    // Intermediate cushion / waypoint heading towards red
+    const midX = (rail1X + red.x) / 2 + (spinFactor > 0 ? 15 : -15);
+    const midY = rail1Y < TABLE_H / 2 ? maxY - 10 : minY + 10;
+    points.push({
+        x: Math.round(Math.max(minX, Math.min(maxX, midX)) * 10) / 10,
+        y: Math.round(Math.max(minY, Math.min(maxY, midY)) * 10) / 10,
+    });
+
+    // Final destination: red ball contact
+    points.push({
+        x: Math.round(Math.max(minX, Math.min(maxX, red.x)) * 10) / 10,
+        y: Math.round(Math.max(minY, Math.min(maxY, red.y)) * 10) / 10,
+    });
 
     return points;
 }
@@ -97,21 +274,61 @@ export function railSpeedToVelocity(railSpeed: number): number {
 }
 
 export function adaptCatalogShot(raw: any): CatalogShot {
+    const white = pixelToTable(raw.cue_ball_x, raw.cue_ball_y);
+    const yellow = pixelToTable(raw.object_ball_1_x, raw.object_ball_1_y);
+    const red = pixelToTable(raw.object_ball_2_x, raw.object_ball_2_y);
+
+    const parsedCueTrajectory = parseTrajectory(raw.cue_ball_trajectory);
+    const cueBallTrajectory = parsedCueTrajectory.length >= 2
+        ? parsedCueTrajectory
+        : synthesizeCaromTrajectory(
+            white,
+            yellow,
+            red,
+            raw.category,
+            raw.ball_thickness,
+            raw.effect_x
+        );
+
+    const nameEs = raw.name_es || CATEGORY_NAMES_ES[raw.category] || raw.category;
+    const nameEn = raw.name_en || CATEGORY_NAMES_EN[raw.category] || raw.category;
+    const nameKo = raw.name_ko || CATEGORY_NAMES_KO[raw.category] || raw.category;
+
+    const descriptionEs = raw.description_es || raw.description || '';
+    const descriptionEn = raw.description_en || '';
+    const descriptionKo = raw.description_ko || '';
+
+    const tipsEs = raw.tips_es || raw.tips || '';
+    const tipsEn = raw.tips_en || '';
+    const tipsKo = raw.tips_ko || '';
+
     return {
         id: raw.external_id,
         category: raw.category,
-        categoryName: CATEGORY_NAMES[raw.category] ?? raw.category,
-        description: raw.description ?? '',
-        tips: raw.tips ?? '',
+        categoryName: CATEGORY_NAMES_ES[raw.category] ?? raw.category,
+        nameEs,
+        nameEn,
+        nameKo,
+
+        description: descriptionEs,
+        descriptionEs,
+        descriptionEn,
+        descriptionKo,
+
+        tips: tipsEs,
+        tipsEs,
+        tipsEn,
+        tipsKo,
+
         playerName: [raw.player_first_name, raw.player_last_name].filter(Boolean).join(' '),
         playerNationality: raw.player_nationality ?? '',
         clubName: raw.club_name ?? '',
 
-        white: pixelToTable(raw.cue_ball_x, raw.cue_ball_y),
-        yellow: pixelToTable(raw.object_ball_1_x, raw.object_ball_1_y),
-        red: pixelToTable(raw.object_ball_2_x, raw.object_ball_2_y),
+        white,
+        yellow,
+        red,
 
-        cueBallTrajectory: parseTrajectory(raw.cue_ball_trajectory),
+        cueBallTrajectory,
         objectBall1Trajectory: parseTrajectory(raw.object_ball_1_trajectory),
         objectBall2Trajectory: parseTrajectory(raw.object_ball_2_trajectory),
 

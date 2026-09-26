@@ -1,12 +1,20 @@
 import { memo, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { IconBolt, IconGauge, IconRoute, IconTarget, IconPlus, IconEye } from '@tabler/icons-react-native';
+import { IconBolt, IconGauge, IconRoute, IconTarget, IconPlus, IconEye, IconPlayerPlay, IconCircleDot } from '@tabler/icons-react-native';
 
-import { BilliardsTableThumbnail } from '@/src/presentation/components/Training/BilliardsTableThumbnail';
+import { TrainingPlayTable } from '@/src/presentation/components/Training/TrainingPlayTable';
 import { getPalette, theme } from '@/constants/theme';
-import type { CatalogShot } from '@/src/infrastructure/catalog/shotAdapter';
+import { useI18n } from '@/components/useLanguage';
+import {
+    CATEGORY_NAMES_ES,
+    getLocalizedShot,
+    type CatalogShot,
+} from '@/src/infrastructure/catalog/shotAdapter';
+import { AnimatedFlameBadge } from './AnimatedFlameBadge';
+import { getThicknessInfo } from './BallThicknessDiagram';
+import { resolveEnglish } from './CueBallEnglishDiagram';
 
-const CATEGORY_COLORS: Record<string, string> = {
+export const CATEGORY_COLORS: Record<string, string> = {
     draw: '#3B82F6',
     side_spin: '#8B5CF6',
     follow: '#10B981',
@@ -24,7 +32,7 @@ const CATEGORY_COLORS: Record<string, string> = {
     ball_choice: '#0EA5E9',
 };
 
-const CATEGORY_NAMES: Record<string, string> = {
+export const CATEGORY_NAMES: Record<string, string> = {
     draw: 'Retro',
     side_spin: 'Lateral',
     follow: 'Seguimiento',
@@ -57,8 +65,14 @@ export const ShotCatalogCard = memo(function ShotCatalogCard({
     palette,
     isPickerMode = false,
 }: ShotCatalogCardProps) {
+    const { language } = useI18n();
+    const localized = getLocalizedShot(shot, language === 'en' ? 'en' : 'es');
     const color = CATEGORY_COLORS[shot.category] ?? '#6B7280';
+    const langCode = (language as string) === 'en' ? 'en' : (language as string) === 'ko' ? 'ko' : 'es';
+    const thicknessInfo = getThicknessInfo(shot.ballThickness, langCode);
+    const englishInfo = resolveEnglish({ effectX: shot.effectX, effectY: shot.effectY }, 10, langCode);
     const [isHovered, setIsHovered] = useState(false);
+    const [isSimulating, setIsSimulating] = useState(false);
 
     return (
         <View
@@ -66,9 +80,10 @@ export const ShotCatalogCard = memo(function ShotCatalogCard({
                 styles.cardContainer,
                 {
                     backgroundColor: palette.card,
-                    borderColor: isHovered ? color : palette.border,
+                    borderColor: isHovered ? color : `${color}25`,
                     shadowColor: isHovered ? color : '#000',
-                    shadowOpacity: isHovered ? 0.25 : 0.08,
+                    shadowOpacity: isHovered ? 0.35 : 0.08,
+                    shadowRadius: isHovered ? 14 : 8,
                 },
             ]}
             {...(Platform.OS === 'web'
@@ -79,73 +94,102 @@ export const ShotCatalogCard = memo(function ShotCatalogCard({
                 : {})}>
             {/* Top Bar: Shot ID & Category Badge */}
             <View style={styles.topBar}>
-                <View style={[styles.idBadge, { backgroundColor: palette.surfaceLow }]}>
+                <View style={[styles.idBadge, { backgroundColor: palette.surfaceLow, borderColor: palette.border }]}>
                     <Text style={[styles.idText, { color: palette.muted }]}>#{shot.id}</Text>
                 </View>
 
                 <View style={styles.topRightBadges}>
                     {shot.isDifficult && (
-                        <View style={[styles.tagBadge, { backgroundColor: 'rgba(239, 68, 68, 0.15)', borderColor: 'rgba(239, 68, 68, 0.3)' }]}>
-                            <Text style={[styles.tagText, { color: '#EF4444' }]}>Difícil</Text>
-                        </View>
+                        <AnimatedFlameBadge size={14} />
                     )}
-                    <View style={[styles.categoryBadge, { backgroundColor: color }]}>
-                        <Text style={styles.categoryText}>
-                            {CATEGORY_NAMES[shot.category] ?? shot.category}
+                    <View style={[styles.categoryBadge, { backgroundColor: `${color}20`, borderColor: `${color}60` }]}>
+                        <View style={[styles.categoryDot, { backgroundColor: color }]} />
+                        <Text style={[styles.categoryText, { color }]}>
+                            {localized.name}
                         </Text>
                     </View>
                 </View>
             </View>
 
-            {/* 2:1 Carom Billiard Table Thumbnail */}
-            <Pressable
-                onPress={() => onPress(shot)}
-                style={styles.tableWrap}
-                accessibilityRole="button"
-                accessibilityLabel={`Ver jugada ${shot.id}`}>
-                <BilliardsTableThumbnail
-                    balls={[
-                        { id: 'white', x: shot.white.x, y: shot.white.y, color: '#FFFFFF', border: '#CCCCCC' },
-                        { id: 'yellow', x: shot.yellow.x, y: shot.yellow.y, color: '#FBBF24', border: '#D97706' },
-                        { id: 'red', x: shot.red.x, y: shot.red.y, color: '#EF4444', border: '#B91C1C' },
-                    ]}
-                    paths={[
-                        { id: 'cue', points: shot.cueBallTrajectory, color, width: 2.2, opacity: 0.95 },
-                        { id: 'obj1', points: shot.objectBall1Trajectory, color: '#FBBF24', width: 1.25, dash: [4, 3], opacity: 0.6 },
-                        { id: 'obj2', points: shot.objectBall2Trajectory, color: '#EF4444', width: 1.25, dash: [4, 3], opacity: 0.6 },
-                    ]}
-                    showPath
-                    style={styles.tableThumbnail}
-                />
-            </Pressable>
+            {/* Canonical 2:1 Carom Billiard Table with White Ball Trajectory in Category Color */}
+            <View style={styles.tableWrap}>
+                <Pressable
+                    onPress={() => onPress(shot)}
+                    style={styles.tablePressable}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Ver jugada ${shot.id}`}>
+                    <TrainingPlayTable
+                        whiteBall={shot.white}
+                        yellowBall={shot.yellow}
+                        redBall={shot.red}
+                        trajectory={shot.cueBallTrajectory}
+                        trajectoryColor={color}
+                        isSimulating={isSimulating}
+                        onSimulationEnd={() => setIsSimulating(false)}
+                        showGrid={false}
+                        showDiamondNumbers={false}
+                        style={styles.tableThumbnail}
+                    />
+                </Pressable>
 
-            {/* Ballistic Specs Bar */}
+                {/* Floating Preview Simulation Button */}
+                <Pressable
+                    style={[
+                        styles.cardSimulateBtn,
+                        {
+                            backgroundColor: isSimulating ? `${color}E6` : 'rgba(10, 16, 13, 0.78)',
+                            borderColor: isSimulating ? '#FFFFFF' : `${color}55`,
+                        },
+                    ]}
+                    onPress={() => {
+                        setIsSimulating(false);
+                        setTimeout(() => setIsSimulating(true), 50);
+                    }}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Simular trayectoria">
+                    <IconPlayerPlay size={11} color="#FFFFFF" strokeWidth={2.5} />
+                    <Text style={styles.cardSimulateBtnText}>
+                        {isSimulating ? '...' : (language === 'en' ? 'Sim' : 'Simular')}
+                    </Text>
+                </Pressable>
+            </View>
+
+            {/* Tactical Specs Bar (Tome de Bola, Efecto/Hora, Bandas) */}
             <View style={[styles.specsRow, { backgroundColor: palette.surfaceLow, borderColor: palette.border }]}>
                 <View style={styles.specItem}>
-                    <IconBolt size={13} color={palette.muted} strokeWidth={2} />
-                    <Text style={[styles.specLabel, { color: palette.muted }]}>Potencia</Text>
-                    <Text style={[styles.specValue, { color: palette.text }]}>{shot.powerLevel.toFixed(1)}</Text>
+                    <IconTarget size={13} color={color} strokeWidth={2} />
+                    <Text style={[styles.specLabel, { color: palette.muted }]}>
+                        {langCode === 'en' ? 'Thick' : langCode === 'ko' ? '두께' : 'Tome'}
+                    </Text>
+                    <Text style={[styles.specValue, { color: palette.text }]}>{thicknessInfo.fraction}</Text>
                 </View>
                 <View style={[styles.specDivider, { backgroundColor: palette.border }]} />
                 <View style={styles.specItem}>
-                    <IconGauge size={13} color={palette.muted} strokeWidth={2} />
-                    <Text style={[styles.specLabel, { color: palette.muted }]}>Velocidad</Text>
-                    <Text style={[styles.specValue, { color: palette.text }]}>{(shot.powerLevel * 0.7).toFixed(1)} m/s</Text>
+                    <IconCircleDot size={13} color={color} strokeWidth={2} />
+                    <Text style={[styles.specLabel, { color: palette.muted }]}>
+                        {langCode === 'en' ? 'Spin' : langCode === 'ko' ? '당점' : 'Efecto'}
+                    </Text>
+                    <Text style={[styles.specValue, { color: palette.text }]}>
+                        {englishInfo.tips > 0 ? englishInfo.clockFormatted : 'Centro'}
+                    </Text>
                 </View>
                 <View style={[styles.specDivider, { backgroundColor: palette.border }]} />
                 <View style={styles.specItem}>
-                    <IconRoute size={13} color={palette.muted} strokeWidth={2} />
-                    <Text style={[styles.specLabel, { color: palette.muted }]}>Rieles</Text>
+                    <IconRoute size={13} color={color} strokeWidth={2} />
+                    <Text style={[styles.specLabel, { color: palette.muted }]}>
+                        {langCode === 'en' ? 'Rails' : langCode === 'ko' ? '레일' : 'Bandas'}
+                    </Text>
                     <Text style={[styles.specValue, { color: palette.text }]}>{shot.railSpeed}</Text>
                 </View>
             </View>
 
             {/* Description / Hint if present */}
-            {shot.description ? (
+            {localized.description ? (
                 <Text
                     style={[styles.description, { color: palette.muted }]}
                     numberOfLines={2}>
-                    {shot.description}
+                    {localized.description}
                 </Text>
             ) : null}
 
@@ -184,14 +228,13 @@ export const ShotCatalogCard = memo(function ShotCatalogCard({
 
 const styles = StyleSheet.create({
     cardContainer: {
-        borderRadius: theme.radius.lg,
-        borderWidth: 1,
+        borderRadius: 14,
+        borderWidth: 1.5,
         padding: 12,
         gap: 10,
         overflow: 'hidden',
-        shadowOffset: { width: 0, height: 3 },
-        shadowRadius: 10,
-        elevation: 3,
+        shadowOffset: { width: 0, height: 4 },
+        elevation: 4,
     },
     topBar: {
         flexDirection: 'row',
@@ -202,10 +245,12 @@ const styles = StyleSheet.create({
         paddingHorizontal: 8,
         paddingVertical: 3,
         borderRadius: 6,
+        borderWidth: 1,
     },
     idText: {
         fontSize: 11,
         fontWeight: '700',
+        letterSpacing: 0.3,
     },
     topRightBadges: {
         flexDirection: 'row',
@@ -224,39 +269,74 @@ const styles = StyleSheet.create({
         textTransform: 'uppercase',
     },
     categoryBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
         borderRadius: 6,
         paddingHorizontal: 8,
         paddingVertical: 3,
+        borderWidth: 1,
+    },
+    categoryDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
     },
     categoryText: {
-        fontSize: 10,
+        fontSize: 10.5,
         fontWeight: '700',
-        color: '#FFFFFF',
         textTransform: 'uppercase',
         letterSpacing: 0.3,
     },
     tableWrap: {
         width: '100%',
-        borderRadius: theme.radius.md,
+        borderRadius: 10,
         overflow: 'hidden',
+        backgroundColor: '#0a100d',
+        position: 'relative',
+    },
+    tablePressable: {
+        width: '100%',
     },
     tableThumbnail: {
         width: '100%',
-        aspectRatio: 2 / 1,
+        aspectRatio: 316 / 174,
+    },
+    cardSimulateBtn: {
+        position: 'absolute',
+        bottom: 6,
+        right: 6,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 7,
+        paddingVertical: 3.5,
+        borderRadius: 12,
+        borderWidth: 1,
+        shadowColor: '#000',
+        shadowOpacity: 0.35,
+        shadowRadius: 3,
+        elevation: 3,
+    },
+    cardSimulateBtnText: {
+        color: '#FFFFFF',
+        fontSize: 10,
+        fontWeight: '700',
+        letterSpacing: 0.2,
     },
     specsRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-around',
-        borderRadius: theme.radius.sm,
+        borderRadius: 8,
         borderWidth: 1,
-        paddingVertical: 6,
-        paddingHorizontal: 4,
+        paddingVertical: 7,
+        paddingHorizontal: 6,
     },
     specItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 4,
+        gap: 5,
     },
     specDivider: {
         width: 1,
@@ -309,3 +389,5 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
 });
+
+export default ShotCatalogCard;

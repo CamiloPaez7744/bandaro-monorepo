@@ -59,8 +59,10 @@ import IconCompass from '@tabler/icons-react-native/IconCompass';
 import IconChevronsLeft from '@tabler/icons-react-native/IconChevronsLeft';
 import IconChevronsRight from '@tabler/icons-react-native/IconChevronsRight';
 import IconInfoCircle from '@tabler/icons-react-native/IconInfoCircle';
+import IconCircleDot from '@tabler/icons-react-native/IconCircleDot';
 
 export {
+    IconCircleDot,
     IconTrophy,
     IconSparkles,
     IconTarget,

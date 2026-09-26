@@ -21,18 +21,37 @@ shotsRouter.get('/catalog', async (req: Request, res: Response) => {
         }
 
         if (search) {
-            conditions.push(sql`(description ILIKE ${'%' + search + '%'} OR tips ILIKE ${'%' + search + '%'} OR name_ko ILIKE ${'%' + search + '%'})`);
+            conditions.push(sql`(
+                description ILIKE ${'%' + search + '%'} OR
+                description_es ILIKE ${'%' + search + '%'} OR
+                description_en ILIKE ${'%' + search + '%'} OR
+                description_ko ILIKE ${'%' + search + '%'} OR
+                tips ILIKE ${'%' + search + '%'} OR
+                tips_es ILIKE ${'%' + search + '%'} OR
+                tips_en ILIKE ${'%' + search + '%'} OR
+                tips_ko ILIKE ${'%' + search + '%'} OR
+                name_es ILIKE ${'%' + search + '%'} OR
+                name_en ILIKE ${'%' + search + '%'} OR
+                name_ko ILIKE ${'%' + search + '%'} OR
+                category ILIKE ${'%' + search + '%'}
+            )`);
         }
+
+        const orderClause = sql`ORDER BY (CASE WHEN has_analysis = true THEN 0 ELSE 1 END) ASC, external_id ASC`;
 
         if (conditions.length > 0) {
             const whereClause = conditions.reduce((acc, cond) => sql`${acc} AND ${cond}`);
-            query = sql`SELECT * FROM shot_catalog WHERE ${whereClause} ORDER BY external_id DESC LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}`;
+            query = sql`SELECT * FROM shot_catalog WHERE ${whereClause} ${orderClause} LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}`;
         } else {
-            query = sql`SELECT * FROM shot_catalog ORDER BY external_id DESC LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}`;
+            query = sql`SELECT * FROM shot_catalog ${orderClause} LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}`;
         }
 
         const result = await db.execute(query);
-        const countResult = await db.execute(sql`SELECT COUNT(*) FROM shot_catalog`);
+
+        const countQuery = conditions.length > 0
+            ? sql`SELECT COUNT(*) FROM shot_catalog WHERE ${conditions.reduce((acc, cond) => sql`${acc} AND ${cond}`)}`
+            : sql`SELECT COUNT(*) FROM shot_catalog`;
+        const countResult = await db.execute(countQuery);
 
         res.json({
             shots: result.rows,

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import {
     Platform, Pressable, ScrollView, Text, View,
     useWindowDimensions, Modal, StyleSheet, type ViewStyle,
@@ -9,9 +9,17 @@ import { IconX, IconPlayerPlay, IconBookmark, IconTarget } from '@tabler/icons-r
 import { useColorScheme } from '@/components/useColorScheme';
 import { getPalette } from '@/constants/theme';
 import { useSidebarWidth } from '@/components/LayoutContext';
-import { BilliardsTableThumbnail } from '@/src/presentation/components/Training/BilliardsTableThumbnail';
+import { useI18n } from '@/components/useLanguage';
+import { TrainingPlayTable } from '@/src/presentation/components/Training/TrainingPlayTable';
 import { fetchShotDetail, type CatalogShotRaw } from '@/src/infrastructure/catalog/catalogApi';
-import { adaptCatalogShot, type CatalogShot } from '@/src/infrastructure/catalog/shotAdapter';
+import {
+    adaptCatalogShot,
+    getLocalizedShot,
+    type CatalogShot,
+    type CatalogLanguage,
+} from '@/src/infrastructure/catalog/shotAdapter';
+import { AnimatedFlameBadge } from '@/src/presentation/components/Catalog/AnimatedFlameBadge';
+import { BallTacticsVisualizer } from '@/src/presentation/components/Catalog/BallTacticsVisualizer';
 
 const CATEGORY_COLORS: Record<string, string> = {
     draw: '#3B82F6',
@@ -49,6 +57,88 @@ const CATEGORY_NAMES: Record<string, string> = {
     ball_choice: 'Selección',
 };
 
+const UI_LABELS: Record<CatalogLanguage, {
+    loading: string;
+    notFound: string;
+    close: string;
+    thickness: string;
+    speed: string;
+    effectX: string;
+    effectY: string;
+    rails: string;
+    difficult: string;
+    position: string;
+    defense: string;
+    description: string;
+    tips: string;
+    youtube: string;
+    train: string;
+    simulate: string;
+    simulating: string;
+    originalNotice: string;
+}> = {
+    es: {
+        loading: 'Cargando tiro...',
+        notFound: 'Tiro no encontrado',
+        close: 'Cerrar',
+        thickness: 'Grosor',
+        speed: 'Velocidad',
+        effectX: 'Efecto X',
+        effectY: 'Efecto Y',
+        rails: 'rieles',
+        difficult: 'Difícil',
+        position: 'Posición',
+        defense: 'Defensa',
+        description: 'Descripción',
+        tips: 'Consejos de Ejecución',
+        youtube: 'Ver en YouTube',
+        train: 'Entrenar',
+        simulate: 'Simular Trayectoria',
+        simulating: 'Simulando...',
+        originalNotice: 'Traducción adaptada al billar carambola',
+    },
+    en: {
+        loading: 'Loading shot...',
+        notFound: 'Shot not found',
+        close: 'Close',
+        thickness: 'Thickness',
+        speed: 'Speed',
+        effectX: 'Spin X',
+        effectY: 'Spin Y',
+        rails: 'rails',
+        difficult: 'Difficult',
+        position: 'Position',
+        defense: 'Defense',
+        description: 'Description',
+        tips: 'Execution Tips',
+        youtube: 'Watch on YouTube',
+        train: 'Practice',
+        simulate: 'Simulate Trajectory',
+        simulating: 'Simulating...',
+        originalNotice: 'English carom billiard technical translation',
+    },
+    ko: {
+        loading: '로딩 중...',
+        notFound: '샷을 찾을 수 없습니다',
+        close: '닫기',
+        thickness: '두께',
+        speed: '당점속도',
+        effectX: '회전 X',
+        effectY: '당점 Y',
+        rails: '쿠션',
+        difficult: '난구',
+        position: '포지션',
+        defense: '수비',
+        description: '배치 설명',
+        tips: '공략 팁',
+        youtube: 'YouTube에서 보기',
+        train: '연습하기',
+        simulate: '경로 시뮬레이션',
+        simulating: '시뮬레이션 중...',
+        originalNotice: 'Billiard Bible 원문 텍스트 (한국어)',
+    },
+};
+
 interface ShotDetailScreenProps {
     shotId?: number;
     onClose?: () => void;
@@ -62,10 +152,33 @@ export function ShotDetailScreen({ shotId: propShotId, onClose, onSimulate }: Sh
     const palette = getPalette(colorScheme);
     const { width: windowWidth } = useWindowDimensions();
     const sidebarWidth = useSidebarWidth();
+    const { language } = useI18n();
 
     const shotId = propShotId ?? (params.shotId ? parseInt(params.shotId, 10) : undefined);
     const [shot, setShot] = useState<CatalogShot | null>(null);
     const [loading, setLoading] = useState(true);
+    const [isSimulating, setIsSimulating] = useState(false);
+    const [selectedLang, setSelectedLang] = useState<CatalogLanguage>(language === 'en' ? 'en' : 'es');
+
+    const scrollViewRef = useRef<ScrollView>(null);
+
+    const handleTriggerSimulation = useCallback(() => {
+        setIsSimulating(false);
+        setTimeout(() => {
+            setIsSimulating(true);
+            if (onSimulate && shot) {
+                onSimulate(shot);
+            }
+        }, 50);
+    }, [onSimulate, shot]);
+
+    const handleSimulateFromButton = useCallback(() => {
+        // Smoothly scroll to the top so user can see the table and trajectory animation
+        scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+
+        // Trigger or restart trajectory simulation
+        handleTriggerSimulation();
+    }, [handleTriggerSimulation]);
 
     useEffect(() => {
         if (!shotId) return;
@@ -86,21 +199,23 @@ export function ShotDetailScreen({ shotId: propShotId, onClose, onSimulate }: Sh
 
     const color = shot ? (CATEGORY_COLORS[shot.category] ?? '#6B7280') : '#6B7280';
     const isWide = windowWidth - sidebarWidth >= 600;
+    const labels = UI_LABELS[selectedLang] ?? UI_LABELS.es;
+    const localized = shot ? getLocalizedShot(shot, selectedLang) : null;
 
     if (loading) {
         return (
             <View style={[styles.center, { backgroundColor: palette.background } as any]}>
-                <Text style={{ color: palette.muted }}>Cargando tiro...</Text>
+                <Text style={{ color: palette.muted }}>{labels.loading}</Text>
             </View>
         );
     }
 
-    if (!shot) {
+    if (!shot || !localized) {
         return (
             <View style={[styles.center, { backgroundColor: palette.background } as any]}>
-                <Text style={{ color: palette.muted }}>Tiro no encontrado</Text>
+                <Text style={{ color: palette.muted }}>{labels.notFound}</Text>
                 <Pressable onPress={handleClose} style={{ marginTop: 16 }}>
-                    <Text style={{ color: color }}>Cerrar</Text>
+                    <Text style={{ color: color }}>{labels.close}</Text>
                 </Pressable>
             </View>
         );
@@ -108,10 +223,11 @@ export function ShotDetailScreen({ shotId: propShotId, onClose, onSimulate }: Sh
 
     const content = (
         <ScrollView
+            ref={scrollViewRef}
             style={{ flex: 1, backgroundColor: palette.background } as any}
-            contentContainerStyle={{ padding: isWide ? 32 : 16, maxWidth: 800, alignSelf: 'center', width: '100%' }}
+            contentContainerStyle={{ padding: isWide ? 28 : 16, maxWidth: 1060, alignSelf: 'center', width: '100%' }}
         >
-            {/* Close button */}
+            {/* Header: Close button & Actions */}
             <View style={styles.headerRow}>
                 <Pressable onPress={handleClose} hitSlop={8} style={styles.closeBtn}>
                     <IconX size={20} color={palette.muted} />
@@ -122,81 +238,161 @@ export function ShotDetailScreen({ shotId: propShotId, onClose, onSimulate }: Sh
                 </Pressable>
             </View>
 
-            {/* Category badge */}
-            <View style={[styles.badge, { backgroundColor: color + '20' }]}>
-                <View style={[styles.badgeDot, { backgroundColor: color }]} />
-                <Text style={[styles.badgeText, { color }]}>
-                    {CATEGORY_NAMES[shot.category] ?? shot.category}
-                </Text>
+            {/* Top row: Category Badge & Multilingual Switcher */}
+            <View style={styles.badgeAndLangRow}>
+                <View style={[styles.badge, { backgroundColor: color + '20', borderColor: color + '50', borderWidth: 1 }]}>
+                    <View style={[styles.badgeDot, { backgroundColor: color }]} />
+                    <Text style={[styles.badgeText, { color }]}>
+                        {localized.name}
+                    </Text>
+                </View>
+
+                {/* Multilingual Selector: ES | EN | KO */}
+                <View style={[styles.langSelector, { backgroundColor: palette.surfaceLow, borderColor: palette.border }]}>
+                    {(['es', 'en', 'ko'] as CatalogLanguage[]).map((langCode) => {
+                        const isSelected = selectedLang === langCode;
+                        const labelTitle: Record<CatalogLanguage, string> = {
+                            es: 'ES',
+                            en: 'EN',
+                            ko: 'KO (원문)',
+                        };
+                        return (
+                            <Pressable
+                                key={langCode}
+                                onPress={() => setSelectedLang(langCode)}
+                                style={[
+                                    styles.langButton,
+                                    isSelected && {
+                                        backgroundColor: color,
+                                        shadowColor: color,
+                                        shadowOpacity: 0.35,
+                                        shadowRadius: 5,
+                                    },
+                                ]}
+                            >
+                                <Text
+                                    style={[
+                                        styles.langButtonText,
+                                        { color: isSelected ? '#FFFFFF' : palette.muted },
+                                        isSelected && { fontWeight: '700' },
+                                    ]}
+                                >
+                                    {labelTitle[langCode]}
+                                </Text>
+                            </Pressable>
+                        );
+                    })}
+                </View>
             </View>
 
             {/* Table */}
             <View style={[styles.tableContainer, isWide && { flexDirection: 'row', gap: 24 }]}>
                 <View style={[styles.tableWrap, isWide && { flex: 1 }]}>
-                    <View style={[styles.tableInner, { borderColor: color + '30' }]}>
-                        <BilliardsTableThumbnail
-                            balls={[
-                                { id: 'white', x: shot.white.x, y: shot.white.y, color: '#FFFFFF', border: '#CCCCCC' },
-                                { id: 'yellow', x: shot.yellow.x, y: shot.yellow.y, color: '#FBBF24', border: '#D97706' },
-                                { id: 'red', x: shot.red.x, y: shot.red.y, color: '#EF4444', border: '#B91C1C' },
-                            ]}
-                            paths={[
-                                { id: 'cue', points: shot.cueBallTrajectory, color, width: 2.5, opacity: 1 },
-                                { id: 'obj1', points: shot.objectBall1Trajectory, color: '#FBBF24', width: 1.5, dash: [5, 4], opacity: 0.6 },
-                                { id: 'obj2', points: shot.objectBall2Trajectory, color: '#EF4444', width: 1.5, dash: [5, 4], opacity: 0.6 },
-                            ]}
-                            showPath
-                            style={{ width: '100%', aspectRatio: 2 / 1 }}
+                    <Pressable
+                        onPress={handleTriggerSimulation}
+                        style={({ pressed }) => [
+                            styles.tableInner,
+                            {
+                                borderColor: isSimulating ? color : `${color}40`,
+                                borderRadius: 12,
+                                overflow: 'hidden',
+                                opacity: pressed ? 0.94 : 1,
+                            },
+                        ]}
+                        accessibilityRole="button"
+                        accessibilityLabel="Tocar la mesa para simular trayectoria"
+                        {...(Platform.OS === 'web' ? ({ title: 'Toca la mesa para simular trayectoria' } as any) : {})}
+                    >
+                        <TrainingPlayTable
+                            whiteBall={shot.white}
+                            yellowBall={shot.yellow}
+                            redBall={shot.red}
+                            trajectory={shot.cueBallTrajectory}
+                            trajectoryColor={color}
+                            isSimulating={isSimulating}
+                            onSimulationEnd={() => setIsSimulating(false)}
+                            showGrid={true}
+                            showDiamondNumbers={true}
+                            style={{ width: '100%', aspectRatio: 316 / 174 }}
                         />
-                    </View>
+
+                        {/* Floating Simulation Badge on the table */}
+                        <View
+                            style={[
+                                styles.tableSimulateBadge,
+                                {
+                                    backgroundColor: isSimulating ? `${color}E6` : 'rgba(10, 16, 13, 0.78)',
+                                    borderColor: isSimulating ? '#FFFFFF' : `${color}55`,
+                                },
+                            ]}
+                        >
+                            <IconPlayerPlay size={12} color="#FFFFFF" strokeWidth={2.4} />
+                            <Text style={styles.tableSimulateBadgeText}>
+                                {isSimulating
+                                    ? labels.simulating
+                                    : (selectedLang === 'en'
+                                        ? 'Tap to simulate'
+                                        : selectedLang === 'ko'
+                                        ? '터치하여 시뮬레이션'
+                                        : 'Toca para simular')}
+                            </Text>
+                        </View>
+                    </Pressable>
                 </View>
 
-                {/* Info sidebar (wide) */}
+                {/* Tactical Parameters Visualizer (wide sidebar) */}
                 {isWide && (
                     <View style={styles.infoSidebar}>
-                        <InfoRow label="Grosor" value={`${shot.ballThickness}`} color={palette.text} muted={palette.muted} />
-                        <InfoRow label="Velocidad" value={`${shot.railSpeed} rieles`} color={palette.text} muted={palette.muted} />
-                        <InfoRow label="Efecto X" value={`${shot.effectX > 0 ? '+' : ''}${shot.effectX}`} color={palette.text} muted={palette.muted} />
-                        <InfoRow label="Efecto Y" value={`${shot.effectY > 0 ? '+' : ''}${shot.effectY}`} color={palette.text} muted={palette.muted} />
-                        {shot.isDifficult && <Tag label="Difícil" color="#EF4444" />}
-                        {shot.isPosition && <Tag label="Posición" color="#3B82F6" />}
-                        {shot.isDefense && <Tag label="Defensa" color="#10B981" />}
+                        <BallTacticsVisualizer
+                            ballThickness={shot.ballThickness}
+                            effectX={shot.effectX}
+                            effectY={shot.effectY}
+                            railSpeed={shot.railSpeed}
+                            categoryColor={color}
+                            isDifficult={shot.isDifficult}
+                            isPosition={shot.isPosition}
+                            isDefense={shot.isDefense}
+                            lang={selectedLang}
+                            compact={true}
+                        />
                     </View>
                 )}
             </View>
 
-            {/* Info row (mobile) */}
+            {/* Tactical Parameters Visualizer (mobile) */}
             {!isWide && (
-                <View style={styles.infoGrid}>
-                    <InfoRow label="Grosor" value={`${shot.ballThickness}`} color={palette.text} muted={palette.muted} />
-                    <InfoRow label="Velocidad" value={`${shot.railSpeed} rieles`} color={palette.text} muted={palette.muted} />
-                    <InfoRow label="Efecto X" value={`${shot.effectX > 0 ? '+' : ''}${shot.effectX}`} color={palette.text} muted={palette.muted} />
-                    <InfoRow label="Efecto Y" value={`${shot.effectY > 0 ? '+' : ''}${shot.effectY}`} color={palette.text} muted={palette.muted} />
-                </View>
-            )}
-
-            {/* Tags (mobile) */}
-            {!isWide && (
-                <View style={styles.tagsRow}>
-                    {shot.isDifficult && <Tag label="Difícil" color="#EF4444" />}
-                    {shot.isPosition && <Tag label="Posición" color="#3B82F6" />}
-                    {shot.isDefense && <Tag label="Defensa" color="#10B981" />}
-                </View>
+                <BallTacticsVisualizer
+                    ballThickness={shot.ballThickness}
+                    effectX={shot.effectX}
+                    effectY={shot.effectY}
+                    railSpeed={shot.railSpeed}
+                    categoryColor={color}
+                    isDifficult={shot.isDifficult}
+                    isPosition={shot.isPosition}
+                    isDefense={shot.isDefense}
+                    lang={selectedLang}
+                    compact={false}
+                />
             )}
 
             {/* Description */}
-            {shot.description ? (
+            {localized.description ? (
                 <View style={styles.section}>
-                    <Text style={[styles.sectionTitle, { color: palette.text }]}>Descripción</Text>
-                    <Text style={[styles.bodyText, { color: palette.muted }]}>{shot.description}</Text>
+                    <View style={styles.sectionHeaderRow}>
+                        <Text style={[styles.sectionTitle, { color: palette.text }]}>{labels.description}</Text>
+                        <Text style={[styles.langSourceBadge, { color: palette.muted }]}>
+                            {labels.originalNotice}
+                        </Text>
+                    </View>
+                    <Text style={[styles.bodyText, { color: palette.muted }]}>{localized.description}</Text>
                 </View>
             ) : null}
 
             {/* Tips */}
-            {shot.tips ? (
+            {localized.tips ? (
                 <View style={styles.section}>
-                    <Text style={[styles.sectionTitle, { color: palette.text }]}>Consejos</Text>
-                    <Text style={[styles.bodyText, { color: palette.muted }]}>{shot.tips}</Text>
+                    <Text style={[styles.sectionTitle, { color: palette.text }]}>{labels.tips}</Text>
+                    <Text style={[styles.bodyText, { color: palette.muted }]}>{localized.tips}</Text>
                 </View>
             ) : null}
 
@@ -211,7 +407,7 @@ export function ShotDetailScreen({ shotId: propShotId, onClose, onSimulate }: Sh
                         }}
                     >
                         <Text style={{ color: '#EF4444', fontSize: 14 }}>
-                            Ver en YouTube
+                            {labels.youtube}
                         </Text>
                     </Pressable>
                 </View>
@@ -227,20 +423,16 @@ export function ShotDetailScreen({ shotId: propShotId, onClose, onSimulate }: Sh
                     }}
                 >
                     <IconTarget size={18} color="#fff" />
-                    <Text style={styles.simulateBtnText}>Entrenar</Text>
+                    <Text style={styles.simulateBtnText}>{labels.train}</Text>
                 </Pressable>
                 <Pressable
                     style={[styles.simulateBtn, { flex: 1, backgroundColor: color }]}
-                    onPress={() => {
-                        if (onSimulate) {
-                            onSimulate(shot);
-                        } else {
-                            router.push({ pathname: '/training/simulate', params: { shotId: String(shot.id) } });
-                        }
-                    }}
+                    onPress={handleSimulateFromButton}
                 >
                     <IconPlayerPlay size={18} color="#fff" />
-                    <Text style={styles.simulateBtnText}>Simular</Text>
+                    <Text style={styles.simulateBtnText}>
+                        {isSimulating ? labels.simulating : labels.simulate}
+                    </Text>
                 </Pressable>
             </View>
 
@@ -285,13 +477,60 @@ const styles = StyleSheet.create({
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' } as ViewStyle,
     headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 } as ViewStyle,
     closeBtn: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(128,128,128,0.1)' } as ViewStyle,
-    badge: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, marginBottom: 16, gap: 6 } as ViewStyle,
+    badgeAndLangRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: 12,
+        marginBottom: 16,
+    } as ViewStyle,
+    badge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, gap: 6 } as ViewStyle,
     badgeDot: { width: 8, height: 8, borderRadius: 4 } as ViewStyle,
     badgeText: { fontSize: 13, fontWeight: '600' },
+    langSelector: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 3,
+        borderRadius: 20,
+        borderWidth: 1,
+        gap: 2,
+    } as ViewStyle,
+    langButton: {
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 16,
+    } as ViewStyle,
+    langButtonText: {
+        fontSize: 11.5,
+        fontWeight: '500',
+    },
     tableContainer: { marginBottom: 16 } as ViewStyle,
     tableWrap: { width: '100%' } as ViewStyle,
-    tableInner: { borderRadius: 12, borderWidth: 1, overflow: 'hidden' } as ViewStyle,
-    infoSidebar: { width: 200, gap: 12 } as ViewStyle,
+    tableInner: { borderRadius: 12, borderWidth: 1, overflow: 'hidden', position: 'relative' } as ViewStyle,
+    tableSimulateBadge: {
+        position: 'absolute',
+        bottom: 8,
+        right: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        paddingHorizontal: 9,
+        paddingVertical: 5,
+        borderRadius: 16,
+        borderWidth: 1,
+        shadowColor: '#000',
+        shadowOpacity: 0.45,
+        shadowRadius: 5,
+        elevation: 4,
+    } as ViewStyle,
+    tableSimulateBadgeText: {
+        color: '#FFFFFF',
+        fontSize: 11,
+        fontWeight: '700',
+        letterSpacing: 0.2,
+    },
+    infoSidebar: { width: 340, gap: 12 } as ViewStyle,
     infoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 12 } as ViewStyle,
     infoRow: { gap: 2 } as ViewStyle,
     infoLabel: { fontSize: 11, fontWeight: '500', textTransform: 'uppercase', letterSpacing: 0.5 },
@@ -300,10 +539,18 @@ const styles = StyleSheet.create({
     tag: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1 } as ViewStyle,
     tagText: { fontSize: 12, fontWeight: '600' },
     section: { marginBottom: 20 } as ViewStyle,
-    sectionTitle: { fontSize: 15, fontWeight: '700', marginBottom: 6 },
+    sectionHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 6,
+        gap: 8,
+    } as ViewStyle,
+    sectionTitle: { fontSize: 15, fontWeight: '700' },
+    langSourceBadge: { fontSize: 11, fontStyle: 'italic' },
     bodyText: { fontSize: 14, lineHeight: 21 },
     simulateBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 12, marginTop: 8 } as ViewStyle,
     simulateBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
-    webOverlay: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, backdropFilter: 'blur(4px)', padding: 8 } as ViewStyle,
-    webModal: { width: '95vw', maxWidth: 800, maxHeight: '92vh', borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 20 } as any,
+    webOverlay: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, backdropFilter: 'blur(4px)', padding: 12 } as ViewStyle,
+    webModal: { width: '95vw', maxWidth: 1100, maxHeight: '92vh', borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 24, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)' } as any,
 });

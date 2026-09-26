@@ -26,6 +26,7 @@ export interface TrainingPlayTableProps {
   redBall: TablePoint;
   redBallColor?: 'red' | 'orange' | 'blue';
   trajectory?: TablePoint[]; // Optional solution path
+  trajectoryColor?: string; // Optional trajectory stroke color (e.g. category color)
   isSimulating?: boolean;
   onSimulationEnd?: () => void;
   showGrid?: boolean;
@@ -56,6 +57,7 @@ function TrainingPlayTableBase({
   redBall,
   redBallColor = 'red',
   trajectory = [],
+  trajectoryColor = '#4edea3',
   isSimulating = false,
   onSimulationEnd,
   showGrid = true,
@@ -100,9 +102,19 @@ function TrainingPlayTableBase({
   const [simBallPos, setSimBallPos] = useState<TablePoint | null>(null);
   const animFrameRef = useRef<number | null>(null);
 
+  const effectiveTrajectory = useMemo(() => {
+    if (!trajectory || trajectory.length === 0) return [];
+    if (trajectory.length === 1) return [];
+    const first = trajectory[0];
+    if (Math.hypot(first.x - safeWhite.x, first.y - safeWhite.y) > 2.0) {
+      return [safeWhite, ...trajectory];
+    }
+    return trajectory;
+  }, [trajectory, safeWhite]);
+
   // Smooth simulation animation along trajectory path
   useEffect(() => {
-    if (!isSimulating || trajectory.length < 2) {
+    if (!isSimulating || effectiveTrajectory.length < 2) {
       setSimBallPos(null);
       if (animFrameRef.current !== null) {
         cancelAnimationFrame(animFrameRef.current);
@@ -116,9 +128,9 @@ function TrainingPlayTableBase({
 
     // Compute cumulative segment distances
     const dists: number[] = [0];
-    for (let i = 1; i < trajectory.length; i++) {
-      const dx = trajectory[i].x - trajectory[i - 1].x;
-      const dy = trajectory[i].y - trajectory[i - 1].y;
+    for (let i = 1; i < effectiveTrajectory.length; i++) {
+      const dx = effectiveTrajectory[i].x - effectiveTrajectory[i - 1].x;
+      const dy = effectiveTrajectory[i].y - effectiveTrajectory[i - 1].y;
       dists.push(dists[i - 1] + Math.sqrt(dx * dx + dy * dy));
     }
     const totalDist = dists[dists.length - 1];
@@ -140,8 +152,8 @@ function TrainingPlayTableBase({
       const segSpan = segEndDist - segStartDist;
       const segFactor = segSpan > 0 ? (currentTargetDist - segStartDist) / segSpan : 1;
 
-      const p0 = trajectory[segIdx];
-      const p1 = trajectory[Math.min(segIdx + 1, trajectory.length - 1)];
+      const p0 = effectiveTrajectory[segIdx];
+      const p1 = effectiveTrajectory[Math.min(segIdx + 1, effectiveTrajectory.length - 1)];
 
       setSimBallPos({
         x: p0.x + (p1.x - p0.x) * segFactor,
@@ -163,13 +175,13 @@ function TrainingPlayTableBase({
         animFrameRef.current = null;
       }
     };
-  }, [isSimulating, trajectory, onSimulationEnd]);
+  }, [isSimulating, effectiveTrajectory, onSimulationEnd]);
 
   const activeCueBall = isSimulating && simBallPos ? simBallPos : safeWhite;
 
   // Build SVG path string for trajectory
-  const pathD = trajectory.length > 0
-    ? trajectory.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x + PLAY_OFFSET_X} ${p.y + PLAY_OFFSET_Y}`).join(' ')
+  const pathD = effectiveTrajectory.length > 1
+    ? effectiveTrajectory.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x + PLAY_OFFSET_X} ${p.y + PLAY_OFFSET_Y}`).join(' ')
     : '';
 
   // Diamonds calculation: 9 on long rails (including corners) or 7, 5 on short rails or 3
@@ -556,26 +568,37 @@ function TrainingPlayTableBase({
           </G>
         )}
 
-        {/* 5. Solution Trajectory Path (Dashed glowing line) */}
+        {/* 5. Solution Trajectory Path (Glow underlay + sharp line in category color) */}
         {pathD ? (
           <G>
             <Path
               d={pathD}
               fill="none"
-              stroke="rgba(78, 222, 163, 0.35)"
-              strokeWidth={4.5}
+              stroke={trajectoryColor}
+              strokeOpacity={0.32}
+              strokeWidth={4.8}
               strokeLinecap="round"
               strokeLinejoin="round"
             />
             <Path
               d={pathD}
               fill="none"
-              stroke="#4edea3"
-              strokeWidth={1.8}
-              strokeDasharray="3, 3"
+              stroke={trajectoryColor}
+              strokeWidth={1.9}
+              strokeDasharray="3.5, 2.5"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
+            {effectiveTrajectory.length > 1 && (
+              <Circle
+                cx={effectiveTrajectory[effectiveTrajectory.length - 1].x + PLAY_OFFSET_X}
+                cy={effectiveTrajectory[effectiveTrajectory.length - 1].y + PLAY_OFFSET_Y}
+                r={2.2}
+                fill={trajectoryColor}
+                stroke="#ffffff"
+                strokeWidth={0.6}
+              />
+            )}
           </G>
         ) : null}
 
@@ -705,7 +728,7 @@ export default TrainingPlayTable;
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    aspectRatio: 2 / 1,
+    aspectRatio: 316 / 174,
     borderRadius: 8,
     overflow: 'hidden',
     shadowColor: '#000000',
