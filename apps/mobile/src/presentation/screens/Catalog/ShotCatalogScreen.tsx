@@ -46,24 +46,6 @@ const CATEGORY_COLORS: Record<string, string> = {
     ball_choice: '#0EA5E9',
 };
 
-const CATEGORY_NAMES: Record<string, string> = {
-    draw: 'Retro',
-    side_spin: 'Lateral',
-    follow: 'Seguimiento',
-    cut: 'Corte',
-    big_spin: 'Gran Rotación',
-    standing: 'Vertical',
-    double_cushion: 'Doble Banda',
-    cross_table: 'Travesía',
-    reverse: 'Reversa',
-    come_back: 'Regreso',
-    bounce: 'Rebote',
-    bank_shot: 'Banda Previa',
-    basic: 'Básico',
-    rescue: 'Rescate',
-    ball_choice: 'Selección',
-};
-
 export interface ShotCatalogScreenProps {
     onSelectShot?: (shot: CatalogShot) => void;
     mode?: 'default' | 'picker';

@@ -51,21 +51,21 @@ const TABLE_W = 284;
 const TABLE_H = 142;
 
 export const CATEGORY_NAMES_ES: Record<string, string> = {
-    draw: 'Retro',
-    side_spin: 'Efecto Lateral',
-    follow: 'Seguimiento',
-    cut: 'Corte',
-    big_spin: 'Gran Rotación',
-    standing: 'Vertical',
-    double_cushion: 'Doble Banda',
-    cross_table: 'Travesía',
-    reverse: 'Reversa',
-    come_back: 'Regreso',
-    bounce: 'Rebote',
-    bank_shot: 'Banco',
-    basic: 'Básico',
-    rescue: 'Rescate',
-    ball_choice: 'Selección',
+    draw: 'Cajones (Retros)',
+    side_spin: 'Rodadas',
+    follow: 'Corridos (Seguimiento)',
+    cut: 'Corte Fino',
+    big_spin: 'Doble Vuelta (Gran Vuelta)',
+    standing: 'Línea (Vertical)',
+    double_cushion: 'Dos Bandas (Doble Banda)',
+    cross_table: 'Zigzag (Pasones)',
+    reverse: 'Renversé (Contra-efecto)',
+    come_back: 'Retorno (Tiki-Tiki)',
+    bounce: 'Curvón (Bounding)',
+    bank_shot: 'Banda Previa (Previas)',
+    basic: 'Fundamentos (Básico)',
+    rescue: 'Tikis de Truco (Fantasía)',
+    ball_choice: 'Selección de Tacada',
 };
 
 export const CATEGORY_NAMES_EN: Record<string, string> = {
@@ -135,7 +135,7 @@ export function getLocalizedShot(
         };
     }
     return {
-        name: shot.nameEs || CATEGORY_NAMES_ES[shot.category] || shot.categoryName,
+        name: CATEGORY_NAMES_ES[shot.category] || shot.nameEs || shot.categoryName,
         description: shot.descriptionEs || shot.description,
         tips: shot.tipsEs || shot.tips,
     };
@@ -290,8 +290,8 @@ export function adaptCatalogShot(raw: any): CatalogShot {
             raw.effect_x
         );
 
-    const nameEs = raw.name_es || CATEGORY_NAMES_ES[raw.category] || raw.category;
-    const nameEn = raw.name_en || CATEGORY_NAMES_EN[raw.category] || raw.category;
+    const nameEs = CATEGORY_NAMES_ES[raw.category] || raw.name_es || raw.category;
+    const nameEn = CATEGORY_NAMES_EN[raw.category] || raw.name_en || raw.category;
     const nameKo = raw.name_ko || CATEGORY_NAMES_KO[raw.category] || raw.category;
 
     const descriptionEs = raw.description_es || raw.description || '';

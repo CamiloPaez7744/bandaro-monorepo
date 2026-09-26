@@ -430,9 +430,9 @@ export function TrainingCatalogScreen() {
 
             {/* 3. Quick Systems Library Shortcut */}
             <View style={styles.libraryShortcutCard}>
-              <Text style={styles.libraryShortcutTitle}>Sistemas Clásicos UMB</Text>
+              <Text style={styles.libraryShortcutTitle}>Sistemas Clásicos (Colombia / México)</Text>
               <Text style={styles.libraryShortcutDesc}>
-                Accede directamente a la biblioteca de fórmulas y diagramas maestros.
+                Accede directamente a la biblioteca de fórmulas y diagramas de referencia.
               </Text>
               <View style={styles.systemsChipsRow}>
                 {TRAINING_SYSTEMS.map((sys) => (
