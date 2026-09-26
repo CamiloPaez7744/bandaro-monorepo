@@ -113,7 +113,7 @@ describe('Carom Physics', () => {
             expect(calculateShotVelocity(20)).toBeGreaterThan(2.0);
             expect(calculateShotVelocity(50)).toBeGreaterThan(calculateShotVelocity(20));
             expect(calculateShotVelocity(100)).toBeGreaterThan(calculateShotVelocity(50));
-            expect(calculateShotVelocity(100)).toBeCloseTo(12.5, 1);
+            expect(calculateShotVelocity(100)).toBeCloseTo(27.84, 1);
         });
 
         it('low power shot (20%) produces gentle travel with 1-2 cushion rebounds', () => {
@@ -123,7 +123,6 @@ describe('Carom Physics', () => {
 
             const result = simulateShot([cue], 1000, DEFAULT_TABLE);
             const cushionHits = result.events.filter((e) => e.type === 'cushion').length;
-            // A gentle 20% power shot should not bounce more than 2 cushions
             expect(cushionHits).toBeLessThanOrEqual(2);
         });
 
@@ -135,9 +134,75 @@ describe('Carom Physics', () => {
 
             const result = simulateShot([cue], 2000, DEFAULT_TABLE);
             const cushionHits = result.events.filter((e) => e.type === 'cushion').length;
-            // Realistic 3-cushion billiards: should achieve 3-5 cushions without 15+ accordion bounces
             expect(cushionHits).toBeGreaterThanOrEqual(3);
-            expect(cushionHits).toBeLessThanOrEqual(6);
+            expect(cushionHits).toBeLessThanOrEqual(8);
+        });
+    });
+
+    describe('Canonical Speed Calibration (Quetglas / UMB Standard Lengths)', () => {
+        // Test ball at right cushion (x = 280.9, y = 106) shooting straight left (-1, 0)
+        const startX = 280.925;
+        const startY = 106;
+
+        it('Velocidad 1 (20%): travels ~1 table length (dies at or gently kisses opposite short cushion)', () => {
+            const v1 = calculateShotVelocity(20);
+            const cue = createBall('white', startX, startY);
+            cue.vel = vec2(-v1, 0);
+
+            const result = simulateShot([cue], 1000, DEFAULT_TABLE);
+            const finalWhite = result.finalBalls.find((b) => b.id === 'white')!;
+
+            // Reaches near opposite cushion (x <= 15) and has at most 1 cushion contact
+            expect(finalWhite.pos.x).toBeLessThan(15);
+            expect(finalWhite.pos.x).toBeGreaterThanOrEqual(3.075);
+        });
+
+        it('Velocidad 2 (40%): travels ~2 table lengths (returns all the way to starting position)', () => {
+            const v2 = calculateShotVelocity(40);
+            const cue = createBall('white', startX, startY);
+            cue.vel = vec2(-v2, 0);
+
+            const result = simulateShot([cue], 1500, DEFAULT_TABLE);
+            const finalWhite = result.finalBalls.find((b) => b.id === 'white')!;
+
+            // Rebounds on left cushion and returns to starting area (x >= 260)
+            expect(finalWhite.pos.x).toBeGreaterThan(260);
+        });
+
+        it('Velocidad 3 (60%): travels ~3 table lengths (rebounds 2 cushions and returns to opposite cushion)', () => {
+            const v3 = calculateShotVelocity(60);
+            const cue = createBall('white', startX, startY);
+            cue.vel = vec2(-v3, 0);
+
+            const result = simulateShot([cue], 2000, DEFAULT_TABLE);
+            const finalWhite = result.finalBalls.find((b) => b.id === 'white')!;
+
+            // Hits left, hits right, returns to opposite cushion area (x <= 25)
+            expect(finalWhite.pos.x).toBeLessThan(25);
+        });
+
+        it('Velocidad 4 (80%): travels ~4 table lengths (rebounds 3 cushions and returns to starting cushion)', () => {
+            const v4 = calculateShotVelocity(80);
+            const cue = createBall('white', startX, startY);
+            cue.vel = vec2(-v4, 0);
+
+            const result = simulateShot([cue], 2500, DEFAULT_TABLE);
+            const finalWhite = result.finalBalls.find((b) => b.id === 'white')!;
+
+            // Returns to right side of the table near start cushion (x >= 260)
+            expect(finalWhite.pos.x).toBeGreaterThan(260);
+        });
+
+        it('Velocidad 5 (100%): travels ~5 table lengths (rebounds 4 cushions and finishes across table)', () => {
+            const v5 = calculateShotVelocity(100);
+            const cue = createBall('white', startX, startY);
+            cue.vel = vec2(-v5, 0);
+
+            const result = simulateShot([cue], 3000, DEFAULT_TABLE);
+            const finalWhite = result.finalBalls.find((b) => b.id === 'white')!;
+
+            // Finishes near opposite cushion (x <= 30)
+            expect(finalWhite.pos.x).toBeLessThan(30);
         });
     });
 });

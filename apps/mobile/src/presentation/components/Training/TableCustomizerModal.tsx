@@ -1,4 +1,4 @@
-import { memo, useState } from 'react';
+import { memo, useState, useEffect } from 'react';
 import {
   Modal,
   Platform,
@@ -68,6 +68,12 @@ function TableCustomizerModalBase({
   const [customHex, setCustomHex] = useState(
     preferences.clothColor.startsWith('#') ? preferences.clothColor : '#0f766e'
   );
+
+  useEffect(() => {
+    if (preferences.clothColor.startsWith('#')) {
+      setCustomHex(preferences.clothColor);
+    }
+  }, [preferences.clothColor, visible]);
 
   const update = (partial: Partial<TablePreferences>) => {
     onChangePreferences({ ...preferences, ...partial });
@@ -338,7 +344,11 @@ function TableCustomizerModalBase({
                   return (
                     <Pressable
                       key={p.id}
-                      style={[s.presetCard, isActive && s.presetCardActive]}
+                      style={[
+                        s.presetCard,
+                        !isMobile && s.presetCardWide,
+                        isActive && s.presetCardActive,
+                      ]}
                       onPress={() => update({ clothColor: p.id })}>
                       <View style={[s.swatchCircle, { backgroundColor: p.hex }]}>
                         {isActive && <IconCheck size={14} color="#ffffff" strokeWidth={3} />}
@@ -464,7 +474,7 @@ function TableCustomizerModalBase({
                     s.countCard,
                     preferences.diamondCount === '9_5' && s.countCardActive,
                   ]}
-                  onPress={() => update({ diamondCount: '9_5' })}>
+                  onPress={() => update({ diamondCount: '9_5', showCornerDiamonds: true })}>
                   <Text
                     style={[
                       s.countCardBadge,
@@ -483,7 +493,7 @@ function TableCustomizerModalBase({
                     s.countCard,
                     preferences.diamondCount === '7_3' && s.countCardActive,
                   ]}
-                  onPress={() => update({ diamondCount: '7_3' })}>
+                  onPress={() => update({ diamondCount: '7_3', showCornerDiamonds: false })}>
                   <Text
                     style={[
                       s.countCardBadge,
@@ -507,10 +517,13 @@ function TableCustomizerModalBase({
                   </Text>
                 </View>
                 <Switch
-                  value={preferences.showCornerDiamonds}
-                  onValueChange={(val) => update({ showCornerDiamonds: val })}
+                  value={preferences.diamondCount === '9_5' && preferences.showCornerDiamonds !== false}
+                  onValueChange={(val) => update({
+                    showCornerDiamonds: val,
+                    diamondCount: val ? '9_5' : '7_3',
+                  })}
                   trackColor={{ false: '#334155', true: '#059669' }}
-                  thumbColor={preferences.showCornerDiamonds ? '#10b981' : '#cbd5e1'}
+                  thumbColor={(preferences.diamondCount === '9_5' && preferences.showCornerDiamonds !== false) ? '#10b981' : '#cbd5e1'}
                 />
               </View>
             </View>
@@ -652,37 +665,36 @@ function TableCustomizerModalBase({
                     Selecciona el diseño central para la mesa:
                   </Text>
 
-                  <View style={s.decalGrid}>
+                  <View style={s.decalVisualGrid}>
                     {TABLE_DECAL_DEFS.map((decal) => {
                       const isSelected = preferences.tableDecal === decal.id;
                       return (
                         <TouchableOpacity
                           key={decal.id}
-                          style={[s.decalCard, isSelected && s.decalCardActive]}
+                          style={[
+                            s.decalVisualCard,
+                            !isMobile && s.decalVisualCardWide,
+                            isSelected && s.decalVisualCardActive,
+                          ]}
                           onPress={() => update({ tableDecal: decal.id })}
                           activeOpacity={0.75}>
-                          <View style={s.decalBadgeBox}>
+                          <View style={s.decalVisualPreview}>
                             {decal.isImage && decal.imageSource ? (
                               <Image
                                 source={decal.imageSource}
-                                style={s.decalThumbImage}
+                                style={s.decalVisualImage}
                                 resizeMode="contain"
                               />
                             ) : (
-                              <Text style={s.decalBadgeIcon}>{decal.badge}</Text>
+                              <Text style={s.decalVisualEmptyIcon}>{decal.badge}</Text>
                             )}
                           </View>
-                          <View style={s.decalInfo}>
-                            <Text style={[s.decalName, isSelected && s.decalNameActive]}>
-                              {decal.name}
-                            </Text>
-                            <Text style={s.decalDesc} numberOfLines={2}>
-                              {decal.description}
-                            </Text>
-                          </View>
+                          <Text style={[s.decalVisualName, isSelected && s.decalVisualNameActive]} numberOfLines={1}>
+                            {decal.name}
+                          </Text>
                           {isSelected && (
-                            <View style={s.decalCheckDot}>
-                              <IconCheck size={12} color="#0a100d" strokeWidth={3} />
+                            <View style={s.decalVisualCheckDot}>
+                              <IconCheck size={11} color="#0a100d" strokeWidth={3} />
                             </View>
                           )}
                         </TouchableOpacity>
@@ -697,11 +709,11 @@ function TableCustomizerModalBase({
                       <View style={s.opacityOptionsRow}>
                         {[
                           { label: 'Muy Sutil (10%)', val: 0.10 },
-                          { label: 'Marca de Agua (18%) ⭐', val: 0.18 },
-                          { label: 'Marcado (28%)', val: 0.28 },
-                          { label: 'Intenso (40%)', val: 0.40 },
+                          { label: 'Marca de Agua (20%) ⭐', val: 0.20 },
+                          { label: 'Marcado (30%)', val: 0.30 },
+                          { label: 'Intenso (45%)', val: 0.45 },
                         ].map((op) => {
-                          const isActive = Math.abs((preferences.decalOpacity ?? 0.18) - op.val) < 0.04;
+                          const isActive = Math.abs((preferences.decalOpacity ?? 0.20) - op.val) < 0.04;
                           return (
                             <TouchableOpacity
                               key={op.val}
@@ -720,37 +732,71 @@ function TableCustomizerModalBase({
               )}
             </View>
 
-            {/* 6. SECCIÓN: MODELO DE TACO DE BILLAR */}
+            {/* SECCIÓN: MODELO DE TACO DE BILLAR */}
             <View style={s.section}>
               <Text style={s.sectionTitle}>Taco de Billar Oficial (Cue Skin)</Text>
               <Text style={s.sectionDesc}>
-                Elige el modelo y acabado estético de tu taco de competición:
+                Elige el diseño visual de tu taco de competición:
               </Text>
 
-              <View style={{ gap: 10, marginTop: 8 }}>
+              <View style={[s.cuesGrid, !isMobile && s.cuesGridWide]}>
                 {CUE_SKIN_PRESETS.map((cue) => {
                   const isSelected = (preferences.cueSkin ?? 'venom_azure') === cue.id;
+                  const isCarbon = cue.id === 'carbon_stealth';
+                  const isClassic = cue.id === 'classic_gold';
+
                   return (
                     <TouchableOpacity
                       key={cue.id}
                       style={[
-                        s.cueCard,
-                        isSelected && { borderColor: cue.accentColor, backgroundColor: 'rgba(2, 132, 199, 0.12)' },
+                        s.visualCueCard,
+                        !isMobile && s.visualCueCardWide,
+                        isSelected && { borderColor: cue.accentColor, backgroundColor: `${cue.primaryColor}18` },
                       ]}
                       onPress={() => update({ cueSkin: cue.id })}
                       activeOpacity={0.8}>
-                      <View style={[s.cueColorIndicator, { backgroundColor: cue.primaryColor, borderColor: cue.accentColor }]} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={[s.cueCardTitle, isSelected && { color: cue.accentColor }]}>
+                      {/* 1. Realistic Cue Stick Visual Graphic */}
+                      <View style={s.cueStickGraphicRow}>
+                        {/* Rubber Bumper */}
+                        <View style={s.cueBumper} />
+                        {/* Butt Sleeve */}
+                        <View style={[s.cueButtSleeve, { backgroundColor: isCarbon ? '#18181b' : isClassic ? '#2b1810' : '#0f172a' }]}>
+                          <View style={[s.cueAccentRing, { backgroundColor: cue.accentColor }]} />
+                        </View>
+                        {/* Grip / Wrap */}
+                        <View style={[s.cueWrapGrip, { backgroundColor: isCarbon ? '#09090b' : isClassic ? '#1c1917' : '#020617' }]}>
+                          <View style={[s.cueWrapTexture, { borderColor: `${cue.accentColor}40` }]} />
+                        </View>
+                        {/* Forearm with Inlaid Flames */}
+                        <View style={[s.cueForearm, { backgroundColor: isCarbon ? '#1c1917' : isClassic ? '#3b2314' : '#0f172a' }]}>
+                          <View style={[s.cueInlayFlame, { borderLeftColor: cue.accentColor }]} />
+                        </View>
+                        {/* Joint Collar (Metal) */}
+                        <View style={[s.cueJointCollar, { backgroundColor: isClassic ? '#f59e0b' : '#cbd5e1' }]} />
+                        {/* Shaft */}
+                        <View style={[s.cueShaft, { backgroundColor: isCarbon ? '#27272a' : isClassic ? '#fde047' : '#0284c7' }]}>
+                          <View style={[s.cueShaftGlow, { backgroundColor: isCarbon ? '#3f3f46' : isClassic ? '#fef08a' : '#38bdf8' }]} />
+                        </View>
+                        {/* Ferrule (Ivory White) */}
+                        <View style={s.cueFerrule} />
+                        {/* Tip (Master Chalk Blue) */}
+                        <View style={s.cueTip} />
+                      </View>
+
+                      {/* 2. Cue Info Row (Name + Edition Tag) */}
+                      <View style={s.cueInfoRow}>
+                        <Text style={[s.visualCueName, isSelected && { color: cue.accentColor }]}>
                           {cue.name}
                         </Text>
-                        <Text style={s.cueCardSub}>{cue.subtitle}</Text>
-                        <Text style={s.cueCardDesc} numberOfLines={2}>
-                          {cue.description}
-                        </Text>
+                        <View style={[s.cueTagPill, { borderColor: `${cue.accentColor}60`, backgroundColor: `${cue.accentColor}18` }]}>
+                          <Text style={[s.cueTagPillText, { color: cue.accentColor }]}>
+                            {cue.subtitle.split('•')[0].trim()}
+                          </Text>
+                        </View>
                       </View>
+
                       {isSelected && (
-                        <View style={[s.cueCheckBadge, { backgroundColor: cue.accentColor }]}>
+                        <View style={[s.visualCueCheckBadge, { backgroundColor: cue.accentColor }]}>
                           <IconCheck size={12} color="#020617" strokeWidth={3} />
                         </View>
                       )}
@@ -794,8 +840,8 @@ const s = StyleSheet.create({
     padding: 16,
   },
   modalContainer: {
-    width: '100%',
-    maxWidth: 620,
+    width: '95%',
+    maxWidth: 1040,
     maxHeight: '90%',
     backgroundColor: '#0f1713',
     borderRadius: 20,
@@ -945,6 +991,9 @@ const s = StyleSheet.create({
     padding: 10,
     borderWidth: 1.5,
     borderColor: '#1d3329',
+  },
+  presetCardWide: {
+    width: '31.8%',
   },
   presetCardActive: {
     borderColor: '#10b981',
@@ -1198,63 +1247,70 @@ const s = StyleSheet.create({
   woodBtnTextActive: {
     color: '#f1f5f3',
   },
-  decalGrid: {
-    gap: 8,
-    marginTop: 8,
-  },
-  decalCard: {
+  decalVisualGrid: {
     flexDirection: 'row',
-    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 10,
+  },
+  decalVisualCard: {
+    width: '23%',
+    minWidth: 68,
     backgroundColor: '#12231c',
-    borderWidth: 1,
-    borderColor: '#1e382d',
     borderRadius: 12,
-    padding: 10,
-    gap: 12,
+    borderWidth: 1.5,
+    borderColor: '#1e382d',
+    padding: 6,
+    alignItems: 'center',
+    gap: 5,
+    position: 'relative',
   },
-  decalCardActive: {
+  decalVisualCardWide: {
+    width: '11.4%',
+    minWidth: 92,
+    padding: 8,
+  },
+  decalVisualCardActive: {
     borderColor: '#10b981',
-    backgroundColor: '#173327',
+    backgroundColor: '#173b2a',
+    shadowColor: '#10b981',
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  decalBadgeBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
+  decalVisualPreview: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: 8,
     backgroundColor: '#0a1611',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#1e382d',
     overflow: 'hidden',
   },
-  decalThumbImage: {
-    width: 38,
-    height: 38,
+  decalVisualImage: {
+    width: '88%',
+    height: '88%',
   },
-  decalBadgeIcon: {
-    fontSize: 20,
+  decalVisualEmptyIcon: {
+    fontSize: 22,
+    color: '#64748b',
   },
-  decalInfo: {
-    flex: 1,
-    gap: 2,
-  },
-  decalName: {
-    fontSize: 13,
+  decalVisualName: {
+    fontSize: 10.5,
     fontWeight: '700',
-    color: '#f1f5f3',
+    color: '#94a39d',
+    textAlign: 'center',
   },
-  decalNameActive: {
+  decalVisualNameActive: {
     color: '#34d399',
   },
-  decalDesc: {
-    fontSize: 11,
-    color: '#94a39d',
-    lineHeight: 14,
-  },
-  decalCheckDot: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+  decalVisualCheckDot: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 17,
+    height: 17,
+    borderRadius: 8.5,
     backgroundColor: '#10b981',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1337,45 +1393,141 @@ const s = StyleSheet.create({
     fontWeight: '700',
     color: '#0a100d',
   },
-  cueCard: {
+  cuesGrid: {
+    gap: 10,
+    marginTop: 8,
+  },
+  cuesGridWide: {
     flexDirection: 'row',
-    alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 12,
-    padding: 12,
+  },
+  visualCueCard: {
+    padding: 10,
     borderRadius: 14,
     backgroundColor: 'rgba(15, 23, 42, 0.65)',
     borderWidth: 1.5,
     borderColor: '#1e293b',
+    gap: 8,
+    position: 'relative',
   },
-  cueColorIndicator: {
-    width: 22,
-    height: 48,
-    borderRadius: 6,
-    borderWidth: 1.5,
+  visualCueCardWide: {
+    width: '49%',
   },
-  cueCardTitle: {
-    fontSize: 13.5,
-    fontWeight: '700',
-    color: '#f8fafc',
+  cueStickGraphicRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 18,
+    backgroundColor: 'rgba(2, 6, 23, 0.75)',
+    borderRadius: 9,
+    paddingHorizontal: 6,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
-  cueCardSub: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#94a3b8',
-    marginTop: 1,
+  cueBumper: {
+    width: 5,
+    height: 12,
+    backgroundColor: '#020617',
+    borderTopLeftRadius: 3,
+    borderBottomLeftRadius: 3,
   },
-  cueCardDesc: {
-    fontSize: 10.5,
-    color: '#64748b',
-    marginTop: 2,
-    lineHeight: 14,
-  },
-  cueCheckBadge: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+  cueButtSleeve: {
+    width: 40,
+    height: 11,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  cueAccentRing: {
+    width: 3,
+    height: 11,
+  },
+  cueWrapGrip: {
+    width: 65,
+    height: 10,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.06)',
+  },
+  cueWrapTexture: {
+    flex: 1,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+  },
+  cueForearm: {
+    width: 55,
+    height: 9,
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  cueInlayFlame: {
+    position: 'absolute',
+    right: 2,
+    width: 0,
+    height: 0,
+    borderTopWidth: 4,
+    borderBottomWidth: 4,
+    borderLeftWidth: 18,
+    borderTopColor: 'transparent',
+    borderBottomColor: 'transparent',
+  },
+  cueJointCollar: {
+    width: 6,
+    height: 8.5,
+  },
+  cueShaft: {
+    flex: 1,
+    height: 7.5,
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  cueShaftGlow: {
+    width: '100%',
+    height: 2,
+    opacity: 0.6,
+  },
+  cueFerrule: {
+    width: 6,
+    height: 6.5,
+    backgroundColor: '#f8fafc',
+  },
+  cueTip: {
+    width: 4,
+    height: 6,
+    backgroundColor: '#0284c7',
+    borderTopRightRadius: 2,
+    borderBottomRightRadius: 2,
+  },
+  cueInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 2,
+  },
+  visualCueName: {
+    fontSize: 13.5,
+    fontWeight: '800',
+    color: '#f1f5f3',
+    letterSpacing: 0.3,
+  },
+  cueTagPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 2.5,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  cueTagPillText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+  },
+  visualCueCheckBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sectionHeaderWithBadge: {
     flexDirection: 'row',

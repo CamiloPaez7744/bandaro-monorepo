@@ -79,8 +79,8 @@ export function predictTrajectory(
     cueBall.spin = vec2Scale(vec2(spin.x, spin.y), spin.magnitude);
 
     const calculatedMaxSteps = maxSteps ?? Math.min(
-        400,
-        Math.ceil(Math.log(PHYSICS.minVelocity / Math.max(0.1, power)) / Math.log(PHYSICS.friction)) + 20
+        800,
+        Math.ceil(Math.log(PHYSICS.minVelocity / Math.max(0.1, power)) / Math.log(PHYSICS.friction)) + 40
     );
 
     // Initialize paths - only cue ball starts with initial position

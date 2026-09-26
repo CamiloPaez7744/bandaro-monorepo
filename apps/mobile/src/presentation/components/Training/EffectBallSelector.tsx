@@ -2,7 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { PanResponder, Pressable, StyleSheet, Text, View, type GestureResponderEvent, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Circle, ClipPath, Defs, G, Line, LinearGradient, RadialGradient, Stop } from 'react-native-svg';
 
-import { SpinEffect } from '@bandaro/core';
+import { BallId, SpinEffect } from '@bandaro/core';
 
 interface EffectBallSelectorProps {
     spin: SpinEffect;
@@ -12,6 +12,7 @@ interface EffectBallSelectorProps {
     style?: StyleProp<ViewStyle>;
     showGuideToggle?: boolean;
     initialGuidesVisible?: boolean;
+    cueBallId?: BallId;
     onGuidesChange?: (visible: boolean) => void;
 }
 
@@ -28,7 +29,8 @@ function EffectBallSelectorBase(props: Readonly<EffectBallSelectorProps>) {
         size = BASE_SIZE,
         style,
         showGuideToggle = true,
-        initialGuidesVisible = false,
+        initialGuidesVisible = true,
+        cueBallId = 'white',
         onGuidesChange,
     } = props;
 
@@ -39,6 +41,8 @@ function EffectBallSelectorBase(props: Readonly<EffectBallSelectorProps>) {
     const dotRadius = (BASE_DOT_RADIUS / BASE_SIZE) * size;
     const maxDrag = sphereRadius * MAX_DRAG_RATIO;
     const clipId = useMemo(() => `effectBallClip-${Math.random().toString(36).slice(2, 9)}`, []);
+    const gradId = useMemo(() => `effGrad-${Math.random().toString(36).slice(2, 9)}`, []);
+    const shineId = useMemo(() => `effShine-${Math.random().toString(36).slice(2, 9)}`, []);
 
     useEffect(() => {
         onGuidesChange?.(guidesVisible);
@@ -97,12 +101,19 @@ function EffectBallSelectorBase(props: Readonly<EffectBallSelectorProps>) {
                                 <ClipPath id={clipId}>
                                     <Circle cx={ballCenter} cy={ballCenter} r={sphereRadius} />
                                 </ClipPath>
-                                <LinearGradient id="effectSphereGradient" x1="0" y1="0" x2="1" y2="1">
-                                    <Stop offset="0%" stopColor="#ffffff" />
-                                    <Stop offset="60%" stopColor="#f0ede0" />
-                                    <Stop offset="100%" stopColor="#c8c4b2" />
+                                <LinearGradient id={gradId} x1="0" y1="0" x2="1" y2="1">
+                                    {cueBallId === 'yellow' ? [
+                                        <Stop key="y0" offset="0%" stopColor="#fffbeb" />,
+                                        <Stop key="y1" offset="30%" stopColor="#fef08a" />,
+                                        <Stop key="y2" offset="70%" stopColor="#eab308" />,
+                                        <Stop key="y3" offset="100%" stopColor="#854d0e" />,
+                                    ] : [
+                                        <Stop key="w0" offset="0%" stopColor="#ffffff" />,
+                                        <Stop key="w1" offset="60%" stopColor="#f0ede0" />,
+                                        <Stop key="w2" offset="100%" stopColor="#c8c4b2" />,
+                                    ]}
                                 </LinearGradient>
-                                <RadialGradient id="effectShine" cx="50%" cy="48%" r="68%">
+                                <RadialGradient id={shineId} cx="50%" cy="48%" r="68%">
                                     <Stop offset="0%" stopColor="rgba(255,255,255,0.50)" />
                                     <Stop offset="45%" stopColor="rgba(255,255,255,0.05)" />
                                     <Stop offset="100%" stopColor="rgba(255,255,255,0)" />
@@ -110,8 +121,8 @@ function EffectBallSelectorBase(props: Readonly<EffectBallSelectorProps>) {
                             </Defs>
 
                             <G clipPath={`url(#${clipId})`}>
-                                <Circle cx={ballCenter} cy={ballCenter} r={sphereRadius} fill="url(#effectSphereGradient)" />
-                                <Circle cx={ballCenter} cy={ballCenter} r={sphereRadius} fill="url(#effectShine)" opacity={0.55} />
+                                <Circle cx={ballCenter} cy={ballCenter} r={sphereRadius} fill={`url(#${gradId})`} />
+                                <Circle cx={ballCenter} cy={ballCenter} r={sphereRadius} fill={`url(#${shineId})`} opacity={0.55} />
                                 <Circle
                                     cx={ballCenter}
                                     cy={ballCenter}
@@ -121,40 +132,65 @@ function EffectBallSelectorBase(props: Readonly<EffectBallSelectorProps>) {
                                     strokeWidth={1}
                                 />
 
-                                {guidesVisible &&
-                                    Array.from({ length: 6 }, (_, index) => {
-                                        const ratio = (index + 1) / 7;
-                                        const r = sphereRadius * ratio;
-                                        return (
+                                {guidesVisible && (
+                                    <>
+                                        {/* Círculos Concéntricos de Casquillos (E1, E2, E3) en azul sutil */}
+                                        {[0.25, 0.5, 0.75].map((ratio, idx) => (
                                             <Circle
-                                                key={`guide-ring-${index}`}
+                                                key={`guide-ring-${idx}`}
                                                 cx={ballCenter}
                                                 cy={ballCenter}
-                                                r={r}
+                                                r={maxDrag * ratio}
                                                 fill="none"
-                                                stroke="rgba(80,75,60,0.45)"
-                                                strokeWidth={0.75}
+                                                stroke="rgba(0, 210, 255, 0.30)"
+                                                strokeWidth={1}
                                             />
-                                        );
-                                    })}
+                                        ))}
+
+                                        {/* Zona Segura Punteada (E4 / Límite Máximo Reglamentario UMB) */}
+                                        <Circle
+                                            cx={ballCenter}
+                                            cy={ballCenter}
+                                            r={maxDrag}
+                                            fill="none"
+                                            stroke="#00d2ff"
+                                            strokeWidth={1.3}
+                                            strokeDasharray="4 3"
+                                        />
+
+                                        {/* Zona de Pifia Punteada (Límite Crítico de Deslizamiento del Taco) */}
+                                        <Circle
+                                            cx={ballCenter}
+                                            cy={ballCenter}
+                                            r={sphereRadius * 0.82}
+                                            fill="none"
+                                            stroke="#ef4444"
+                                            strokeWidth={1.3}
+                                            strokeDasharray="3 3"
+                                        />
+                                    </>
+                                )}
                             </G>
 
+                            {/* EJE X (Horizontal / Lateral) */}
                             <Line
                                 x1={ballCenter - sphereRadius * 1.04}
                                 y1={ballCenter}
                                 x2={ballCenter + sphereRadius * 1.04}
                                 y2={ballCenter}
                                 stroke="rgba(0,210,255,0.98)"
-                                strokeWidth={2.5}
+                                strokeWidth={2}
                                 strokeLinecap="round"
                             />
+
+                            {/* EJE Y (Vertical / Corrido y Pique) */}
                             <Line
                                 x1={ballCenter}
                                 y1={ballCenter - sphereRadius * 1.04}
                                 x2={ballCenter}
                                 y2={ballCenter + sphereRadius * 1.04}
                                 stroke="rgba(0,210,255,0.98)"
-                                strokeWidth={2.5}
+                                strokeWidth={2}
                                 strokeLinecap="round"
                             />
 

@@ -38,6 +38,7 @@ import {
     BALL_SKIN_PRESETS,
     loadTablePreferences,
     saveTablePreferences,
+    useTablePreferences,
     type TablePreferences,
 } from '@/src/presentation/components/Training/tablePreferences';
 import { useTrainingSimulation } from '@/src/presentation/hooks/useTrainingSimulation';
@@ -60,14 +61,14 @@ type Orientation = 'horizontal' | 'vertical';
 
 const EFFECT_SPIN_PRESETS: Record<string, SpinEffect> = {
     center: { x: 0, y: 0, magnitude: 0 },
-    top: { x: 0, y: -0.7, magnitude: 0.7 },
-    'top-right': { x: 0.6, y: -0.6, magnitude: 0.85 },
+    top: { x: 0, y: 0.7, magnitude: 0.7 },
+    'top-right': { x: 0.6, y: 0.6, magnitude: 0.85 },
     right: { x: 0.7, y: 0, magnitude: 0.7 },
-    'bottom-right': { x: 0.6, y: 0.6, magnitude: 0.85 },
-    bottom: { x: 0, y: 0.7, magnitude: 0.7 },
-    'bottom-left': { x: -0.6, y: 0.6, magnitude: 0.85 },
+    'bottom-right': { x: 0.6, y: -0.6, magnitude: 0.85 },
+    bottom: { x: 0, y: -0.7, magnitude: 0.7 },
+    'bottom-left': { x: -0.6, y: -0.6, magnitude: 0.85 },
     left: { x: -0.7, y: 0, magnitude: 0.7 },
-    'top-left': { x: -0.6, y: -0.6, magnitude: 0.85 },
+    'top-left': { x: -0.6, y: 0.6, magnitude: 0.85 },
 };
 
 function getInitialPowerLevel(recommendedPower: number) {
@@ -103,20 +104,11 @@ export function TrainingSimulationScreen() {
 
     const [snapshotBalls, setSnapshotBalls] = useState<SnapshotBall[] | null>(null);
 
-    const [tablePreferences, setTablePreferences] = useState<TablePreferences>(DEFAULT_TABLE_PREFERENCES);
+    const { preferences: tablePreferences, updatePreferences: handlePreferencesChange } = useTablePreferences();
     const [showCustomizer, setShowCustomizer] = useState(false);
     const [showEffectModal, setShowEffectModal] = useState(false);
     const [showNumberingModal, setShowNumberingModal] = useState(false);
     const [showBallStudioModal, setShowBallStudioModal] = useState(false);
-
-    useEffect(() => {
-        loadTablePreferences().then(setTablePreferences).catch(() => {});
-    }, []);
-
-    const handlePreferencesChange = useCallback((newPrefs: TablePreferences) => {
-        setTablePreferences(newPrefs);
-        saveTablePreferences(newPrefs).catch(() => {});
-    }, []);
 
     useEffect(() => {
         if (params.snapshotId) {
@@ -192,6 +184,21 @@ export function TrainingSimulationScreen() {
         dismissValidation,
     } = useTrainingSimulation(initialPositions);
 
+    // Sincronizar bola tiradora con las preferencias guardadas del usuario si existen
+    useEffect(() => {
+        if (tablePreferences.cueBallId && tablePreferences.cueBallId !== state.cueBallId) {
+            setCueBall(tablePreferences.cueBallId);
+        }
+    }, [tablePreferences.cueBallId, state.cueBallId, setCueBall]);
+
+    const handleCueBallChange = useCallback((id: BallId) => {
+        setCueBall(id);
+        handlePreferencesChange({
+            ...tablePreferences,
+            cueBallId: id,
+        });
+    }, [setCueBall, handlePreferencesChange, tablePreferences]);
+
     const snapshotLoadedRef = useRef(false);
     // Reset balls when snapshot loads asynchronously
     useEffect(() => {
@@ -200,6 +207,20 @@ export function TrainingSimulationScreen() {
             resetBalls(initialPositions);
         }
     }, [snapshotBalls, resetBalls, initialPositions]);
+
+    const customCoordsAimSetRef = useRef(false);
+    useEffect(() => {
+        if (params.whiteX && params.whiteY && !customCoordsAimSetRef.current) {
+            customCoordsAimSetRef.current = true;
+            const wx = Number(params.whiteX) || 71;
+            // Si la bola blanca está situada en el extremo derecho (x > 142), apuntar horizontalmente hacia la izquierda
+            if (wx > 142) {
+                setAimDirection(vec2(-1, 0));
+            } else {
+                setAimDirection(vec2(1, 0));
+            }
+        }
+    }, [params.whiteX, params.whiteY, setAimDirection]);
 
     const [tableOrientation, setTableOrientation] = useState<Orientation>(
         width >= 900 ? 'horizontal' : 'vertical'
@@ -552,7 +573,7 @@ export function TrainingSimulationScreen() {
                                             styles.ballOptionBtnMobile,
                                             state.cueBallId === 'white' && styles.ballOptionBtnActive,
                                         ]}
-                                        onPress={() => setCueBall('white')}
+                                        onPress={() => handleCueBallChange('white')}
                                         disabled={state.isSimulating}>
                                         <View style={styles.whiteBallIcon}>
                                             {tablePreferences.showBallDots !== false && (
@@ -574,7 +595,7 @@ export function TrainingSimulationScreen() {
                                             styles.ballOptionBtnMobile,
                                             state.cueBallId === 'yellow' && styles.ballOptionBtnActive,
                                         ]}
-                                        onPress={() => setCueBall('yellow')}
+                                        onPress={() => handleCueBallChange('yellow')}
                                         disabled={state.isSimulating}>
                                         <View style={styles.yellowBallIcon}>
                                             {tablePreferences.showBallDots !== false && (
@@ -664,7 +685,7 @@ export function TrainingSimulationScreen() {
                                         styles.ballOptionBtn,
                                         state.cueBallId === 'white' && styles.ballOptionBtnActive,
                                     ]}
-                                    onPress={() => setCueBall('white')}
+                                    onPress={() => handleCueBallChange('white')}
                                     disabled={state.isSimulating}>
                                     <View style={styles.whiteBallIcon}>
                                         {tablePreferences.showBallDots !== false && (
@@ -686,7 +707,7 @@ export function TrainingSimulationScreen() {
                                         styles.ballOptionBtn,
                                         state.cueBallId === 'yellow' && styles.ballOptionBtnActive,
                                     ]}
-                                    onPress={() => setCueBall('yellow')}
+                                    onPress={() => handleCueBallChange('yellow')}
                                     disabled={state.isSimulating}>
                                     <View style={styles.yellowBallIcon}>
                                         {tablePreferences.showBallDots !== false && (
@@ -790,6 +811,7 @@ export function TrainingSimulationScreen() {
                     visible={showEffectModal}
                     spin={state.spin}
                     cueBallId={state.cueBallId}
+                    tablePreferences={tablePreferences}
                     onSpinChange={setSpin}
                     onClose={() => setShowEffectModal(false)}
                 />
@@ -817,7 +839,7 @@ export function TrainingSimulationScreen() {
                     visible={showBallStudioModal}
                     cueBallId={state.cueBallId}
                     tablePreferences={tablePreferences}
-                    onCueBallChange={setCueBall}
+                    onCueBallChange={handleCueBallChange}
                     onPreferencesChange={handlePreferencesChange}
                     onResetToBreakPosition={handleSetToCurrentBreak}
                     onClose={() => setShowBallStudioModal(false)}

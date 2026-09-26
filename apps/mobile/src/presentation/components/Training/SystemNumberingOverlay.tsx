@@ -3,6 +3,8 @@ import Svg, { G, Text as SvgText, Circle } from 'react-native-svg';
 
 import { DEFAULT_TABLE } from '@bandaro/core';
 
+import { useTablePreferences, type TablePreferences } from './tablePreferences';
+
 type Orientation = 'horizontal' | 'vertical';
 type DiamondSide = 'top' | 'bottom' | 'left' | 'right';
 
@@ -38,6 +40,7 @@ interface SystemNumberingOverlayProps {
     formula?: Formula;
     opacity?: number;
     isEditMode?: boolean;
+    tablePreferences?: TablePreferences;
 }
 
 interface DiamondPosition {
@@ -52,13 +55,17 @@ function getDiamondPositions(
     playY: number,
     playW: number,
     playH: number,
-    railThickness: number
+    railThickness: number,
+    hasCorners: boolean = true
 ): DiamondPosition[] {
     const positions: DiamondPosition[] = [];
     const offset = railThickness * 0.5;
 
-    // Top diamonds (8 segments = 9 diamonds including corners)
-    for (let i = 0; i <= 8; i++) {
+    const longIndices = hasCorners ? [0, 1, 2, 3, 4, 5, 6, 7, 8] : [1, 2, 3, 4, 5, 6, 7];
+    const shortIndices = hasCorners ? [0, 1, 2, 3, 4] : [1, 2, 3];
+
+    // Top diamonds
+    for (const i of longIndices) {
         positions.push({
             x: playX + (playW * i) / 8,
             y: playY - offset,
@@ -68,7 +75,7 @@ function getDiamondPositions(
     }
 
     // Bottom diamonds
-    for (let i = 0; i <= 8; i++) {
+    for (const i of longIndices) {
         positions.push({
             x: playX + (playW * i) / 8,
             y: playY + playH + offset,
@@ -77,8 +84,8 @@ function getDiamondPositions(
         });
     }
 
-    // Left diamonds (4 segments = 5 diamonds including corners)
-    for (let i = 0; i <= 4; i++) {
+    // Left diamonds
+    for (const i of shortIndices) {
         positions.push({
             x: playX - offset,
             y: playY + (playH * i) / 4,
@@ -88,7 +95,7 @@ function getDiamondPositions(
     }
 
     // Right diamonds
-    for (let i = 0; i <= 4; i++) {
+    for (const i of shortIndices) {
         positions.push({
             x: playX + playW + offset,
             y: playY + (playH * i) / 4,
@@ -111,7 +118,11 @@ function SystemNumberingOverlayBase(props: Readonly<SystemNumberingOverlayProps>
         formula,
         opacity = 0.9,
         isEditMode = false,
+        tablePreferences: propsPrefs,
     } = props;
+
+    const { preferences: reactivePrefs } = useTablePreferences(propsPrefs);
+    const hasCorners = (reactivePrefs?.diamondCount === '9_5' || !reactivePrefs?.diamondCount) && reactivePrefs?.showCornerDiamonds !== false;
 
     const layout = useMemo(() => {
         const aspect = orientation === 'horizontal' ? 2 : 0.5;
@@ -139,9 +150,10 @@ function SystemNumberingOverlayBase(props: Readonly<SystemNumberingOverlayProps>
             layout.playY,
             layout.playW,
             layout.playH,
-            railThickness
+            railThickness,
+            hasCorners
         );
-    }, [layout, railThickness]);
+    }, [layout, railThickness, hasCorners]);
 
     const renderedAnchors = useMemo(() => {
         return anchors.map((anchor) => {

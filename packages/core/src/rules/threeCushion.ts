@@ -25,6 +25,7 @@ export interface ShotValidation {
 export interface ScoringDetails {
     firstBallHit: BallId | null;
     secondBallHit: BallId | null;
+    hasRetruque: boolean;
     cushionsBeforeFirstHit: number;
     cushionsBetweenHits: number;
     cushionsBeforeSecondHit: number;
@@ -72,7 +73,7 @@ export function validateThreeCushionShot(
 
     const isValid = checkThreeCushionRule(scoringDetails);
     const { classification, classificationLabel } = classifyShot(scoringDetails, isValid);
-    const reason = generateValidationReason(isValid, scoringDetails, classificationLabel);
+    const reason = generateValidationReason(isValid, scoringDetails, classificationLabel, cueBallId);
 
     return {
         isValid,
@@ -96,12 +97,12 @@ function calculateScoringDetails(
 ): ScoringDetails {
     let firstBallHit: BallId | null = null;
     let secondBallHit: BallId | null = null;
+    let hasRetruque = false;
     let cushionsBeforeFirstHit = 0;
     let cushionsBetweenHits = 0;
     let cushionsAfterSecondHit = 0;
 
     let cushionCount = 0;
-    let collisionCount = 0;
     const timeline: ScoringDetails['eventTimeline'] = [];
 
     for (const event of events) {
@@ -110,11 +111,11 @@ function calculateScoringDetails(
             // Solo contamos bandas de la bola tiradora si está etiquetada, o todas si no hay filtro
             if (!cData.ballId || cData.ballId === cueBallId) {
                 cushionCount++;
-                if (collisionCount === 0) {
+                if (!firstBallHit) {
                     cushionsBeforeFirstHit++;
-                } else if (collisionCount === 1) {
+                } else if (!secondBallHit) {
                     cushionsBetweenHits++;
-                } else if (collisionCount >= 2) {
+                } else {
                     cushionsAfterSecondHit++;
                 }
 
@@ -130,10 +131,9 @@ function calculateScoringDetails(
         } else if (event.type === 'ball_collision') {
             const collision = event.data as any;
             if (collision.ball1 === cueBallId || collision.ball2 === cueBallId) {
-                const targetBall = collision.ball1 === cueBallId ? collision.ball2 : collision.ball1;
-                collisionCount++;
+                const targetBall: BallId = collision.ball1 === cueBallId ? collision.ball2 : collision.ball1;
 
-                if (collisionCount === 1) {
+                if (!firstBallHit) {
                     firstBallHit = targetBall;
                     timeline.push({
                         step: timeline.length + 1,
@@ -143,12 +143,35 @@ function calculateScoringDetails(
                         cushionsCount: cushionCount,
                         isThirdCushionReached: cushionCount >= 3,
                     });
-                } else if (collisionCount === 2) {
-                    secondBallHit = targetBall;
+                } else if (!secondBallHit) {
+                    if (targetBall === firstBallHit) {
+                        // Retruque con la 1ª bola: según reglamento oficial UMB NO cuenta como la 2ª bola objetivo
+                        hasRetruque = true;
+                        timeline.push({
+                            step: timeline.length + 1,
+                            type: 'ball',
+                            description: `Retruque con 1ª bola (${targetBall}) tras ${cushionCount} bandas`,
+                            ballId: targetBall,
+                            cushionsCount: cushionCount,
+                            isThirdCushionReached: cushionCount >= 3,
+                        });
+                    } else {
+                        // Impacto con la 2ª bola objetivo distinta: completa el contacto de ambas bolas
+                        secondBallHit = targetBall;
+                        timeline.push({
+                            step: timeline.length + 1,
+                            type: 'ball',
+                            description: `Carambola en 2ª bola (${targetBall}) tras ${cushionCount} bandas previas`,
+                            ballId: targetBall,
+                            cushionsCount: cushionCount,
+                            isThirdCushionReached: cushionCount >= 3,
+                        });
+                    }
+                } else {
                     timeline.push({
                         step: timeline.length + 1,
                         type: 'ball',
-                        description: `Carambola en 2ª bola (${targetBall}) tras ${cushionCount} bandas previas`,
+                        description: `Choque posterior con bola (${targetBall})`,
                         ballId: targetBall,
                         cushionsCount: cushionCount,
                         isThirdCushionReached: cushionCount >= 3,
@@ -163,6 +186,7 @@ function calculateScoringDetails(
     return {
         firstBallHit,
         secondBallHit,
+        hasRetruque,
         cushionsBeforeFirstHit,
         cushionsBetweenHits,
         cushionsBeforeSecondHit,
@@ -174,9 +198,9 @@ function calculateScoringDetails(
 
 export function checkThreeCushionRule(details: ScoringDetails): boolean {
     // Regla Oficial UMB:
-    // La bola tiradora debe contactar a ambas bolas objetivo Y haber contactado
-    // al menos tres veces una o varias bandas ANTES de tocar la segunda bola objetivo.
-    if (!details.firstBallHit || !details.secondBallHit) {
+    // 1. La bola tiradora debe contactar a AMBAS bolas objetivo DISTINTAS (firstBallHit y secondBallHit no nulos y distintos).
+    // 2. Debe haber contactado al menos tres veces una o varias bandas ANTES de tocar la segunda bola objetivo.
+    if (!details.firstBallHit || !details.secondBallHit || details.firstBallHit === details.secondBallHit) {
         return false;
     }
 
@@ -187,10 +211,16 @@ function classifyShot(
     details: ScoringDetails,
     isValid: boolean
 ): { classification: ShotClassification; classificationLabel: string } {
-    if (!details.firstBallHit || !details.secondBallHit) {
+    if (!details.firstBallHit || !details.secondBallHit || details.firstBallHit === details.secondBallHit) {
+        if (details.firstBallHit && details.hasRetruque && !details.secondBallHit) {
+            return {
+                classification: 'incompleto',
+                classificationLabel: `Retruque en bola ${details.firstBallHit} sin tocar la otra bola`,
+            };
+        }
         return {
             classification: 'incompleto',
-            classificationLabel: 'Carambola incompleta (falta contactar bolas objetivo)',
+            classificationLabel: 'Carambola incompleta (falta contactar ambas bolas objetivo)',
         };
     }
 
@@ -237,24 +267,37 @@ function classifyShot(
 function generateValidationReason(
     isValid: boolean,
     details: ScoringDetails,
-    classificationLabel: string
+    classificationLabel: string,
+    cueBallId?: BallId
 ): string {
     if (isValid) {
         const parts: string[] = [];
         parts.push(`¡Carambola Válida UMB! 🎯 (+1 punto)`);
         parts.push(classificationLabel);
         parts.push(`${details.cushionsBeforeSecondHit} bandas antes de contactar a la bola ${details.secondBallHit}`);
+        if (details.hasRetruque) {
+            parts.push('(con retruque superado)');
+        }
         return parts.join(' | ');
     }
 
     const issues: string[] = [];
     if (!details.firstBallHit) {
-        issues.push('No se impactó ninguna bola objetivo');
-    } else if (!details.secondBallHit) {
-        issues.push(`Solo se tocó una bola (${details.firstBallHit}), no completó la carambola`);
+        issues.push('No se impactó ninguna bola objetivo (pifia / tiro en blanco)');
+    } else if (!details.secondBallHit || details.firstBallHit === details.secondBallHit) {
+        if (details.hasRetruque) {
+            const missingBall = cueBallId
+                ? (['white', 'yellow', 'red'] as BallId[]).find((b) => b !== cueBallId && b !== details.firstBallHit)
+                : 'la otra bola objetivo';
+            issues.push(
+                `Se golpeó la misma bola (${details.firstBallHit}) dos veces por retruque, pero no se tocó la segunda bola objetivo${missingBall ? ` (${missingBall})` : ''}`
+            );
+        } else {
+            issues.push(`Solo se tocó una bola (${details.firstBallHit}), no completó la carambola`);
+        }
     } else if (details.cushionsBeforeSecondHit < 3) {
         issues.push(
-            `Faltan ${3 - details.cushionsBeforeSecondHit} banda(s) antes de la segunda bola (tocó ${details.cushionsBeforeSecondHit} bandas)`
+            `Faltan ${3 - details.cushionsBeforeSecondHit} banda(s) antes de la segunda bola (tocó ${details.cushionsBeforeSecondHit} de 3 bandas)`
         );
     }
 

@@ -170,7 +170,7 @@ export function useTrainingSimulation(
             aimDirection,
             velocity,
             spin,
-            350,
+            750,
             DEFAULT_TABLE
         );
     }, [balls, cueBallId, aimDirection, powerPercentage, spin, isSimulating]);
@@ -305,7 +305,7 @@ export function useTrainingSimulation(
             const cueCushions = allEvents.filter((e) => e.type === 'cushion').length;
             setLiveCushionCount(cueCushions);
 
-            // Actualizar estado de bolas tocadas en vivo
+            // Actualizar estado de bolas objetivo distintas tocadas en vivo
             const cueHits = allEvents
                 .filter((e) => e.type === 'ball_collision')
                 .map((e) =>
@@ -315,9 +315,10 @@ export function useTrainingSimulation(
                         ? e.data.ball1
                         : null
                 )
-                .filter(Boolean);
-            const hitFirst = cueHits.length >= 1;
-            const hitSecond = cueHits.length >= 2;
+                .filter(Boolean) as BallId[];
+            const distinctHits = new Set(cueHits);
+            const hitFirst = distinctHits.size >= 1;
+            const hitSecond = distinctHits.size >= 2;
             setLiveBallHits({ first: hitFirst, second: hitSecond });
 
             setBalls([...currentBalls]);

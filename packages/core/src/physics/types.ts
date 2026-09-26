@@ -100,10 +100,34 @@ export const PHYSICS = {
     englishBounceFactor: 1.25,
 };
 
+export const VELOCITY_CALIBRATION_POINTS = [
+    { pct: 0, v: 0.0 },
+    { pct: 10, v: 1.439 },
+    { pct: 20, v: 2.828 }, // 1 largo de mesa (Velocidad 1: casi toca banda corta opuesta)
+    { pct: 30, v: 4.723 },
+    { pct: 40, v: 6.601 }, // 2 largos de mesa (Velocidad 2: regresa a la posición de salida)
+    { pct: 50, v: 9.159 },
+    { pct: 60, v: 11.696 }, // 3 largos de mesa (Velocidad 3: rebota en 2 bandas cortas y casi toca la opuesta)
+    { pct: 70, v: 15.140 },
+    { pct: 80, v: 18.555 }, // 4 largos de mesa (Velocidad 4: rebota en 3 bandas cortas y regresa a la inicial)
+    { pct: 90, v: 23.212 },
+    { pct: 100, v: 27.838 }, // 5 largos de mesa (Velocidad 5: 5 largos de mesa)
+] as const;
+
 export function calculateShotVelocity(powerPercentage: number): number {
     const clamped = Math.max(0, Math.min(100, powerPercentage));
     if (clamped <= 0) return 0;
-    return 1.2 + (clamped / 100) * 11.3;
+
+    for (let i = 0; i < VELOCITY_CALIBRATION_POINTS.length - 1; i++) {
+        const p0 = VELOCITY_CALIBRATION_POINTS[i];
+        const p1 = VELOCITY_CALIBRATION_POINTS[i + 1];
+        if (clamped >= p0.pct && clamped <= p1.pct) {
+            const ratio = (clamped - p0.pct) / (p1.pct - p0.pct);
+            return p0.v + ratio * (p1.v - p0.v);
+        }
+    }
+
+    return VELOCITY_CALIBRATION_POINTS[VELOCITY_CALIBRATION_POINTS.length - 1].v;
 }
 
 export interface PowerLevel {
@@ -117,32 +141,32 @@ export const POWER_LEVELS: PowerLevel[] = [
     {
         level: 1,
         label: 'Muy suave',
-        description: 'La bola casi llega a la banda corta (1 banda)',
-        velocity: 1.2,
+        description: 'La bola casi llega a la banda corta (1 largo)',
+        velocity: 2.828,
     },
     {
         level: 2,
         label: 'Suave',
-        description: 'Llega a la banda corta y rebota casi hasta la opuesta (2 bandas)',
-        velocity: 2.2,
+        description: 'Llega a la banda corta y regresa a la posición inicial (2 largos)',
+        velocity: 6.601,
     },
     {
         level: 3,
         label: 'Medio',
-        description: 'Recorrido estándar de carambola a 3 bandas (3 bandas)',
-        velocity: 3.5,
+        description: 'Rebota en 2 bandas cortas y regresa a la opuesta (3 largos)',
+        velocity: 11.696,
     },
     {
         level: 4,
         label: 'Fuerte',
-        description: 'Múltiples rebotes con velocidad para pasebolas o cajones (4-5 bandas)',
-        velocity: 5.2,
+        description: 'Rebota en 3 bandas cortas y regresa a la inicial (4 largos)',
+        velocity: 18.555,
     },
     {
         level: 5,
         label: 'Muy fuerte',
-        description: 'Máxima potencia para recorridos largos o dobles vueltas (5+ bandas)',
-        velocity: 7.5,
+        description: 'Máxima potencia para 5 largos de mesa (5 largos)',
+        velocity: 27.838,
     },
 ];
 

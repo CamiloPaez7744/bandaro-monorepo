@@ -3,13 +3,13 @@ import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Circle, Defs, G, Line, LinearGradient, Path, Polygon, RadialGradient, Rect, Stop, Text as SvgText, Image as SvgImage } from 'react-native-svg';
 
 import { resolveBilliardPhysics } from './billiardPhysics';
-import { SKULL_DECAL_SOURCE } from './tableDecals';
+import { getTableDecalSource } from './tableDecals';
 import {
   type TablePreferences,
   type DiamondShape,
   type DiamondCount,
   type WoodFinish,
-  loadTablePreferences,
+  useTablePreferences,
   resolveClothPalette,
   resolveWoodPalette,
 } from './tablePreferences';
@@ -69,16 +69,9 @@ function TrainingPlayTableBase({
   woodFinish = 'ebony',
   preferences,
 }: TrainingPlayTableProps) {
-  const [storedPrefs, setStoredPrefs] = useState<TablePreferences | null>(null);
-
-  useEffect(() => {
-    if (!preferences) {
-      loadTablePreferences().then(setStoredPrefs);
-    }
-  }, [preferences]);
-
-  // Active visual options (merged from preferences prop, stored prefs, or explicit fallback props)
-  const effectivePrefs = preferences ?? storedPrefs ?? undefined;
+  const { preferences: reactivePrefs } = useTablePreferences(preferences);
+  const effectivePrefs = reactivePrefs;
+  const tableUid = useMemo(() => `tpt_${Math.random().toString(36).slice(2, 8)}`, []);
   const activeClothColor = effectivePrefs?.clothColor ?? clothColor;
   const activeDiamondShape = effectivePrefs?.diamondShape ?? diamondShape;
   const activeDiamondCount = effectivePrefs?.diamondCount ?? diamondCount;
@@ -87,8 +80,8 @@ function TrainingPlayTableBase({
   const activeShowNumbers = effectivePrefs?.showDiamondNumbers ?? showDiamondNumbers;
   const activeWoodFinish = effectivePrefs?.woodFinish ?? woodFinish;
   const activeShowTableDecal = effectivePrefs?.showTableDecal ?? true;
-  const activeTableDecal = effectivePrefs?.tableDecal ?? 'tournament_crest';
-  const activeDecalOpacity = effectivePrefs?.decalOpacity ?? 0.18;
+  const activeTableDecal = effectivePrefs?.tableDecal ?? 'blackhole';
+  const activeDecalOpacity = effectivePrefs?.decalOpacity ?? 0.20;
 
   const clothPalette = useMemo(() => resolveClothPalette(activeClothColor), [activeClothColor]);
   const woodPalette = useMemo(() => resolveWoodPalette(activeWoodFinish), [activeWoodFinish]);
@@ -203,56 +196,56 @@ function TrainingPlayTableBase({
       >
         <Defs>
           {/* Hardwood Rail Gradient based on woodFinish */}
-          <LinearGradient id="railGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <LinearGradient id={`${tableUid}_railGrad`} x1="0%" y1="0%" x2="0%" y2="100%">
             <Stop offset="0%" stopColor={woodPalette.start} />
             <Stop offset="50%" stopColor={woodPalette.mid} />
             <Stop offset="100%" stopColor={woodPalette.end} />
           </LinearGradient>
 
           {/* Dynamic Cloth Radial Gradient (Preset or Custom Hex) */}
-          <RadialGradient id="clothGrad" cx="50%" cy="50%" rx="80%" ry="75%">
+          <RadialGradient id={`${tableUid}_clothGrad`} cx="50%" cy="50%" rx="80%" ry="75%">
             <Stop offset="0%" stopColor={clothPalette.highlight} />
             <Stop offset="55%" stopColor={clothPalette.base} />
             <Stop offset="100%" stopColor={clothPalette.edge} />
           </RadialGradient>
 
           {/* Realistic 3D Ball Spherical Shading */}
-          <RadialGradient id="whiteBallGrad" cx="35%" cy="35%" rx="65%" ry="65%">
+          <RadialGradient id={`${tableUid}_whiteBallGrad`} cx="35%" cy="35%" rx="65%" ry="65%">
             <Stop offset="0%" stopColor="#ffffff" />
             <Stop offset="50%" stopColor="#f1f5f9" />
             <Stop offset="80%" stopColor="#cbd5e1" />
             <Stop offset="100%" stopColor="#94a3b8" />
           </RadialGradient>
 
-          <RadialGradient id="yellowBallGrad" cx="35%" cy="35%" rx="65%" ry="65%">
+          <RadialGradient id={`${tableUid}_yellowBallGrad`} cx="35%" cy="35%" rx="65%" ry="65%">
             <Stop offset="0%" stopColor="#fef08a" />
             <Stop offset="45%" stopColor="#eab308" />
             <Stop offset="80%" stopColor="#ca8a04" />
             <Stop offset="100%" stopColor="#854d0e" />
           </RadialGradient>
 
-          <RadialGradient id="redBallGrad" cx="35%" cy="35%" rx="65%" ry="65%">
+          <RadialGradient id={`${tableUid}_redBallGrad`} cx="35%" cy="35%" rx="65%" ry="65%">
             <Stop offset="0%" stopColor="#f87171" />
             <Stop offset="45%" stopColor="#dc2626" />
             <Stop offset="80%" stopColor="#b91c1c" />
             <Stop offset="100%" stopColor="#7f1d1d" />
           </RadialGradient>
 
-          <RadialGradient id="orangeBallGrad" cx="35%" cy="35%" rx="65%" ry="65%">
+          <RadialGradient id={`${tableUid}_orangeBallGrad`} cx="35%" cy="35%" rx="65%" ry="65%">
             <Stop offset="0%" stopColor="#fdba74" />
             <Stop offset="45%" stopColor="#ea580c" />
             <Stop offset="80%" stopColor="#c2410c" />
             <Stop offset="100%" stopColor="#7c2d12" />
           </RadialGradient>
 
-          <RadialGradient id="blueBallGrad" cx="35%" cy="35%" rx="65%" ry="65%">
+          <RadialGradient id={`${tableUid}_blueBallGrad`} cx="35%" cy="35%" rx="65%" ry="65%">
             <Stop offset="0%" stopColor="#93c5fd" />
             <Stop offset="45%" stopColor="#2563eb" />
             <Stop offset="80%" stopColor="#1d4ed8" />
             <Stop offset="100%" stopColor="#1e3a8a" />
           </RadialGradient>
 
-          <RadialGradient id="ballShadow" cx="50%" cy="50%" rx="50%" ry="50%">
+          <RadialGradient id={`${tableUid}_ballShadow`} cx="50%" cy="50%" rx="50%" ry="50%">
             <Stop offset="0%" stopColor="rgba(0,0,0,0.55)" />
             <Stop offset="70%" stopColor="rgba(0,0,0,0.2)" />
             <Stop offset="100%" stopColor="rgba(0,0,0,0)" />
@@ -266,7 +259,7 @@ function TrainingPlayTableBase({
           width={TOTAL_W}
           height={TOTAL_H}
           rx={8}
-          fill="url(#railGrad)"
+          fill={`url(#${tableUid}_railGrad)`}
         />
 
         {/* Outer Rail Bevel Inset */}
@@ -435,7 +428,7 @@ function TrainingPlayTableBase({
           y={PLAY_OFFSET_Y}
           width={TABLE_W}
           height={TABLE_H}
-          fill="url(#clothGrad)"
+          fill={`url(#${tableUid}_clothGrad)`}
         />
 
         {/* Cushion Nose Edge Line (Inner boundary of playing felt) */}
@@ -467,13 +460,14 @@ function TrainingPlayTableBase({
           const centerX = PLAY_OFFSET_X + TABLE_W / 2;
           const centerY = PLAY_OFFSET_Y + TABLE_H / 2;
           const minDim = Math.min(TABLE_W, TABLE_H);
+          const decalSource = getTableDecalSource(activeTableDecal);
 
-          if (activeTableDecal === 'skull') {
+          if (decalSource) {
             const decalSize = minDim * 0.78;
             return (
               <SvgImage
-                key="training-decal-skull"
-                href={SKULL_DECAL_SOURCE}
+                key={`training-decal-${activeTableDecal}`}
+                href={decalSource}
                 x={centerX - decalSize / 2}
                 y={centerY - decalSize / 2}
                 width={decalSize}
@@ -483,59 +477,7 @@ function TrainingPlayTableBase({
               />
             );
           }
-
-          if (activeTableDecal === 'crown_filigree') {
-            return (
-              <G key="training-decal-crown" opacity={activeDecalOpacity} transform={`translate(${centerX}, ${centerY})`}>
-                <Path
-                  d="M -22 10 L 22 10 L 25 -8 L 12 0 L 0 -16 L -12 0 L -25 -8 Z"
-                  fill="none"
-                  stroke="#fbbf24"
-                  strokeWidth={1.2}
-                />
-                <Circle cx={0} cy={-16} r={2} fill="#fbbf24" />
-                <Circle cx={-25} cy={-8} r={1.6} fill="#fbbf24" />
-                <Circle cx={25} cy={-8} r={1.6} fill="#fbbf24" />
-                <Circle cx={0} cy={2} r={3} fill="#fbbf24" opacity={0.6} />
-                <Circle cx={0} cy={0} r={28} fill="none" stroke="#fbbf24" strokeWidth={0.6} strokeDasharray="3 3" />
-              </G>
-            );
-          }
-
-          if (activeTableDecal === 'cyber_rings') {
-            return (
-              <G key="training-decal-cyber" opacity={activeDecalOpacity} transform={`translate(${centerX}, ${centerY})`}>
-                <Circle cx={0} cy={0} r={32} fill="none" stroke="#22d3ee" strokeWidth={0.8} />
-                <Circle cx={0} cy={0} r={28} fill="none" stroke="#06b6d4" strokeWidth={0.5} strokeDasharray="4 2" />
-                <Circle cx={0} cy={0} r={20} fill="none" stroke="#22d3ee" strokeWidth={0.6} />
-                <Line x1={-36} y1={0} x2={36} y2={0} stroke="#22d3ee" strokeWidth={0.6} />
-                <Line x1={0} y1={-36} x2={0} y2={36} stroke="#22d3ee" strokeWidth={0.6} />
-              </G>
-            );
-          }
-
-          if (activeTableDecal === 'classic_carom') {
-            return (
-              <G key="training-decal-classic" opacity={activeDecalOpacity} transform={`translate(${centerX}, ${centerY})`}>
-                <Circle cx={0} cy={-8} r={6} fill="none" stroke="#ffffff" strokeWidth={1} />
-                <Circle cx={-8} cy={6} r={6} fill="none" stroke="#fef08a" strokeWidth={1} />
-                <Circle cx={8} cy={6} r={6} fill="none" stroke="#fca5a5" strokeWidth={1} />
-                <Circle cx={0} cy={0} r={22} fill="none" stroke="#ffffff" strokeWidth={0.5} strokeDasharray="2 2" />
-              </G>
-            );
-          }
-
-          return (
-            <G key="training-decal-crest" opacity={activeDecalOpacity} transform={`translate(${centerX}, ${centerY})`}>
-              <Circle cx={0} cy={0} r={18} fill="none" stroke="#ffffff" strokeWidth={0.7} />
-              <Circle cx={0} cy={0} r={16.5} fill="none" stroke="#ffffff" strokeWidth={0.4} strokeDasharray="2 2" />
-              <Line x1={-12} y1={-12} x2={12} y2={12} stroke="#ffffff" strokeWidth={0.8} />
-              <Line x1={-12} y1={12} x2={12} y2={-12} stroke="#ffffff" strokeWidth={0.8} />
-              <Circle cx={0} cy={-5} r={2.2} fill="#ffffff" />
-              <Circle cx={-4.5} cy={4} r={2.2} fill="#ffffff" />
-              <Circle cx={4.5} cy={4} r={2.2} fill="#ffffff" />
-            </G>
-          );
+          return null;
         })()}
 
         {/* 8x4 Carom Diamond Aiming Grid (Module of 35.5cm squares) */}
@@ -608,7 +550,7 @@ function TrainingPlayTableBase({
             cx={safeRed.x + PLAY_OFFSET_X + 1.2}
             cy={safeRed.y + PLAY_OFFSET_Y + 1.6}
             r={BALL_R * 1.05}
-            fill="url(#ballShadow)"
+            fill={`url(#${tableUid}_ballShadow)`}
           />
           <Circle
             cx={safeRed.x + PLAY_OFFSET_X}
@@ -616,10 +558,10 @@ function TrainingPlayTableBase({
             r={BALL_R}
             fill={
               redBallColor === 'blue'
-                ? 'url(#blueBallGrad)'
+                ? `url(#${tableUid}_blueBallGrad)`
                 : redBallColor === 'orange'
-                ? 'url(#orangeBallGrad)'
-                : 'url(#redBallGrad)'
+                ? `url(#${tableUid}_orangeBallGrad)`
+                : `url(#${tableUid}_redBallGrad)`
             }
           />
           {/* Specular glint highlight */}
@@ -638,13 +580,13 @@ function TrainingPlayTableBase({
             cx={safeYellow.x + PLAY_OFFSET_X + 1.2}
             cy={safeYellow.y + PLAY_OFFSET_Y + 1.6}
             r={BALL_R * 1.05}
-            fill="url(#ballShadow)"
+            fill={`url(#${tableUid}_ballShadow)`}
           />
           <Circle
             cx={safeYellow.x + PLAY_OFFSET_X}
             cy={safeYellow.y + PLAY_OFFSET_Y}
             r={BALL_R}
-            fill="url(#yellowBallGrad)"
+            fill={`url(#${tableUid}_yellowBallGrad)`}
           />
           {/* Specular highlight */}
           <Circle
@@ -681,13 +623,13 @@ function TrainingPlayTableBase({
             cx={activeCueBall.x + PLAY_OFFSET_X + 1.2}
             cy={activeCueBall.y + PLAY_OFFSET_Y + 1.6}
             r={BALL_R * 1.05}
-            fill="url(#ballShadow)"
+            fill={`url(#${tableUid}_ballShadow)`}
           />
           <Circle
             cx={activeCueBall.x + PLAY_OFFSET_X}
             cy={activeCueBall.y + PLAY_OFFSET_Y}
             r={BALL_R}
-            fill="url(#whiteBallGrad)"
+            fill={`url(#${tableUid}_whiteBallGrad)`}
           />
           {/* Specular highlight */}
           <Circle

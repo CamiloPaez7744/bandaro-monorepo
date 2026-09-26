@@ -2,7 +2,7 @@ import { memo, useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import { StyleSheet, View, Text, type StyleProp, type ViewStyle, PanResponder, GestureResponderEvent, Platform } from 'react-native';
 import Svg, { Circle, Defs, G, Line, LinearGradient, Polygon, Polyline, RadialGradient, Rect, Stop, Path, Ellipse, Image as SvgImage } from 'react-native-svg';
 import { IconHandClick, IconTarget } from '@/src/presentation/components/icons';
-import { SKULL_DECAL_SOURCE } from './tableDecals';
+import { getTableDecalSource } from './tableDecals';
 
 import {
     Ball,
@@ -414,6 +414,108 @@ function compute8BallAimGuide(
     };
 }
 
+function resolveBallDragPosition(
+    targetX: number,
+    targetY: number,
+    ballRadius: number,
+    tableWidth: number,
+    tableHeight: number,
+    otherBalls: Ball[]
+): Vec2 {
+    const minX = ballRadius;
+    const maxX = tableWidth - ballRadius;
+    const minY = ballRadius;
+    const maxY = tableHeight - ballRadius;
+    const minDist = ballRadius * 2 + 0.05;
+
+    let bestX = Math.max(minX, Math.min(maxX, targetX));
+    let bestY = Math.max(minY, Math.min(maxY, targetY));
+
+    for (let iter = 0; iter < 12; iter++) {
+        let anyViolated = false;
+        for (const ob of otherBalls) {
+            const dx = bestX - ob.pos.x;
+            const dy = bestY - ob.pos.y;
+            const dist = Math.hypot(dx, dy);
+
+            if (dist < minDist - 1e-4) {
+                anyViolated = true;
+                const candidates: Vec2[] = [];
+
+                // 1. Proyección radial directa alejándose de la otra bola
+                let dirX = dx;
+                let dirY = dy;
+                if (dist < 1e-4) {
+                    dirX = ob.pos.x < (minX + maxX) / 2 ? 1 : -1;
+                    dirY = ob.pos.y < (minY + maxY) / 2 ? 1 : -1;
+                }
+                const len = Math.hypot(dirX, dirY);
+                const rx = ob.pos.x + (dirX / len) * minDist;
+                const ry = ob.pos.y + (dirY / len) * minDist;
+                if (rx >= minX - 1e-4 && rx <= maxX + 1e-4 && ry >= minY - 1e-4 && ry <= maxY + 1e-4) {
+                    candidates.push({
+                        x: Math.max(minX, Math.min(maxX, rx)),
+                        y: Math.max(minY, Math.min(maxY, ry)),
+                    });
+                }
+
+                // 2. Desplazamiento perimetral sobre las bandas para esquinas y laterales
+                // Banda izquierda
+                if (Math.abs(minX - ob.pos.x) < minDist) {
+                    const reqDy = Math.sqrt(Math.max(0, minDist * minDist - (minX - ob.pos.x) * (minX - ob.pos.x)));
+                    if (ob.pos.y + reqDy <= maxY + 1e-4) candidates.push({ x: minX, y: Math.min(maxY, ob.pos.y + reqDy) });
+                    if (ob.pos.y - reqDy >= minY - 1e-4) candidates.push({ x: minX, y: Math.max(minY, ob.pos.y - reqDy) });
+                }
+                // Banda derecha
+                if (Math.abs(maxX - ob.pos.x) < minDist) {
+                    const reqDy = Math.sqrt(Math.max(0, minDist * minDist - (maxX - ob.pos.x) * (maxX - ob.pos.x)));
+                    if (ob.pos.y + reqDy <= maxY + 1e-4) candidates.push({ x: maxX, y: Math.min(maxY, ob.pos.y + reqDy) });
+                    if (ob.pos.y - reqDy >= minY - 1e-4) candidates.push({ x: maxX, y: Math.max(minY, ob.pos.y - reqDy) });
+                }
+                // Banda superior
+                if (Math.abs(minY - ob.pos.y) < minDist) {
+                    const reqDx = Math.sqrt(Math.max(0, minDist * minDist - (minY - ob.pos.y) * (minY - ob.pos.y)));
+                    if (ob.pos.x + reqDx <= maxX + 1e-4) candidates.push({ x: Math.min(maxX, ob.pos.x + reqDx), y: minY });
+                    if (ob.pos.x - reqDx >= minX - 1e-4) candidates.push({ x: Math.max(minX, ob.pos.x - reqDx), y: minY });
+                }
+                // Banda inferior
+                if (Math.abs(maxY - ob.pos.y) < minDist) {
+                    const reqDx = Math.sqrt(Math.max(0, minDist * minDist - (maxY - ob.pos.y) * (maxY - ob.pos.y)));
+                    if (ob.pos.x + reqDx <= maxX + 1e-4) candidates.push({ x: Math.min(maxX, ob.pos.x + reqDx), y: maxY });
+                    if (ob.pos.x - reqDx >= minX - 1e-4) candidates.push({ x: Math.max(minX, ob.pos.x - reqDx), y: maxY });
+                }
+
+                // Seleccionar el candidato más cercano al toque del usuario minimizando colisión con terceras bolas
+                let bestCand: Vec2 | null = null;
+                let bestScore = Infinity;
+                for (const c of candidates) {
+                    let penalty = 0;
+                    for (const other of otherBalls) {
+                        if (other === ob) continue;
+                        const dOther = Math.hypot(c.x - other.pos.x, c.y - other.pos.y);
+                        if (dOther < minDist) {
+                            penalty += (minDist - dOther) * 1000;
+                        }
+                    }
+                    const dSq = (c.x - targetX) ** 2 + (c.y - targetY) ** 2 + penalty;
+                    if (dSq < bestScore) {
+                        bestScore = dSq;
+                        bestCand = c;
+                    }
+                }
+
+                if (bestCand) {
+                    bestX = bestCand.x;
+                    bestY = bestCand.y;
+                }
+            }
+        }
+        if (!anyViolated) break;
+    }
+
+    return { x: bestX, y: bestY };
+}
+
 function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTableProps>) {
     const {
         orientation = 'vertical',
@@ -562,15 +664,19 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
     const findBallAtPointRef = useCallback(
         (tableX: number, tableY: number): BallId | null => {
             const hitRadius = 15;
+            let closestBallId: BallId | null = null;
+            let minDistance = hitRadius;
+
             for (const ball of ballsRef.current) {
                 const dx = ball.pos.x - tableX;
                 const dy = ball.pos.y - tableY;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                if (dist < hitRadius) {
-                    return ball.id;
+                const dist = Math.hypot(dx, dy);
+                if (dist < minDistance) {
+                    minDistance = dist;
+                    closestBallId = ball.id;
                 }
             }
-            return null;
+            return closestBallId;
         },
         []
     );
@@ -640,6 +746,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                     const tablePos = screenToTableRef(locationX, locationY);
                     const ballId = findBallAtPointRef(tablePos.x, tablePos.y);
                     if (ballId) {
+                        draggingBallIdRef.current = ballId;
                         setDraggingBallId(ballId);
                     }
                 } else {
@@ -705,28 +812,17 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
 
                     const ballRadius = draggingBall.radius;
                     
-                    let clampedX = Math.max(ballRadius, Math.min(TABLE_W - ballRadius, tablePos.x));
-                    let clampedY = Math.max(ballRadius, Math.min(TABLE_H - ballRadius, tablePos.y));
-
                     const otherBalls = ballsRef.current.filter((b) => b.id !== currentDraggingBall);
-                    const minDistance = ballRadius * 2;
-                    
-                    for (const otherBall of otherBalls) {
-                        const dx = clampedX - otherBall.pos.x;
-                        const dy = clampedY - otherBall.pos.y;
-                        const distance = Math.sqrt(dx * dx + dy * dy);
-                        
-                        if (distance < minDistance) {
-                            const angle = Math.atan2(dy, dx);
-                            clampedX = otherBall.pos.x + Math.cos(angle) * minDistance;
-                            clampedY = otherBall.pos.y + Math.sin(angle) * minDistance;
-                            
-                            clampedX = Math.max(ballRadius, Math.min(TABLE_W - ballRadius, clampedX));
-                            clampedY = Math.max(ballRadius, Math.min(TABLE_H - ballRadius, clampedY));
-                        }
-                    }
+                    const resolved = resolveBallDragPosition(
+                        tablePos.x,
+                        tablePos.y,
+                        ballRadius,
+                        TABLE_W,
+                        TABLE_H,
+                        otherBalls
+                    );
 
-                    onBallMoveRef.current(currentDraggingBall, vec2(clampedX, clampedY));
+                    onBallMoveRef.current(currentDraggingBall, vec2(resolved.x, resolved.y));
                 } else if (!isEditModeRef.current) {
                     const cueBall = ballsRef.current.find((b) => b.id === cueBallIdRef.current);
                     if (!cueBall) return;
@@ -757,6 +853,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                     onPowerChangeRef.current?.(0);
                     isDraggingCueRef.current = false;
                 }
+                draggingBallIdRef.current = null;
                 setDraggingBallId(null);
                 draggingNumberIdRef.current = null;
             },
@@ -766,6 +863,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                     onPowerChangeRef.current?.(0);
                 }
                 isDraggingCueRef.current = false;
+                draggingBallIdRef.current = null;
                 setDraggingBallId(null);
                 draggingNumberIdRef.current = null;
             },
@@ -973,53 +1071,91 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                     strokeWidth={1.2}
                 />
 
-                {/* 2. Cantoneras metálicas esquineras pulidas estilo 8 Ball Pool */}
+                {/* 2. Cantoneras metálicas esquineras pulidas estilo 8 Ball Pool / Carom Pro */}
                 {(() => {
                     const railT = layout.railThickness;
-                    const cornerSize = railT * 1.5;
-                    const cornerR = railT * 0.4;
-                    const rivetR = Math.max(1.0, railT * 0.08);
+                    const cushionT = layout.cushionThickness;
+                    // Distancia exacta desde el borde exterior del marco hasta el diamante de la esquina
+                    const diamondDist = railT + cushionT;
+                    // Extensión generosa y elegante de los brazos metálicos que sobrepasa el diamante esquinero
+                    const cornerExtension = Math.max(5.0, railT * 0.65);
+                    const cornerSize = diamondDist + cornerExtension;
+                    const cornerR = Math.min(12, railT * 0.55);
+                    const innerR = Math.min(4, cushionT * 0.5);
+                    const rivetR = Math.max(1.4, railT * 0.10);
+
+                    // Posiciones exactas de los 8 diamantes esquineros (coincidencia 1:1 con diamonds.corners)
+                    const cornerRivets = [
+                        // Esquina Superior Izquierda (riel superior y riel izquierdo)
+                        { cx: layout.playX, cy: layout.railY + railT * 0.5 },
+                        { cx: layout.railX + railT * 0.5, cy: layout.playY },
+                        // Esquina Superior Derecha (riel superior y riel derecho)
+                        { cx: layout.playX + layout.playW, cy: layout.railY + railT * 0.5 },
+                        { cx: layout.railX + layout.railW - railT * 0.5, cy: layout.playY },
+                        // Esquina Inferior Izquierda (riel inferior y riel izquierdo)
+                        { cx: layout.playX, cy: layout.railY + layout.railH - railT * 0.5 },
+                        { cx: layout.railX + railT * 0.5, cy: layout.playY + layout.playH },
+                        // Esquina Inferior Derecha (riel inferior y riel derecho)
+                        { cx: layout.playX + layout.playW, cy: layout.railY + layout.railH - railT * 0.5 },
+                        { cx: layout.railX + layout.railW - railT * 0.5, cy: layout.playY + layout.playH },
+                    ];
+
                     return (
                         <G>
                             {/* Esquina Superior Izquierda */}
                             <Path
-                                d={`M ${layout.railX} ${layout.railY + cornerSize} L ${layout.railX} ${layout.railY + cornerR} Q ${layout.railX} ${layout.railY} ${layout.railX + cornerR} ${layout.railY} L ${layout.railX + cornerSize} ${layout.railY} L ${layout.railX + cornerSize} ${layout.railY + railT} L ${layout.railX + railT} ${layout.railY + cornerSize} Z`}
+                                d={`M ${layout.railX} ${layout.railY + cornerSize} L ${layout.railX} ${layout.railY + cornerR} Q ${layout.railX} ${layout.railY} ${layout.railX + cornerR} ${layout.railY} L ${layout.railX + cornerSize} ${layout.railY} L ${layout.railX + cornerSize} ${layout.railY + railT} L ${layout.railX + railT + innerR} ${layout.railY + railT} Q ${layout.railX + railT} ${layout.railY + railT} ${layout.railX + railT} ${layout.railY + railT + innerR} L ${layout.railX + railT} ${layout.railY + cornerSize} Z`}
                                 fill="url(#cornerMetalGrad)"
                                 stroke={metalPalette.border}
-                                strokeWidth={0.6}
+                                strokeWidth={0.7}
                             />
-                            <Circle cx={layout.railX + cornerSize * 0.55} cy={layout.railY + railT * 0.5} r={rivetR} fill={metalPalette.rivet} />
-                            <Circle cx={layout.railX + railT * 0.5} cy={layout.railY + cornerSize * 0.55} r={rivetR} fill={metalPalette.rivet} />
 
                             {/* Esquina Superior Derecha */}
                             <Path
-                                d={`M ${layout.railX + layout.railW - cornerSize} ${layout.railY} L ${layout.railX + layout.railW - cornerR} ${layout.railY} Q ${layout.railX + layout.railW} ${layout.railY} ${layout.railX + layout.railW} ${layout.railY + cornerR} L ${layout.railX + layout.railW} ${layout.railY + cornerSize} L ${layout.railX + layout.railW - railT} ${layout.railY + cornerSize} L ${layout.railX + layout.railW - cornerSize} ${layout.railY + railT} Z`}
+                                d={`M ${layout.railX + layout.railW - cornerSize} ${layout.railY} L ${layout.railX + layout.railW - cornerR} ${layout.railY} Q ${layout.railX + layout.railW} ${layout.railY} ${layout.railX + layout.railW} ${layout.railY + cornerR} L ${layout.railX + layout.railW} ${layout.railY + cornerSize} L ${layout.railX + layout.railW - railT} ${layout.railY + cornerSize} L ${layout.railX + layout.railW - railT} ${layout.railY + railT + innerR} Q ${layout.railX + layout.railW - railT} ${layout.railY + railT} ${layout.railX + layout.railW - railT - innerR} ${layout.railY + railT} L ${layout.railX + layout.railW - cornerSize} ${layout.railY + railT} Z`}
                                 fill="url(#cornerMetalGrad)"
                                 stroke={metalPalette.border}
-                                strokeWidth={0.6}
+                                strokeWidth={0.7}
                             />
-                            <Circle cx={layout.railX + layout.railW - cornerSize * 0.55} cy={layout.railY + railT * 0.5} r={rivetR} fill={metalPalette.rivet} />
-                            <Circle cx={layout.railX + layout.railW - railT * 0.5} cy={layout.railY + cornerSize * 0.55} r={rivetR} fill={metalPalette.rivet} />
 
                             {/* Esquina Inferior Izquierda */}
                             <Path
-                                d={`M ${layout.railX} ${layout.railY + layout.railH - cornerSize} L ${layout.railX + railT} ${layout.railY + layout.railH - cornerSize} L ${layout.railX + cornerSize} ${layout.railY + layout.railH - railT} L ${layout.railX + cornerSize} ${layout.railY + layout.railH} L ${layout.railX + cornerR} ${layout.railY + layout.railH} Q ${layout.railX} ${layout.railY + layout.railH} ${layout.railX} ${layout.railY + layout.railH - cornerR} Z`}
+                                d={`M ${layout.railX} ${layout.railY + layout.railH - cornerSize} L ${layout.railX + railT} ${layout.railY + layout.railH - cornerSize} L ${layout.railX + railT} ${layout.railY + layout.railH - railT - innerR} Q ${layout.railX + railT} ${layout.railY + layout.railH - railT} ${layout.railX + railT + innerR} ${layout.railY + layout.railH - railT} L ${layout.railX + cornerSize} ${layout.railY + layout.railH - railT} L ${layout.railX + cornerSize} ${layout.railY + layout.railH} L ${layout.railX + cornerR} ${layout.railY + layout.railH} Q ${layout.railX} ${layout.railY + layout.railH} ${layout.railX} ${layout.railY + layout.railH - cornerR} Z`}
                                 fill="url(#cornerMetalGrad)"
                                 stroke={metalPalette.border}
-                                strokeWidth={0.6}
+                                strokeWidth={0.7}
                             />
-                            <Circle cx={layout.railX + cornerSize * 0.55} cy={layout.railY + layout.railH - railT * 0.5} r={rivetR} fill={metalPalette.rivet} />
-                            <Circle cx={layout.railX + railT * 0.5} cy={layout.railY + layout.railH - cornerSize * 0.55} r={rivetR} fill={metalPalette.rivet} />
 
                             {/* Esquina Inferior Derecha */}
                             <Path
-                                d={`M ${layout.railX + layout.railW - cornerSize} ${layout.railY + layout.railH} L ${layout.railX + layout.railW - cornerSize} ${layout.railY + layout.railH - railT} L ${layout.railX + layout.railW - railT} ${layout.railY + layout.railH - cornerSize} L ${layout.railX + layout.railW} ${layout.railY + layout.railH - cornerSize} L ${layout.railX + layout.railW} ${layout.railY + layout.railH - cornerR} Q ${layout.railX + layout.railW} ${layout.railY + layout.railH} ${layout.railX + layout.railW - cornerR} ${layout.railY + layout.railH} Z`}
+                                d={`M ${layout.railX + layout.railW - cornerSize} ${layout.railY + layout.railH} L ${layout.railX + layout.railW - cornerSize} ${layout.railY + layout.railH - railT} L ${layout.railX + layout.railW - railT - innerR} ${layout.railY + layout.railH - railT} Q ${layout.railX + layout.railW - railT} ${layout.railY + layout.railH - railT} ${layout.railX + layout.railW - railT} ${layout.railY + layout.railH - railT - innerR} L ${layout.railX + layout.railW - railT} ${layout.railY + layout.railH - cornerSize} L ${layout.railX + layout.railW} ${layout.railY + layout.railH - cornerSize} L ${layout.railX + layout.railW} ${layout.railY + layout.railH - cornerR} Q ${layout.railX + layout.railW} ${layout.railY + layout.railH} ${layout.railX + layout.railW - cornerR} ${layout.railY + layout.railH} Z`}
                                 fill="url(#cornerMetalGrad)"
                                 stroke={metalPalette.border}
-                                strokeWidth={0.6}
+                                strokeWidth={0.7}
                             />
-                            <Circle cx={layout.railX + layout.railW - cornerSize * 0.55} cy={layout.railY + layout.railH - railT * 0.5} r={rivetR} fill={metalPalette.rivet} />
-                            <Circle cx={layout.railX + layout.railW - railT * 0.5} cy={layout.railY + layout.railH - cornerSize * 0.55} r={rivetR} fill={metalPalette.rivet} />
+
+                            {/* Engastes y pernos metálicos sobre las cantoneras, exactamente alineados 1:1 con los diamantes esquineros */}
+                            {cornerRivets.map((rivet, idx) => (
+                                <G key={`corner-rivet-${idx}`}>
+                                    {/* Engaste / bisel metálico exterior */}
+                                    <Circle
+                                        cx={rivet.cx}
+                                        cy={rivet.cy}
+                                        r={rivetR * 1.3}
+                                        fill={metalPalette.dark}
+                                        stroke={metalPalette.border}
+                                        strokeWidth={0.4}
+                                        opacity={0.85}
+                                    />
+                                    {/* Perno / remache central con brillo pulido */}
+                                    <Circle
+                                        cx={rivet.cx}
+                                        cy={rivet.cy}
+                                        r={rivetR * 0.85}
+                                        fill={metalPalette.rivet}
+                                    />
+                                </G>
+                            ))}
                         </G>
                     );
                 })()}
@@ -1073,17 +1209,18 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
 
                 {/* 7. Marca de agua / Calcomanía central de paño (Sticker / Decal) */}
                 {tablePreferences.showTableDecal && tablePreferences.tableDecal !== 'none' && (() => {
-                    const decalOpacity = tablePreferences.decalOpacity ?? 0.18;
+                    const decalOpacity = tablePreferences.decalOpacity ?? 0.20;
                     const centerX = layout.playX + layout.playW / 2;
                     const centerY = layout.playY + layout.playH / 2;
                     const minDim = Math.min(layout.playW, layout.playH);
+                    const decalSource = getTableDecalSource(tablePreferences.tableDecal);
 
-                    if (tablePreferences.tableDecal === 'skull') {
+                    if (decalSource) {
                         const decalSize = minDim * 0.78;
                         return (
                             <SvgImage
-                                key="decal-skull"
-                                href={SKULL_DECAL_SOURCE}
+                                key={`decal-${tablePreferences.tableDecal}`}
+                                href={decalSource}
                                 x={centerX - decalSize / 2}
                                 y={centerY - decalSize / 2}
                                 width={decalSize}
@@ -1093,60 +1230,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                             />
                         );
                     }
-
-                    if (tablePreferences.tableDecal === 'crown_filigree') {
-                        return (
-                            <G key="decal-crown" opacity={decalOpacity} transform={`translate(${centerX}, ${centerY}) scale(${minDim / 142})`}>
-                                <Path
-                                    d="M -22 10 L 22 10 L 25 -8 L 12 0 L 0 -16 L -12 0 L -25 -8 Z"
-                                    fill="none"
-                                    stroke="#fbbf24"
-                                    strokeWidth={1.2}
-                                />
-                                <Circle cx={0} cy={-16} r={2} fill="#fbbf24" />
-                                <Circle cx={-25} cy={-8} r={1.6} fill="#fbbf24" />
-                                <Circle cx={25} cy={-8} r={1.6} fill="#fbbf24" />
-                                <Circle cx={0} cy={2} r={3} fill="#fbbf24" opacity={0.6} />
-                                <Circle cx={0} cy={0} r={28} fill="none" stroke="#fbbf24" strokeWidth={0.6} strokeDasharray="3 3" />
-                            </G>
-                        );
-                    }
-
-                    if (tablePreferences.tableDecal === 'cyber_rings') {
-                        return (
-                            <G key="decal-cyber" opacity={decalOpacity} transform={`translate(${centerX}, ${centerY}) scale(${minDim / 142})`}>
-                                <Circle cx={0} cy={0} r={32} fill="none" stroke="#22d3ee" strokeWidth={0.8} />
-                                <Circle cx={0} cy={0} r={28} fill="none" stroke="#06b6d4" strokeWidth={0.5} strokeDasharray="4 2" />
-                                <Circle cx={0} cy={0} r={20} fill="none" stroke="#22d3ee" strokeWidth={0.6} />
-                                <Line x1={-36} y1={0} x2={36} y2={0} stroke="#22d3ee" strokeWidth={0.6} />
-                                <Line x1={0} y1={-36} x2={0} y2={36} stroke="#22d3ee" strokeWidth={0.6} />
-                            </G>
-                        );
-                    }
-
-                    if (tablePreferences.tableDecal === 'classic_carom') {
-                        return (
-                            <G key="decal-classic" opacity={decalOpacity} transform={`translate(${centerX}, ${centerY}) scale(${minDim / 142})`}>
-                                <Circle cx={0} cy={-8} r={6} fill="none" stroke="#ffffff" strokeWidth={1} />
-                                <Circle cx={-8} cy={6} r={6} fill="none" stroke="#fef08a" strokeWidth={1} />
-                                <Circle cx={8} cy={6} r={6} fill="none" stroke="#fca5a5" strokeWidth={1} />
-                                <Circle cx={0} cy={0} r={22} fill="none" stroke="#ffffff" strokeWidth={0.5} strokeDasharray="2 2" />
-                            </G>
-                        );
-                    }
-
-                    // Default: tournament_crest
-                    return (
-                        <G key="decal-crest" opacity={decalOpacity} transform={`translate(${centerX}, ${centerY}) scale(${minDim / 142})`}>
-                            <Circle cx={0} cy={0} r={18} fill="none" stroke="#ffffff" strokeWidth={0.7} />
-                            <Circle cx={0} cy={0} r={16.5} fill="none" stroke="#ffffff" strokeWidth={0.4} strokeDasharray="2 2" />
-                            <Line x1={-12} y1={-12} x2={12} y2={12} stroke="#ffffff" strokeWidth={0.8} />
-                            <Line x1={-12} y1={12} x2={12} y2={-12} stroke="#ffffff" strokeWidth={0.8} />
-                            <Circle cx={0} cy={-5} r={2.2} fill="#ffffff" />
-                            <Circle cx={-4.5} cy={4} r={2.2} fill="#ffffff" />
-                            <Circle cx={4.5} cy={4} r={2.2} fill="#ffffff" />
-                        </G>
-                    );
+                    return null;
                 })()}
 
                 {/* 8. Cuadrícula táctica 8x4 */}
@@ -1244,7 +1328,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                         />
                     );
                 })}
-                {tablePreferences.showCornerDiamonds && diamonds.corners.map((point, idx) => {
+                {((tablePreferences.diamondCount === '9_5' || !tablePreferences.diamondCount) && tablePreferences.showCornerDiamonds !== false) && diamonds.corners.map((point, idx) => {
                     const isHorizontalRail = orientation === 'horizontal' ? idx % 2 === 0 : idx % 2 !== 0;
                     const isThick = orientation === 'vertical';
                     const dx = isHorizontalRail ? (isThick ? 2.4 : 0.9) : (isThick ? 1.4 : 1.7);
@@ -1769,6 +1853,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                     anchors={numberingAnchors}
                     formula={numberingFormula ?? undefined}
                     isEditMode={isEditMode}
+                    tablePreferences={tablePreferences}
                 />
             )}
 

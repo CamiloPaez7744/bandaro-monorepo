@@ -63,6 +63,7 @@ import {
   DEFAULT_TABLE_PREFERENCES,
   loadTablePreferences,
   saveTablePreferences,
+  useTablePreferences,
   resolveClothPalette,
 } from '@/src/presentation/components/Training/tablePreferences';
 import {
@@ -382,7 +383,7 @@ function TableVisionStudioModalBase({
 
   // Tactical toggles
   const [swapCue, setSwapCue] = useState(false);
-  const [tablePrefs, setTablePrefs] = useState<TablePreferences>(DEFAULT_TABLE_PREFERENCES);
+  const { preferences: tablePrefs, updatePreferences: handleChangeTablePrefs } = useTablePreferences();
   const [customizerVisible, setCustomizerVisible] = useState(false);
   const [canvasSettingsVisible, setCanvasSettingsVisible] = useState(false);
   const [tableOrientation, setTableOrientation] = useState<'horizontal' | 'vertical'>('horizontal');
@@ -390,17 +391,6 @@ function TableVisionStudioModalBase({
   const [tableCoverage, setTableCoverage] = useState<'full' | 'half'>('full');
   const [halfTableZone, setHalfTableZone] = useState<'half_1' | 'half_2'>('half_1');
   const [showFineControls, setShowFineControls] = useState(false);
-
-  useEffect(() => {
-    loadTablePreferences().then((loaded) => {
-      setTablePrefs(loaded);
-    });
-  }, []);
-
-  const handleChangeTablePrefs = useCallback((newPrefs: TablePreferences) => {
-    setTablePrefs(newPrefs);
-    saveTablePreferences(newPrefs);
-  }, []);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
@@ -885,15 +875,16 @@ function TableVisionStudioModalBase({
     let centerLine: { p1: Point2D; p2: Point2D } | null = null;
 
     if (!isHalf) {
-      const showCorners = tablePrefs.showCornerDiamonds !== false;
-      const is9x5 = tablePrefs.diamondCount === '9_5';
+      const showCorners = (tablePrefs.diamondCount === '9_5' || !tablePrefs.diamondCount) && tablePrefs.showCornerDiamonds !== false;
+      const longIndices = showCorners
+        ? [0, 1, 2, 3, 4, 5, 6, 7, 8]
+        : [1, 2, 3, 4, 5, 6, 7];
+      const shortIndices = showCorners
+        ? [0, 1, 2, 3, 4]
+        : [1, 2, 3];
 
       if (isHoriz) {
         // Horizontal table: Long rails are Top & Bottom
-        const longIndices = is9x5
-          ? (showCorners ? [0, 1, 2, 3, 4, 5, 6, 7, 8] : [1, 2, 3, 4, 5, 6, 7])
-          : (showCorners ? [0, 1, 2, 3, 4, 5, 6, 7, 8] : [1, 2, 3, 4, 5, 6, 7]);
-
         for (const idx of longIndices) {
           const u = idx / 8.0;
           diamonds.push({ ...mapPt(u, -dMidV), label: String(idx * 10), isLong: true });
@@ -904,10 +895,6 @@ function TableVisionStudioModalBase({
         }
 
         // Short rails are Left & Right
-        const shortIndices = is9x5
-          ? (showCorners ? [0, 1, 2, 3, 4] : [1, 2, 3])
-          : (showCorners ? [0, 1, 2, 3, 4] : [1, 2, 3]);
-
         for (const idx of shortIndices) {
           const v = idx / 4.0;
           diamonds.push({ ...mapPt(-dMidU, v), label: String(idx * 10), isLong: false });
@@ -918,10 +905,6 @@ function TableVisionStudioModalBase({
         }
       } else {
         // Vertical table: Long rails are Left & Right
-        const longIndices = is9x5
-          ? (showCorners ? [0, 1, 2, 3, 4, 5, 6, 7, 8] : [1, 2, 3, 4, 5, 6, 7])
-          : (showCorners ? [0, 1, 2, 3, 4, 5, 6, 7, 8] : [1, 2, 3, 4, 5, 6, 7]);
-
         for (const idx of longIndices) {
           const v = idx / 8.0;
           diamonds.push({ ...mapPt(-dMidU, v), label: String(idx * 10), isLong: true });
@@ -932,10 +915,6 @@ function TableVisionStudioModalBase({
         }
 
         // Short rails are Top & Bottom
-        const shortIndices = is9x5
-          ? (showCorners ? [0, 1, 2, 3, 4] : [1, 2, 3])
-          : (showCorners ? [0, 1, 2, 3, 4] : [1, 2, 3]);
-
         for (const idx of shortIndices) {
           const u = idx / 4.0;
           diamonds.push({ ...mapPt(u, -dMidV), label: String(idx * 10), isLong: false });

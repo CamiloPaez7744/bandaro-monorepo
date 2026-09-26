@@ -22,11 +22,17 @@ import Svg, {
 } from 'react-native-svg';
 import { BallId, SpinEffect } from '@bandaro/core';
 import { IconRefresh, IconX, IconCheck } from '@/src/presentation/components/icons';
+import {
+    useTablePreferences,
+    type TablePreferences,
+    BALL_SKIN_PRESETS,
+} from './tablePreferences';
 
 interface CaromProEffectModalProps {
     visible: boolean;
     spin: SpinEffect;
     cueBallId: BallId;
+    tablePreferences?: TablePreferences;
     onSpinChange: (spin: SpinEffect) => void;
     onClose: () => void;
 }
@@ -41,16 +47,22 @@ export const CaromProEffectModal = memo(function CaromProEffectModal({
     visible,
     spin,
     cueBallId,
+    tablePreferences: propsTablePreferences,
     onSpinChange,
     onClose,
 }: CaromProEffectModalProps) {
     const { width: windowWidth, height: windowHeight } = useWindowDimensions();
     const isMobile = windowWidth < 768;
 
+    const { preferences: prefs } = useTablePreferences(propsTablePreferences);
+    const modalUid = useMemo(() => `cpe_${Math.random().toString(36).slice(2, 8)}`, []);
+    const ballSkin = prefs.ballSkin ?? 'aramith_pro_cup';
+    const showDots = prefs.showBallDots !== false;
+
     // Responsive size of the sphere stage for mobile
-    const size = isMobile ? Math.min(200, windowWidth - 70) : 270;
+    const size = isMobile ? Math.min(230, windowWidth - 50) : 280;
     const center = size / 2;
-    const sphereRadius = size * 0.40;
+    const sphereRadius = size * 0.36;
     const tipRadius = sphereRadius * (REAL_TIP_RADIUS_MM / REAL_BALL_RADIUS_MM);
     const maxDragRadius = sphereRadius * MAX_SAFE_RADIUS_RATIO;
 
@@ -128,6 +140,18 @@ export const CaromProEffectModal = memo(function CaromProEffectModal({
         [onSpinChange]
     );
 
+    const setPresetLevel = useCallback(
+        (level: number) => {
+            if (level === 0) {
+                setPreset(0, 0);
+                return;
+            }
+            const signX = spin.x < -0.05 ? -1 : 1;
+            setPreset(signX * level * 0.25, 0);
+        },
+        [setPreset, spin.x]
+    );
+
     return (
         <Modal
             visible={visible}
@@ -139,9 +163,23 @@ export const CaromProEffectModal = memo(function CaromProEffectModal({
                     {/* Header */}
                     <View style={styles.modalHeader}>
                         <View style={{ flex: 1 }}>
-                            <Text style={styles.headerSubtitle}>UMB CAROM 3-CUSHION</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Text style={styles.headerSubtitle}>
+                                    {prefs.breakFormat === 'umb' ? '🌍 UMB 3-CUSHION' : '🇰🇷 PBA TOUR'}
+                                </Text>
+                                <View style={{
+                                    backgroundColor: isYellow ? '#eab308' : '#f8fafc',
+                                    paddingHorizontal: 6,
+                                    paddingVertical: 1,
+                                    borderRadius: 4,
+                                }}>
+                                    <Text style={{ fontSize: 9, fontWeight: '800', color: isYellow ? '#713f12' : '#0f172a' }}>
+                                        {isYellow ? 'BOLA AMARILLA' : 'BOLA BLANCA'}
+                                    </Text>
+                                </View>
+                            </View>
                             <Text style={[styles.headerTitle, isMobile && { fontSize: 13 }]}>
-                                SELECTOR DE EFECTO
+                                SELECTOR DE EFECTO • {BALL_SKIN_PRESETS.find((s) => s.id === ballSkin)?.name.split(' (')[0] ?? 'PRO'}
                             </Text>
                         </View>
                         <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
@@ -162,20 +200,20 @@ export const CaromProEffectModal = memo(function CaromProEffectModal({
                                 {...panResponder.panHandlers}>
                                 <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
                                     <Defs>
-                                        <RadialGradient id="modalSphereShadeYellow" cx="42%" cy="38%" r="65%">
+                                        <RadialGradient id={`${modalUid}_sphereShadeYellow`} cx="42%" cy="38%" r="65%">
                                             <Stop offset="0%" stopColor="#fffbeb" />
                                             <Stop offset="30%" stopColor="#fef08a" />
                                             <Stop offset="75%" stopColor="#eab308" />
                                             <Stop offset="100%" stopColor="#713f12" />
                                         </RadialGradient>
-                                        <RadialGradient id="modalSphereShadeWhite" cx="42%" cy="38%" r="65%">
+                                        <RadialGradient id={`${modalUid}_sphereShadeWhite`} cx="42%" cy="38%" r="65%">
                                             <Stop offset="0%" stopColor="#ffffff" />
                                             <Stop offset="35%" stopColor="#f8fafc" />
                                             <Stop offset="75%" stopColor="#cbd5e1" />
                                             <Stop offset="100%" stopColor="#475569" />
                                         </RadialGradient>
 
-                                        <RadialGradient id="neonTipGlow" cx="50%" cy="50%" r="50%">
+                                        <RadialGradient id={`${modalUid}_neonTipGlow`} cx="50%" cy="50%" r="50%">
                                             <Stop offset="0%" stopColor="#00d2ff" stopOpacity="0.9" />
                                             <Stop offset="50%" stopColor="#00d2ff" stopOpacity="0.4" />
                                             <Stop offset="100%" stopColor="#00d2ff" stopOpacity="0" />
@@ -195,50 +233,73 @@ export const CaromProEffectModal = memo(function CaromProEffectModal({
                                         cx={center}
                                         cy={center}
                                         r={sphereRadius}
-                                        fill={isYellow ? 'url(#modalSphereShadeYellow)' : 'url(#modalSphereShadeWhite)'}
-                                        stroke="rgba(255, 255, 255, 0.3)"
+                                        fill={isYellow ? `url(#${modalUid}_sphereShadeYellow)` : `url(#${modalUid}_sphereShadeWhite)`}
+                                        stroke={isYellow ? 'rgba(234, 179, 8, 0.45)' : 'rgba(255, 255, 255, 0.4)'}
                                         strokeWidth={1.5}
                                     />
 
-                                    {/* Malla esférica 3D */}
-                                    <G opacity={0.28}>
-                                        {[-0.75, -0.5, -0.25, 0.25, 0.5, 0.75].map((factor) => {
-                                            const yOffset = sphereRadius * factor;
-                                            const rAtY = Math.sqrt(Math.max(0, sphereRadius * sphereRadius - yOffset * yOffset));
+                                    {/* Puntos y marcajes oficiales según set de bolas activo */}
+                                    {showDots && (() => {
+                                        if (ballSkin === 'aramith_pro_cup') {
+                                            const dotR = sphereRadius * 0.085;
+                                            const dOffset = sphereRadius * 0.44;
                                             return (
-                                                <Ellipse
-                                                    key={`lat-${factor}`}
-                                                    cx={center}
-                                                    cy={center + yOffset}
-                                                    rx={rAtY}
-                                                    ry={rAtY * 0.35}
-                                                    fill="none"
-                                                    stroke={isYellow ? '#713f12' : '#334155'}
-                                                    strokeWidth={0.8}
-                                                />
+                                                <G pointerEvents="none" opacity={0.88}>
+                                                    <Circle cx={center} cy={center} r={dotR} fill="#dc2626" />
+                                                    <Circle cx={center - dOffset} cy={center - dOffset * 0.5} r={dotR} fill="#dc2626" />
+                                                    <Circle cx={center + dOffset} cy={center - dOffset * 0.5} r={dotR} fill="#dc2626" />
+                                                    <Circle cx={center - dOffset} cy={center + dOffset * 0.5} r={dotR} fill="#dc2626" />
+                                                    <Circle cx={center + dOffset} cy={center + dOffset * 0.5} r={dotR} fill="#dc2626" />
+                                                    <Circle cx={center} cy={center - dOffset * 0.85} r={dotR} fill="#dc2626" />
+                                                </G>
                                             );
-                                        })}
-
-                                        {[-0.75, -0.5, -0.25, 0.25, 0.5, 0.75].map((factor) => {
-                                            const xOffset = sphereRadius * factor;
-                                            const rAtX = Math.sqrt(Math.max(0, sphereRadius * sphereRadius - xOffset * xOffset));
+                                        }
+                                        if (ballSkin === 'cosmo_helix_pba') {
+                                            const dotColor = isYellow ? '#0284c7' : '#00e5ff';
+                                            const ringColor = isYellow ? 'rgba(2, 132, 199, 0.45)' : 'rgba(0, 229, 255, 0.45)';
+                                            const dotR = sphereRadius * 0.085;
+                                            const dOffset = sphereRadius * 0.44;
                                             return (
-                                                <Ellipse
-                                                    key={`long-${factor}`}
-                                                    cx={center + xOffset}
-                                                    cy={center}
-                                                    rx={rAtX * 0.35}
-                                                    ry={rAtX}
-                                                    fill="none"
-                                                    stroke={isYellow ? '#713f12' : '#334155'}
-                                                    strokeWidth={0.8}
-                                                />
+                                                <G pointerEvents="none">
+                                                    <Circle cx={center} cy={center} r={sphereRadius * 0.55} fill="none" stroke={ringColor} strokeWidth={1.2} strokeDasharray="3 2" />
+                                                    <Circle cx={center} cy={center} r={sphereRadius * 0.82} fill="none" stroke={ringColor} strokeWidth={1} strokeDasharray="2 3" />
+                                                    <Circle cx={center} cy={center} r={dotR} fill={dotColor} />
+                                                    <Circle cx={center - dOffset} cy={center - dOffset * 0.5} r={dotR} fill={dotColor} />
+                                                    <Circle cx={center + dOffset} cy={center - dOffset * 0.5} r={dotR} fill={dotColor} />
+                                                    <Circle cx={center - dOffset} cy={center + dOffset * 0.5} r={dotR} fill={dotColor} />
+                                                    <Circle cx={center + dOffset} cy={center + dOffset * 0.5} r={dotR} fill={dotColor} />
+                                                </G>
                                             );
-                                        })}
-                                    </G>
+                                        }
+                                        if (ballSkin === 'dynaspheres') {
+                                            const dotColor = isYellow ? '#1d4ed8' : '#475569';
+                                            const ringColor = isYellow ? 'rgba(29, 78, 216, 0.4)' : 'rgba(71, 85, 105, 0.4)';
+                                            const dotR = sphereRadius * 0.075;
+                                            const dOffset = sphereRadius * 0.42;
+                                            return (
+                                                <G pointerEvents="none">
+                                                    <Circle cx={center} cy={center} r={sphereRadius * 0.58} fill="none" stroke={ringColor} strokeWidth={1.3} />
+                                                    <Circle cx={center} cy={center} r={dotR} fill={dotColor} />
+                                                    <Circle cx={center - dOffset} cy={center} r={dotR} fill={dotColor} />
+                                                    <Circle cx={center + dOffset} cy={center} r={dotR} fill={dotColor} />
+                                                    <Circle cx={center} cy={center - dOffset} r={dotR} fill={dotColor} />
+                                                    <Circle cx={center} cy={center + dOffset} r={dotR} fill={dotColor} />
+                                                </G>
+                                            );
+                                        }
+                                        if (ballSkin === 'classic_solid') {
+                                            const dotColor = isYellow ? '#dc2626' : '#0f172a';
+                                            return (
+                                                <G pointerEvents="none">
+                                                    <Circle cx={center} cy={center} r={sphereRadius * 0.075} fill={dotColor} opacity={0.8} />
+                                                </G>
+                                            );
+                                        }
+                                        return null;
+                                    })()}
 
-                                    {/* 4 Círculos Concéntricos de Casquillos Reales */}
-                                    {[0.25, 0.5, 0.75, 1.0].map((ratio, idx) => {
+                                    {/* 1. Círculos Concéntricos de Casquillos (E1, E2, E3) en azul sutil */}
+                                    {[0.25, 0.5, 0.75].map((ratio, idx) => {
                                         const r = maxDragRadius * ratio;
                                         return (
                                             <Circle
@@ -247,62 +308,161 @@ export const CaromProEffectModal = memo(function CaromProEffectModal({
                                                 cy={center}
                                                 r={r}
                                                 fill="none"
-                                                stroke="rgba(0, 210, 255, 0.25)"
+                                                stroke="rgba(0, 210, 255, 0.30)"
                                                 strokeWidth={0.9}
-                                                strokeDasharray={idx === 3 ? '4 3' : undefined}
                                             />
                                         );
                                     })}
 
-                                    {/* Límite de Pifia */}
+                                    {/* 2. Zona Segura Punteada (Casquillo E4 / Límite Máximo Reglamentario UMB) */}
+                                    <Circle
+                                        cx={center}
+                                        cy={center}
+                                        r={maxDragRadius}
+                                        fill="rgba(0, 210, 255, 0.02)"
+                                        stroke="#00d2ff"
+                                        strokeWidth={1.3}
+                                        strokeDasharray="4 3"
+                                    />
+
+                                    {/* 3. Zona de Pifia Punteada (Límite Crítico de Deslizamiento del Taco) */}
                                     <Circle
                                         cx={center}
                                         cy={center}
                                         r={sphereRadius * 0.82}
-                                        fill="none"
-                                        stroke="rgba(239, 68, 68, 0.35)"
-                                        strokeWidth={1}
-                                        strokeDasharray="2 4"
+                                        fill="rgba(239, 68, 68, 0.03)"
+                                        stroke="#ef4444"
+                                        strokeWidth={1.3}
+                                        strokeDasharray="3 3"
                                     />
 
-                                    {/* EJE Y */}
+                                    {/* 4. EJE X (Horizontal / Lateral - 9h Izq a 3h Der) */}
+                                    <Line
+                                        x1={center - sphereRadius - 6}
+                                        y1={center}
+                                        x2={center + sphereRadius + 6}
+                                        y2={center}
+                                        stroke="#00d2ff"
+                                        strokeWidth={1.5}
+                                        strokeLinecap="round"
+                                    />
+
+                                    {/* Calibración milimétrica de casquillos sobre Eje X */}
+                                    {[-1, -0.75, -0.5, -0.25, 0.25, 0.5, 0.75, 1].map((r) => (
+                                        <Line
+                                            key={`tick-x-${r}`}
+                                            x1={center + maxDragRadius * r}
+                                            y1={center - (Math.abs(r) === 1 ? 3.5 : 2.2)}
+                                            x2={center + maxDragRadius * r}
+                                            y2={center + (Math.abs(r) === 1 ? 3.5 : 2.2)}
+                                            stroke="#00d2ff"
+                                            strokeWidth={1}
+                                            strokeLinecap="round"
+                                        />
+                                    ))}
+
+                                    {/* 5. EJE Y (Vertical / Corrido 12h y Pique 6h) */}
                                     <Line
                                         x1={center}
-                                        y1={center - sphereRadius - 10}
+                                        y1={center - sphereRadius - 6}
                                         x2={center}
-                                        y2={center + sphereRadius + 10}
+                                        y2={center + sphereRadius + 6}
                                         stroke="#00d2ff"
-                                        strokeWidth={1.8}
+                                        strokeWidth={1.5}
                                         strokeLinecap="round"
                                     />
 
-                                    {/* EJE X */}
-                                    <Line
-                                        x1={center - sphereRadius - 10}
-                                        y1={center}
-                                        x2={center + sphereRadius + 10}
-                                        stroke="#00d2ff"
-                                        strokeWidth={1.8}
-                                        strokeLinecap="round"
-                                    />
+                                    {/* Calibración milimétrica de casquillos sobre Eje Y */}
+                                    {[-1, -0.75, -0.5, -0.25, 0.25, 0.5, 0.75, 1].map((r) => (
+                                        <Line
+                                            key={`tick-y-${r}`}
+                                            x1={center - (Math.abs(r) === 1 ? 3.5 : 2.2)}
+                                            y1={center + maxDragRadius * r}
+                                            x2={center + (Math.abs(r) === 1 ? 3.5 : 2.2)}
+                                            y2={center + maxDragRadius * r}
+                                            stroke="#00d2ff"
+                                            strokeWidth={1}
+                                            strokeLinecap="round"
+                                        />
+                                    ))}
 
-                                    {/* Etiquetas de ejes */}
+                                    {/* Centro E0 */}
+                                    <Circle cx={center} cy={center} r={2} fill="#00d2ff" />
+
+                                    {/* Etiquetas en los extremos de los ejes */}
                                     <SvgText
-                                        x={center + sphereRadius + 12}
+                                        x={center + sphereRadius + 10}
                                         y={center + 3}
                                         fill="#00d2ff"
-                                        fontSize="7"
-                                        fontWeight="bold">
-                                        X
+                                        fontSize="8"
+                                        fontWeight="bold"
+                                        textAnchor="start">
+                                        3h
+                                    </SvgText>
+                                    <SvgText
+                                        x={center - sphereRadius - 10}
+                                        y={center + 3}
+                                        fill="#00d2ff"
+                                        fontSize="8"
+                                        fontWeight="bold"
+                                        textAnchor="end">
+                                        9h
                                     </SvgText>
                                     <SvgText
                                         x={center}
-                                        y={center - sphereRadius - 12}
+                                        y={center - sphereRadius - 9}
                                         fill="#00d2ff"
-                                        fontSize="7"
+                                        fontSize="8"
                                         fontWeight="bold"
                                         textAnchor="middle">
-                                        Y
+                                        12h
+                                    </SvgText>
+                                    <SvgText
+                                        x={center}
+                                        y={center + sphereRadius + 15}
+                                        fill="#00d2ff"
+                                        fontSize="8"
+                                        fontWeight="bold"
+                                        textAnchor="middle">
+                                        6h
+                                    </SvgText>
+
+                                    {/* Indicadores de dirección sobre las líneas interiores */}
+                                    <SvgText
+                                        x={center + maxDragRadius * 0.86}
+                                        y={center - 4}
+                                        fill="rgba(0, 210, 255, 0.7)"
+                                        fontSize="6"
+                                        fontWeight="bold"
+                                        textAnchor="middle">
+                                        Der
+                                    </SvgText>
+                                    <SvgText
+                                        x={center - maxDragRadius * 0.86}
+                                        y={center - 4}
+                                        fill="rgba(0, 210, 255, 0.7)"
+                                        fontSize="6"
+                                        fontWeight="bold"
+                                        textAnchor="middle">
+                                        Izq
+                                    </SvgText>
+                                    <SvgText
+                                        x={center + 4}
+                                        y={center - maxDragRadius * 0.86 + 2}
+                                        fill="rgba(0, 210, 255, 0.7)"
+                                        fontSize="6"
+                                        fontWeight="bold"
+                                        textAnchor="start">
+                                        Corr
+                                    </SvgText>
+                                    <SvgText
+                                        x={center + 4}
+                                        y={center + maxDragRadius * 0.86 + 2}
+                                        fill="rgba(0, 210, 255, 0.7)"
+                                        fontSize="6"
+                                        fontWeight="bold"
+                                        textAnchor="start">
+                                        Piq
                                     </SvgText>
 
                                     {/* Halo exterior y Casquillo del taco */}
@@ -310,7 +470,7 @@ export const CaromProEffectModal = memo(function CaromProEffectModal({
                                         cx={tipX}
                                         cy={tipY}
                                         r={tipRadius * 1.5}
-                                        fill="url(#neonTipGlow)"
+                                        fill={`url(#${modalUid}_neonTipGlow)`}
                                     />
                                     <Circle
                                         cx={tipX}
@@ -329,6 +489,18 @@ export const CaromProEffectModal = memo(function CaromProEffectModal({
                                         strokeWidth={1.2}
                                     />
                                 </Svg>
+                            </View>
+
+                            {/* Leyenda de Referencia de Zonas */}
+                            <View style={styles.legendRow}>
+                                <View style={styles.legendItem}>
+                                    <View style={styles.legendDashSafe} />
+                                    <Text style={styles.legendText}>Zona segura (E4)</Text>
+                                </View>
+                                <View style={styles.legendItem}>
+                                    <View style={styles.legendDashMiscue} />
+                                    <Text style={[styles.legendText, { color: '#f87171' }]}>Zona de pifia</Text>
+                                </View>
                             </View>
                         </View>
 
@@ -362,36 +534,36 @@ export const CaromProEffectModal = memo(function CaromProEffectModal({
                             <View style={styles.pillRow}>
                                 <TouchableOpacity
                                     style={[styles.pillBtn, effectLevel === 0 && styles.pillBtnActive]}
-                                    onPress={() => setPreset(0, 0)}>
+                                    onPress={() => setPresetLevel(0)}>
                                     <Text style={[styles.pillText, effectLevel === 0 && styles.pillTextActive]}>
                                         E0
                                     </Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
-                                    style={[styles.pillBtn, effectLevel === 1 && spin.x > 0 && styles.pillBtnActive]}
-                                    onPress={() => setPreset(0.25, 0)}>
-                                    <Text style={[styles.pillText, effectLevel === 1 && spin.x > 0 && styles.pillTextActive]}>
+                                    style={[styles.pillBtn, effectLevel === 1 && styles.pillBtnActive]}
+                                    onPress={() => setPresetLevel(1)}>
+                                    <Text style={[styles.pillText, effectLevel === 1 && styles.pillTextActive]}>
                                         E1
                                     </Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
-                                    style={[styles.pillBtn, effectLevel === 2 && spin.x > 0 && styles.pillBtnActive]}
-                                    onPress={() => setPreset(0.5, 0)}>
-                                    <Text style={[styles.pillText, effectLevel === 2 && spin.x > 0 && styles.pillTextActive]}>
+                                    style={[styles.pillBtn, effectLevel === 2 && styles.pillBtnActive]}
+                                    onPress={() => setPresetLevel(2)}>
+                                    <Text style={[styles.pillText, effectLevel === 2 && styles.pillTextActive]}>
                                         E2
                                     </Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
-                                    style={[styles.pillBtn, effectLevel === 3 && spin.x > 0 && styles.pillBtnActive]}
-                                    onPress={() => setPreset(0.75, 0)}>
-                                    <Text style={[styles.pillText, effectLevel === 3 && spin.x > 0 && styles.pillTextActive]}>
+                                    style={[styles.pillBtn, effectLevel === 3 && styles.pillBtnActive]}
+                                    onPress={() => setPresetLevel(3)}>
+                                    <Text style={[styles.pillText, effectLevel === 3 && styles.pillTextActive]}>
                                         E3
                                     </Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
-                                    style={[styles.pillBtn, effectLevel === 4 && spin.x > 0 && styles.pillBtnActive]}
-                                    onPress={() => setPreset(1.0, 0)}>
-                                    <Text style={[styles.pillText, effectLevel === 4 && spin.x > 0 && styles.pillTextActive]}>
+                                    style={[styles.pillBtn, effectLevel === 4 && styles.pillBtnActive]}
+                                    onPress={() => setPresetLevel(4)}>
+                                    <Text style={[styles.pillText, effectLevel === 4 && styles.pillTextActive]}>
                                         E4
                                     </Text>
                                 </TouchableOpacity>
@@ -534,6 +706,39 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         paddingVertical: 2,
+        gap: 6,
+    },
+    legendRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 16,
+        paddingTop: 2,
+    },
+    legendItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    legendDashSafe: {
+        width: 14,
+        height: 0,
+        borderWidth: 1,
+        borderColor: '#00d2ff',
+        borderStyle: 'dashed',
+    },
+    legendDashMiscue: {
+        width: 14,
+        height: 0,
+        borderWidth: 1,
+        borderColor: '#ef4444',
+        borderStyle: 'dashed',
+    },
+    legendText: {
+        fontSize: 9,
+        fontWeight: '700',
+        color: '#94a3b8',
+        letterSpacing: 0.2,
     },
     svgContainer: {
         cursor: 'crosshair' as any,

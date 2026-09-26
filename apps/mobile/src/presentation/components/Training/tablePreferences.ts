@@ -1,11 +1,20 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { BreakFormat, PbaFormationId } from '@bandaro/core';
+import { BreakFormat, PbaFormationId, BallId } from '@bandaro/core';
+import { useState, useEffect, useCallback } from 'react';
 
 export type DiamondShape = 'rhombus' | 'circle';
 export type DiamondCount = '9_5' | '7_3';
 export type WoodFinish = 'ebony' | 'mahogany' | 'walnut';
 export type CornerMetalStyle = 'brass' | 'gold_24k' | 'chrome' | 'neon_cyan' | 'antique_bronze';
-export type TableDecal = 'tournament_crest' | 'skull' | 'crown_filigree' | 'cyber_rings' | 'classic_carom' | 'none';
+export type TableDecal =
+  | 'blackhole'
+  | 'skull'
+  | 'constelacion'
+  | 'pulpo'
+  | 'tiburon'
+  | 'tigre'
+  | 'trofeo'
+  | 'none';
 
 export interface ClothSkinPreset {
   id: string;
@@ -55,7 +64,7 @@ export const TABLE_ARENA_SKINS: TableArenaSkin[] = [
     cornerMetal: 'brass',
     diamondShape: 'rhombus',
     diamondColor: '#f1f5f9',
-    tableDecal: 'tournament_crest',
+    tableDecal: 'trofeo',
     accentGlow: '#38bdf8',
   },
   {
@@ -69,7 +78,7 @@ export const TABLE_ARENA_SKINS: TableArenaSkin[] = [
     cornerMetal: 'gold_24k',
     diamondShape: 'rhombus',
     diamondColor: '#fbbf24',
-    tableDecal: 'crown_filigree',
+    tableDecal: 'trofeo',
     accentGlow: '#fbbf24',
   },
   {
@@ -83,7 +92,7 @@ export const TABLE_ARENA_SKINS: TableArenaSkin[] = [
     cornerMetal: 'neon_cyan',
     diamondShape: 'circle',
     diamondColor: '#22d3ee',
-    tableDecal: 'cyber_rings',
+    tableDecal: 'blackhole',
     accentGlow: '#06b6d4',
   },
   {
@@ -97,7 +106,7 @@ export const TABLE_ARENA_SKINS: TableArenaSkin[] = [
     cornerMetal: 'chrome',
     diamondShape: 'rhombus',
     diamondColor: '#ffffff',
-    tableDecal: 'classic_carom',
+    tableDecal: 'tigre',
     accentGlow: '#f43f5e',
   },
   {
@@ -111,7 +120,7 @@ export const TABLE_ARENA_SKINS: TableArenaSkin[] = [
     cornerMetal: 'antique_bronze',
     diamondShape: 'circle',
     diamondColor: '#fef08a',
-    tableDecal: 'classic_carom',
+    tableDecal: 'constelacion',
     accentGlow: '#4ade80',
   },
 ];
@@ -271,6 +280,7 @@ export interface TablePreferences {
   cueSkin: CueSkinId; // Modelo visual del taco de billar
   ballSkin: BallSkinId; // Skin visual del set de bolas
   showBallDots: boolean; // Mostrar puntos de rotación
+  cueBallId?: BallId; // Bola tiradora preferida del jugador ('white' o 'yellow')
   breakFormat: BreakFormat; // Formato de salida por defecto ('umb' o 'pba')
   pbaFormation: PbaFormationId; // Formación PBA ('159', '357', '258', etc.)
   umbSide: 'right' | 'left'; // Lado de la bola blanca en UMB ('right' o 'left')
@@ -286,40 +296,120 @@ export const DEFAULT_TABLE_PREFERENCES: TablePreferences = {
   showDiamondNumbers: false,
   woodFinish: 'mahogany',
   cornerMetal: 'brass',
-  tableDecal: 'tournament_crest',
-  decalOpacity: 0.18,
+  tableDecal: 'blackhole',
+  decalOpacity: 0.20,
   showSpotlight: true,
   showTableDecal: true,
   cueSkin: 'venom_azure',
   ballSkin: 'aramith_pro_cup',
   showBallDots: true,
+  cueBallId: 'white',
   breakFormat: 'umb',
   pbaFormation: '159',
   umbSide: 'right',
 };
 
-
 const STORAGE_KEY = '@bandaro_table_preferences_v1';
+
+// In-memory cache for synchronous availability across all components
+let cachedTablePreferences: TablePreferences = { ...DEFAULT_TABLE_PREFERENCES };
+let isHydratedFromStorage = false;
+const preferenceListeners = new Set<(prefs: TablePreferences) => void>();
+
+/**
+ * Returns current in-memory cached table preferences synchronously (never blocks or delays).
+ */
+export function getCachedTablePreferences(): TablePreferences {
+  return cachedTablePreferences;
+}
+
+/**
+ * Subscribes a listener callback to any preferences changes.
+ * Calls listener immediately with current cached preferences, and returns an unsubscribe function.
+ */
+export function subscribeTablePreferences(listener: (prefs: TablePreferences) => void): () => void {
+  preferenceListeners.add(listener);
+  listener(cachedTablePreferences);
+  return () => {
+    preferenceListeners.delete(listener);
+  };
+}
 
 export async function loadTablePreferences(): Promise<TablePreferences> {
   try {
     const raw = await AsyncStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      return { ...DEFAULT_TABLE_PREFERENCES, ...parsed };
+      cachedTablePreferences = { ...DEFAULT_TABLE_PREFERENCES, ...parsed };
+      isHydratedFromStorage = true;
+      preferenceListeners.forEach((listener) => {
+        try {
+          listener(cachedTablePreferences);
+        } catch (e) {
+          console.warn('[TablePreferences] Listener error:', e);
+        }
+      });
+      return cachedTablePreferences;
     }
   } catch (err) {
     console.warn('[TablePreferences] Failed to load preferences:', err);
   }
-  return DEFAULT_TABLE_PREFERENCES;
+  isHydratedFromStorage = true;
+  return cachedTablePreferences;
 }
 
+// Auto-hydrate cache in background as soon as module loads
+loadTablePreferences().catch(() => {});
+
 export async function saveTablePreferences(prefs: TablePreferences): Promise<void> {
+  // Update in-memory cache and notify all listeners immediately (synchronous reactive update)
+  cachedTablePreferences = { ...prefs };
+  preferenceListeners.forEach((listener) => {
+    try {
+      listener(cachedTablePreferences);
+    } catch (e) {
+      console.warn('[TablePreferences] Listener error:', e);
+    }
+  });
+
   try {
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
   } catch (err) {
     console.warn('[TablePreferences] Failed to save preferences:', err);
   }
+}
+
+/**
+ * React hook to consume and update table preferences reactively across any modal or component.
+ * Automatically synchronizes changes without needing a page refresh or manual re-load.
+ */
+export function useTablePreferences(overridePreferences?: Partial<TablePreferences>): {
+  preferences: TablePreferences;
+  updatePreferences: (newPrefs: TablePreferences) => void;
+} {
+  const [prefs, setPrefs] = useState<TablePreferences>(
+    overridePreferences ? { ...cachedTablePreferences, ...overridePreferences } : cachedTablePreferences
+  );
+
+  useEffect(() => {
+    if (overridePreferences) {
+      setPrefs({ ...cachedTablePreferences, ...overridePreferences });
+      return;
+    }
+
+    return subscribeTablePreferences((latest) => {
+      setPrefs(latest);
+    });
+  }, [overridePreferences]);
+
+  const updatePreferences = useCallback((newPrefs: TablePreferences) => {
+    saveTablePreferences(newPrefs).catch(() => {});
+  }, []);
+
+  return {
+    preferences: prefs,
+    updatePreferences,
+  };
 }
 
 /**

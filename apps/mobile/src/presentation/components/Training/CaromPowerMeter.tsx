@@ -78,7 +78,8 @@ export const CaromPowerMeter = React.memo(function CaromPowerMeter({
     ).current;
 
     // Convert power (0..100) to rail speed indicator (1..5)
-    const railSpeed = Math.min(5, Math.max(1, Math.round((powerLevel / 100) * 4) + 1));
+    // 0-20% = Vel 1 (1 largo), 21-40% = Vel 2 (2 largos), 41-60% = Vel 3 (3 largos), 61-80% = Vel 4 (4 largos), 81-100% = Vel 5 (5 largos)
+    const railSpeed = powerLevel <= 0 ? 1 : Math.min(5, Math.max(1, Math.ceil(powerLevel / 20)));
 
     // Dynamic color based on power
     const getFillColor = (pct: number) => {
@@ -126,8 +127,10 @@ export const CaromPowerMeter = React.memo(function CaromPowerMeter({
 
                 {/* Líneas de graduación / Marcas de velocidad de 1 a 5 bandas */}
                 <View style={styles.ticksContainer} pointerEvents="none">
-                    {[20, 40, 60, 80].map((mark) => (
-                        <View key={mark} style={[styles.tickLine, { top: `${mark}%` }]} />
+                    {[20, 40, 60, 80].map((mark, idx) => (
+                        <View key={mark} style={[styles.tickLine, { top: `${mark}%` }]}>
+                            <Text style={styles.tickLabel}>{idx + 1}</Text>
+                        </View>
                     ))}
                 </View>
 
@@ -207,10 +210,20 @@ const styles = StyleSheet.create({
     },
     tickLine: {
         position: 'absolute',
-        left: 4,
-        right: 4,
+        left: 3,
+        right: 3,
         height: 1,
         backgroundColor: 'rgba(255, 255, 255, 0.25)',
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+    },
+    tickLabel: {
+        fontSize: 8,
+        fontWeight: '800',
+        color: 'rgba(255, 255, 255, 0.45)',
+        marginTop: -10,
+        marginRight: 1,
     },
     cueHandle: {
         position: 'absolute',

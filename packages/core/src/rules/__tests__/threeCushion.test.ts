@@ -140,4 +140,88 @@ describe('validateThreeCushionShot', () => {
         expect(result.classification).toBe('falta_bandas');
         expect(result.scoringDetails.cushionsBeforeSecondHit).toBe(2);
     });
+
+    it('rejects retruque on same ball that travels 3 cushions and hits same ball again without touching second ball', () => {
+        // Cue ball (white) hits yellow, then 3 cushions, then hits yellow again
+        const events: ShotEvent[] = [
+            {
+                type: 'ball_collision',
+                timestamp: 10,
+                data: { ball1: 'white', ball2: 'yellow', position: vec2(100, 50), timestamp: 10 },
+            },
+            {
+                type: 'cushion',
+                timestamp: 20,
+                data: { ballId: 'white', side: 'top', normal: vec2(0, 1), position: vec2(150, 0), timestamp: 20 },
+            },
+            {
+                type: 'cushion',
+                timestamp: 30,
+                data: { ballId: 'white', side: 'right', normal: vec2(-1, 0), position: vec2(284, 50), timestamp: 30 },
+            },
+            {
+                type: 'cushion',
+                timestamp: 40,
+                data: { ballId: 'white', side: 'bottom', normal: vec2(0, -1), position: vec2(200, 142), timestamp: 40 },
+            },
+            {
+                type: 'ball_collision',
+                timestamp: 50,
+                data: { ball1: 'white', ball2: 'yellow', position: vec2(180, 100), timestamp: 50 },
+            },
+        ];
+
+        const result = validateThreeCushionShot(events, 'white');
+        // Must be INVALID because red was NEVER contacted!
+        expect(result.isValid).toBe(false);
+        expect(result.classification).toBe('incompleto');
+        expect(result.scoringDetails.firstBallHit).toBe('yellow');
+        expect(result.scoringDetails.secondBallHit).toBeNull();
+        expect(result.scoringDetails.hasRetruque).toBe(true);
+        expect(result.reason).toContain('Se golpeó la misma bola (yellow) dos veces');
+    });
+
+    it('validates shot with early retruque on yellow, then 3 cushions, then hits red', () => {
+        // Cue ball (white) hits yellow, retruques on yellow, then 3 cushions, then hits red
+        const events: ShotEvent[] = [
+            {
+                type: 'ball_collision',
+                timestamp: 10,
+                data: { ball1: 'white', ball2: 'yellow', position: vec2(100, 50), timestamp: 10 },
+            },
+            {
+                type: 'ball_collision',
+                timestamp: 12,
+                data: { ball1: 'white', ball2: 'yellow', position: vec2(102, 51), timestamp: 12 }, // Retruque
+            },
+            {
+                type: 'cushion',
+                timestamp: 20,
+                data: { ballId: 'white', side: 'top', normal: vec2(0, 1), position: vec2(150, 0), timestamp: 20 },
+            },
+            {
+                type: 'cushion',
+                timestamp: 30,
+                data: { ballId: 'white', side: 'right', normal: vec2(-1, 0), position: vec2(284, 50), timestamp: 30 },
+            },
+            {
+                type: 'cushion',
+                timestamp: 40,
+                data: { ballId: 'white', side: 'bottom', normal: vec2(0, -1), position: vec2(200, 142), timestamp: 40 },
+            },
+            {
+                type: 'ball_collision',
+                timestamp: 50,
+                data: { ball1: 'white', ball2: 'red', position: vec2(180, 100), timestamp: 50 },
+            },
+        ];
+
+        const result = validateThreeCushionShot(events, 'white');
+        // Valid carom because 3 cushions were completed and red was contacted!
+        expect(result.isValid).toBe(true);
+        expect(result.scoringDetails.firstBallHit).toBe('yellow');
+        expect(result.scoringDetails.secondBallHit).toBe('red');
+        expect(result.scoringDetails.hasRetruque).toBe(true);
+        expect(result.scoringDetails.cushionsBeforeSecondHit).toBe(3);
+    });
 });

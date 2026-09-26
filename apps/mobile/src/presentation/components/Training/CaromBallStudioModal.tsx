@@ -1,4 +1,4 @@
-import React, { memo, useState, useCallback } from 'react';
+import React, { memo, useState, useCallback, useMemo } from 'react';
 import {
     Modal,
     ScrollView,
@@ -53,12 +53,24 @@ export const CaromBallStudioModal = memo(function CaromBallStudioModal({
     const isMobile = windowWidth < 768;
 
     const [activeTab, setActiveTab] = useState<'skins' | 'break' | 'tactical'>('skins');
+    const studioUid = useMemo(() => `cbs_${Math.random().toString(36).slice(2, 8)}`, []);
 
     const currentBallSkin = tablePreferences.ballSkin ?? 'aramith_pro_cup';
     const currentBreakFormat = tablePreferences.breakFormat ?? 'umb';
     const currentPbaFormation = tablePreferences.pbaFormation ?? '159';
     const currentUmbSide = tablePreferences.umbSide ?? 'right';
     const showDots = tablePreferences.showBallDots !== false;
+
+    const handleSelectCueBall = useCallback(
+        (selectedId: BallId) => {
+            onCueBallChange(selectedId);
+            onPreferencesChange({
+                ...tablePreferences,
+                cueBallId: selectedId,
+            });
+        },
+        [onCueBallChange, onPreferencesChange, tablePreferences]
+    );
 
     const handleSelectSkin = useCallback(
         (skinId: BallSkinId) => {
@@ -168,11 +180,11 @@ export const CaromBallStudioModal = memo(function CaromBallStudioModal({
                                     s.ballPodiumItem,
                                     cueBallId === 'white' && s.ballPodiumItemActive,
                                 ]}
-                                onPress={() => onCueBallChange('white')}
+                                onPress={() => handleSelectCueBall('white')}
                                 activeOpacity={0.8}>
                                 <Svg width={54} height={54} viewBox="0 0 54 54">
                                     <Defs>
-                                        <RadialGradient id="podiumWhite" cx="35%" cy="35%" r="65%">
+                                        <RadialGradient id={`${studioUid}_podiumWhite`} cx="35%" cy="35%" r="65%">
                                             <Stop offset="0%" stopColor="#ffffff" />
                                             <Stop offset="55%" stopColor="#f1f5f9" />
                                             <Stop offset="85%" stopColor="#cbd5e1" />
@@ -180,7 +192,7 @@ export const CaromBallStudioModal = memo(function CaromBallStudioModal({
                                         </RadialGradient>
                                     </Defs>
                                     <Circle cx={27} cy={30} r={22} fill="rgba(0,0,0,0.35)" />
-                                    <Circle cx={27} cy={27} r={23} fill="url(#podiumWhite)" stroke="#94a3b8" strokeWidth={1} />
+                                    <Circle cx={27} cy={27} r={23} fill={`url(#${studioUid}_podiumWhite)`} stroke="#94a3b8" strokeWidth={1} />
                                     {showDots && currentBallSkin === 'aramith_pro_cup' && (
                                         <G>
                                             <Circle cx={27} cy={27} r={2.5} fill="#dc2626" />
@@ -199,6 +211,19 @@ export const CaromBallStudioModal = memo(function CaromBallStudioModal({
                                             <Circle cx={36} cy={33} r={2.5} fill="#00e5ff" />
                                             <Circle cx={18} cy={33} r={2.5} fill="#00e5ff" />
                                         </G>
+                                    )}
+                                    {showDots && currentBallSkin === 'dynaspheres' && (
+                                        <G>
+                                            <Circle cx={27} cy={27} r={12} fill="none" stroke="rgba(51,65,85,0.5)" strokeWidth={1.2} />
+                                            <Circle cx={27} cy={27} r={2.5} fill="#475569" />
+                                            <Circle cx={18} cy={21} r={2.5} fill="#475569" />
+                                            <Circle cx={36} cy={21} r={2.5} fill="#475569" />
+                                            <Circle cx={36} cy={33} r={2.5} fill="#475569" />
+                                            <Circle cx={18} cy={33} r={2.5} fill="#475569" />
+                                        </G>
+                                    )}
+                                    {showDots && currentBallSkin === 'classic_solid' && (
+                                        <Circle cx={27} cy={27} r={2.5} fill="#0f172a" />
                                     )}
                                     <Circle cx={20} cy={19} r={5} fill="rgba(255,255,255,0.85)" />
                                 </Svg>
@@ -220,11 +245,11 @@ export const CaromBallStudioModal = memo(function CaromBallStudioModal({
                                     s.ballPodiumItem,
                                     cueBallId === 'yellow' && s.ballPodiumItemActive,
                                 ]}
-                                onPress={() => onCueBallChange('yellow')}
+                                onPress={() => handleSelectCueBall('yellow')}
                                 activeOpacity={0.8}>
                                 <Svg width={54} height={54} viewBox="0 0 54 54">
                                     <Defs>
-                                        <RadialGradient id="podiumYellow" cx="35%" cy="35%" r="65%">
+                                        <RadialGradient id={`${studioUid}_podiumYellow`} cx="35%" cy="35%" r="65%">
                                             <Stop offset="0%" stopColor="#fef08a" />
                                             <Stop offset="45%" stopColor="#facc15" />
                                             <Stop offset="80%" stopColor="#ca8a04" />
@@ -232,7 +257,7 @@ export const CaromBallStudioModal = memo(function CaromBallStudioModal({
                                         </RadialGradient>
                                     </Defs>
                                     <Circle cx={27} cy={30} r={22} fill="rgba(0,0,0,0.35)" />
-                                    <Circle cx={27} cy={27} r={23} fill="url(#podiumYellow)" stroke="#a16207" strokeWidth={1} />
+                                    <Circle cx={27} cy={27} r={23} fill={`url(#${studioUid}_podiumYellow)`} stroke="#a16207" strokeWidth={1} />
                                     {showDots && currentBallSkin === 'aramith_pro_cup' && (
                                         <G>
                                             <Circle cx={27} cy={27} r={2.5} fill="#dc2626" />
@@ -252,6 +277,19 @@ export const CaromBallStudioModal = memo(function CaromBallStudioModal({
                                             <Circle cx={18} cy={33} r={2.5} fill="#1e3a8a" />
                                         </G>
                                     )}
+                                    {showDots && currentBallSkin === 'dynaspheres' && (
+                                        <G>
+                                            <Circle cx={27} cy={27} r={12} fill="none" stroke="rgba(29,78,216,0.5)" strokeWidth={1.2} />
+                                            <Circle cx={27} cy={27} r={2.5} fill="#1d4ed8" />
+                                            <Circle cx={18} cy={21} r={2.5} fill="#1d4ed8" />
+                                            <Circle cx={36} cy={21} r={2.5} fill="#1d4ed8" />
+                                            <Circle cx={36} cy={33} r={2.5} fill="#1d4ed8" />
+                                            <Circle cx={18} cy={33} r={2.5} fill="#1d4ed8" />
+                                        </G>
+                                    )}
+                                    {showDots && currentBallSkin === 'classic_solid' && (
+                                        <Circle cx={27} cy={27} r={2.5} fill="#dc2626" />
+                                    )}
                                     <Circle cx={20} cy={19} r={5} fill="rgba(255,255,255,0.75)" />
                                 </Svg>
                                 <View style={s.ballLabelWrap}>
@@ -270,7 +308,7 @@ export const CaromBallStudioModal = memo(function CaromBallStudioModal({
                             <View style={s.ballPodiumItem}>
                                 <Svg width={54} height={54} viewBox="0 0 54 54">
                                     <Defs>
-                                        <RadialGradient id="podiumRed" cx="35%" cy="35%" r="65%">
+                                        <RadialGradient id={`${studioUid}_podiumRed`} cx="35%" cy="35%" r="65%">
                                             <Stop offset="0%" stopColor="#f87171" />
                                             <Stop offset="45%" stopColor="#dc2626" />
                                             <Stop offset="80%" stopColor="#991b1b" />
@@ -278,9 +316,12 @@ export const CaromBallStudioModal = memo(function CaromBallStudioModal({
                                         </RadialGradient>
                                     </Defs>
                                     <Circle cx={27} cy={30} r={22} fill="rgba(0,0,0,0.35)" />
-                                    <Circle cx={27} cy={27} r={23} fill="url(#podiumRed)" stroke="#7f1d1d" strokeWidth={1} />
+                                    <Circle cx={27} cy={27} r={23} fill={`url(#${studioUid}_podiumRed)`} stroke="#7f1d1d" strokeWidth={1} />
                                     {showDots && currentBallSkin === 'cosmo_helix_pba' && (
                                         <Circle cx={27} cy={27} r={11} fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth={1.2} strokeDasharray="3 2" />
+                                    )}
+                                    {showDots && currentBallSkin === 'dynaspheres' && (
+                                        <Circle cx={27} cy={27} r={12} fill="none" stroke="rgba(217,119,6,0.5)" strokeWidth={1.2} />
                                     )}
                                     <Circle cx={20} cy={19} r={5} fill="rgba(255,255,255,0.75)" />
                                 </Svg>
