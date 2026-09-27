@@ -63,7 +63,7 @@ export function ShotCatalogScreen({
     const sidebarWidth = useSidebarWidth();
     const insets = useSafeAreaInsets();
     const router = useRouter();
-    const { language } = useI18n();
+    const { language, t } = useI18n();
 
     const isPickerMode = mode === 'picker';
     const contentWidth = isPickerMode ? windowWidth : windowWidth - sidebarWidth;
@@ -119,20 +119,18 @@ export function ShotCatalogScreen({
                             <View style={[styles.pillBadge, { backgroundColor: `${palette.primary}18`, borderColor: `${palette.primary}33` }]}>
                                 <IconSparkles size={13} color={palette.primary} />
                                 <Text style={[styles.pillBadgeText, { color: palette.primary }]}>
-                                    {isPickerMode ? 'SELECTOR DE ENTRENAMIENTO' : 'BIBLIA DE CARAMBOLAS UMB'}
+                                    {isPickerMode ? t('catalog.pickerBadge') : t('catalog.heroBadge')}
                                 </Text>
                             </View>
                             <Text style={[styles.totalCountText, { color: palette.muted }]}>
-                                {total.toLocaleString()} jugadas
+                                {t('catalog.shotsCount', { count: total.toLocaleString() })}
                             </Text>
                         </View>
                         <Text style={[styles.title, { color: palette.text }]}>
-                            {isPickerMode ? 'Elige una Jugada para Entrenar' : 'Catálogo de Jugadas'}
+                            {isPickerMode ? t('catalog.pickerTitle') : t('catalog.title')}
                         </Text>
                         <Text style={[styles.subtitle, { color: palette.muted }]}>
-                            {isPickerMode
-                                ? 'Selecciona la posición que deseas añadir a tu mesa de práctica.'
-                                : 'Explora tiros profesionales con diagramas balísticos, efectos y trayectorias exactas.'}
+                            {isPickerMode ? t('catalog.pickerSubtitle') : t('catalog.subtitle')}
                         </Text>
                     </View>
 
@@ -140,7 +138,7 @@ export function ShotCatalogScreen({
                         <TouchableOpacity
                             style={[styles.closeBtn, { backgroundColor: palette.surfaceLow }]}
                             onPress={onClosePicker}
-                            accessibilityLabel="Cerrar selector">
+                            accessibilityLabel={language === 'en' ? 'Close picker' : 'Cerrar selector'}>
                             <IconX size={20} color={palette.text} />
                         </TouchableOpacity>
                     ) : (
@@ -149,7 +147,7 @@ export function ShotCatalogScreen({
                             onPress={() => router.push('/training/session')}
                             activeOpacity={0.85}>
                             <IconTarget size={18} color="#FFFFFF" strokeWidth={2.2} />
-                            <Text style={styles.quickStartBtnText}>Sesión Libre</Text>
+                            <Text style={styles.quickStartBtnText}>{t('catalog.freeSession')}</Text>
                         </TouchableOpacity>
                     )}
                 </View>
@@ -161,7 +159,7 @@ export function ShotCatalogScreen({
                         <TextInput
                             value={searchQuery}
                             onChangeText={setSearchQuery}
-                            placeholder="Buscar por ID, efecto, jugador, categoría..."
+                            placeholder={t('catalog.searchPlaceholder')}
                             placeholderTextColor={palette.muted}
                             style={[styles.searchInput, { color: palette.text }]}
                         />
@@ -193,7 +191,7 @@ export function ShotCatalogScreen({
                                 styles.categoryChipText,
                                 !selectedCategory ? styles.categoryChipTextActive : { color: palette.muted },
                             ]}>
-                            Todas ({total})
+                            {t('catalog.allCategories', { total })}
                         </Text>
                     </TouchableOpacity>
 
@@ -236,7 +234,7 @@ export function ShotCatalogScreen({
                 <View style={styles.centerContainer}>
                     <ActivityIndicator size="large" color={palette.primary} />
                     <Text style={[styles.loadingText, { color: palette.muted }]}>
-                        Cargando catálogo balístico...
+                        {t('catalog.loading')}
                     </Text>
                 </View>
             ) : error ? (
@@ -261,10 +259,10 @@ export function ShotCatalogScreen({
                         <View style={styles.emptyContainer}>
                             <IconAdjustments size={40} color={palette.muted} strokeWidth={1.5} />
                             <Text style={[styles.emptyTitle, { color: palette.text }]}>
-                                No se encontraron jugadas
+                                {t('catalog.emptyTitle')}
                             </Text>
                             <Text style={[styles.emptyDesc, { color: palette.muted }]}>
-                                Prueba ajustando tu búsqueda o seleccionando otra categoría.
+                                {t('catalog.emptyDesc')}
                             </Text>
                         </View>
                     ) : (

@@ -22,6 +22,7 @@ import {
 
 import { getPalette, theme } from '@/constants/theme';
 import { useColorScheme } from '@/components/useColorScheme';
+import { useI18n } from '@/components/useLanguage';
 
 export interface TrainingPositionSelectorModalProps {
   visible: boolean;
@@ -43,6 +44,7 @@ export function TrainingPositionSelectorModal({
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const isDesktop = width >= 640;
+  const { t } = useI18n();
   const palette = getPalette(useColorScheme());
   const styles = getStyles(palette, isDesktop, insets.bottom);
 
@@ -70,11 +72,11 @@ export function TrainingPositionSelectorModal({
                 </View>
                 <View style={styles.headerTextWrap}>
                   <View style={styles.headerTagRow}>
-                    <Text style={styles.headerTag}>CONFIGURACIÓN DE ENTRENAMIENTO</Text>
+                    <Text style={styles.headerTag}>{t('training.selector.tag')}</Text>
                   </View>
-                  <Text style={styles.title}>Nueva Sesión de Billar</Text>
+                  <Text style={styles.title}>{t('training.selector.title')}</Text>
                   <Text style={styles.subtitle} numberOfLines={isDesktop ? 2 : 1}>
-                    Elige cómo deseas configurar o cargar las posiciones en la mesa
+                    {t('training.selector.subtitle')}
                   </Text>
                 </View>
               </View>
@@ -82,7 +84,7 @@ export function TrainingPositionSelectorModal({
                 style={styles.closeBtn}
                 onPress={onClose}
                 activeOpacity={0.7}
-                accessibilityLabel="Cerrar modal"
+                accessibilityLabel={t('common.close')}
               >
                 <IconX size={isDesktop ? 20 : 18} color={palette.muted} />
               </TouchableOpacity>
@@ -117,14 +119,14 @@ export function TrainingPositionSelectorModal({
                 </View>
 
                 <View style={styles.cardBody}>
-                  <Text style={styles.cardTitle}>Elegir del Catálogo</Text>
+                  <Text style={styles.cardTitle}>{t('training.selector.catalogTitle')}</Text>
                   <Text style={styles.cardDesc}>
-                    Banda previa, Bricoles, Pase bola, Rondas y sistemas maestros UMB organizados por categoría y nivel.
+                    {t('training.selector.catalogDesc')}
                   </Text>
                 </View>
 
                 <View style={styles.cardFooter}>
-                  <Text style={[styles.cardActionCue, { color: palette.primary }]}>Explorar Jugadas</Text>
+                  <Text style={[styles.cardActionCue, { color: palette.primary }]}>{t('training.selector.catalogAction')}</Text>
                   <IconArrowRight size={14} color={palette.primary} strokeWidth={2.5} />
                 </View>
               </TouchableOpacity>
@@ -143,19 +145,19 @@ export function TrainingPositionSelectorModal({
                     <IconDeviceGamepad2 size={isDesktop ? 24 : 20} color={palette.secondary} strokeWidth={2} />
                   </View>
                   <View style={[styles.cardTagBadge, { backgroundColor: `${palette.secondary}15`, borderColor: `${palette.secondary}40` }]}>
-                    <Text style={[styles.cardTagText, { color: palette.secondary }]}>INTERACTIVO</Text>
+                    <Text style={[styles.cardTagText, { color: palette.secondary }]}>{t('common.active')}</Text>
                   </View>
                 </View>
 
                 <View style={styles.cardBody}>
-                  <Text style={styles.cardTitle}>Armar en Simulador</Text>
+                  <Text style={styles.cardTitle}>{t('training.selector.simTitle')}</Text>
                   <Text style={styles.cardDesc}>
-                    Coloca las 3 bolas libremente en la mesa virtual, ajusta efecto, fuerza y ángulo de ataque para practicar.
+                    {t('training.selector.simDesc')}
                   </Text>
                 </View>
 
                 <View style={styles.cardFooter}>
-                  <Text style={[styles.cardActionCue, { color: palette.secondary }]}>Abrir Mesa Virtual</Text>
+                  <Text style={[styles.cardActionCue, { color: palette.secondary }]}>{t('training.selector.simAction')}</Text>
                   <IconArrowRight size={14} color={palette.secondary} strokeWidth={2.5} />
                 </View>
               </TouchableOpacity>
@@ -174,19 +176,19 @@ export function TrainingPositionSelectorModal({
                     <IconCamera size={isDesktop ? 24 : 20} color={palette.tertiary} strokeWidth={2} />
                   </View>
                   <View style={[styles.cardTagBadge, { backgroundColor: `${palette.tertiary}15`, borderColor: `${palette.tertiary}40` }]}>
-                    <Text style={[styles.cardTagText, { color: palette.tertiary }]}>VISIÓN AI</Text>
+                    <Text style={[styles.cardTagText, { color: palette.tertiary }]}>AI VISION</Text>
                   </View>
                 </View>
 
                 <View style={styles.cardBody}>
-                  <Text style={styles.cardTitle}>Escanear con Foto</Text>
+                  <Text style={styles.cardTitle}>{t('training.selector.cameraTitle')}</Text>
                   <Text style={styles.cardDesc}>
-                    Toma una foto de tu mesa física o pega una captura de YouTube para clonar la posición con calibración proyectiva.
+                    {t('training.selector.cameraDesc')}
                   </Text>
                 </View>
 
                 <View style={styles.cardFooter}>
-                  <Text style={[styles.cardActionCue, { color: palette.tertiary }]}>Escanear Mesa</Text>
+                  <Text style={[styles.cardActionCue, { color: palette.tertiary }]}>{t('training.selector.cameraAction')}</Text>
                   <IconArrowRight size={14} color={palette.tertiary} strokeWidth={2.5} />
                 </View>
               </TouchableOpacity>

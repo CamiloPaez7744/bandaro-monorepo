@@ -8,6 +8,7 @@ import {
     IconX,
 } from '@/src/presentation/components/icons';
 import { ShotValidation } from '@bandaro/core';
+import { useI18n } from '@/components/useLanguage';
 
 interface CaromRefereeBannerProps {
     validation: ShotValidation | null;
@@ -16,6 +17,66 @@ interface CaromRefereeBannerProps {
     ballHitsLive?: { first: boolean; second: boolean };
     onDismiss?: () => void;
 }
+
+const getLocalizedBallName = (ballId?: string, lang?: string) => {
+    if (!ballId) return '';
+    if (lang === 'en') {
+        if (ballId === 'white') return 'White';
+        if (ballId === 'yellow') return 'Yellow';
+        if (ballId === 'red') return 'Red';
+    } else {
+        if (ballId === 'white') return 'Blanca';
+        if (ballId === 'yellow') return 'Amarilla';
+        if (ballId === 'red') return 'Roja';
+    }
+    return ballId;
+};
+
+const getLocalizedClassification = (validation: ShotValidation, lang: string) => {
+    if (lang !== 'en') return validation.classificationLabel;
+    const { classification, scoringDetails } = validation;
+    const cushionsBeforeSecondHit = scoringDetails?.cushionsBeforeSecondHit ?? 0;
+    const cushionsBeforeFirstHit = scoringDetails?.cushionsBeforeFirstHit ?? 0;
+    const cushionsBetweenHits = scoringDetails?.cushionsBetweenHits ?? 0;
+
+    switch (classification) {
+        case 'incompleto':
+            return 'Incomplete carom (must contact both object balls)';
+        case 'carambola_directa':
+            return 'Direct carom (0 cushions before 2nd ball)';
+        case 'falta_bandas':
+            return `Insufficient cushions (${cushionsBeforeSecondHit} of 3 cushions needed)`;
+        case 'bricole':
+            return 'Cushion First (Bricole 3+ cushions)';
+        case 'bricole_mixta':
+            return `Mixed cushion first (${cushionsBeforeFirstHit} prior + ${cushionsBetweenHits} middle)`;
+        case 'pasebola':
+            return `Around the table / Pasebola (${cushionsBetweenHits} cushions)`;
+        case 'clasico':
+            return `Classic 3-cushion carom (${cushionsBetweenHits} cushions)`;
+        default:
+            return validation.classificationLabel;
+    }
+};
+
+const getLocalizedTimelineDescription = (item: any, lang: string) => {
+    if (lang !== 'en') return item.description;
+    if (item.type === 'cushion') {
+        const sideMap: Record<string, string> = {
+            top: 'top rail',
+            bottom: 'bottom rail',
+            left: 'left rail',
+            right: 'right rail',
+        };
+        const side = sideMap[item.side] ?? item.side ?? 'cushion';
+        return `Cushion #${item.cushionsCount} (${side})`;
+    }
+    if (item.type === 'ball') {
+        const ball = getLocalizedBallName(item.ballId, lang);
+        return `Hit ball (${ball}) after ${item.cushionsCount} cushions`;
+    }
+    return item.description;
+};
 
 /**
  * HUD y Banner Oficial del Árbitro UMB de Tres Bandas.
@@ -32,6 +93,7 @@ export const CaromRefereeBanner = React.memo(function CaromRefereeBanner({
     ballHitsLive = { first: false, second: false },
     onDismiss,
 }: CaromRefereeBannerProps) {
+    const { t, language } = useI18n();
     const [showDetails, setShowDetails] = useState(false);
     const [hasInteracted, setHasInteracted] = useState(false);
 
@@ -173,7 +235,7 @@ export const CaromRefereeBanner = React.memo(function CaromRefereeBanner({
                                             styles.cushionCircleText,
                                             isPassed && styles.cushionCircleTextActive,
                                         ]}>
-                                        {num}ª
+                                        {language === 'en' ? `${num}${num === 1 ? 'st' : num === 2 ? 'nd' : 'rd'}` : `${num}ª`}
                                     </Text>
                                 </View>
                             );
@@ -182,8 +244,8 @@ export const CaromRefereeBanner = React.memo(function CaromRefereeBanner({
 
                     <Text style={styles.liveLabel}>
                         {isThirdReached
-                            ? '¡3 BANDAS TOCADAS! 🎯'
-                            : `Esperando bandas (${cushionCountLive}/3)`}
+                            ? (language === 'en' ? '3 CUSHIONS HIT! 🎯' : '¡3 BANDAS TOCADAS! 🎯')
+                            : (language === 'en' ? `Waiting for cushions (${cushionCountLive}/3)` : `Esperando bandas (${cushionCountLive}/3)`)}
                     </Text>
 
                     {/* Indicador de bolas tocadas */}
@@ -194,14 +256,14 @@ export const CaromRefereeBanner = React.memo(function CaromRefereeBanner({
                                 ballHitsLive.first && styles.ballHitDotActive,
                             ]}
                         />
-                        <Text style={styles.ballHitText}>Bola 1</Text>
+                        <Text style={styles.ballHitText}>{language === 'en' ? 'Ball 1' : 'Bola 1'}</Text>
                         <View
                             style={[
                                 styles.ballHitDot,
                                 ballHitsLive.second && styles.ballHitDotActive,
                             ]}
                         />
-                        <Text style={styles.ballHitText}>Bola 2</Text>
+                        <Text style={styles.ballHitText}>{language === 'en' ? 'Ball 2' : 'Bola 2'}</Text>
                     </View>
                 </View>
             </View>
@@ -241,18 +303,20 @@ export const CaromRefereeBanner = React.memo(function CaromRefereeBanner({
                                     styles.verdictTitle,
                                     { color: isValid ? '#4ade80' : '#f87171' },
                                 ]}>
-                                {isValid ? '¡CARAMBOLA VÁLIDA! (+1)' : 'TIRO NO VÁLIDO'}
+                                {isValid
+                                    ? (language === 'en' ? 'VALID CAROM! (+1)' : '¡CARAMBOLA VÁLIDA! (+1)')
+                                    : (language === 'en' ? 'INVALID SHOT' : 'TIRO NO VÁLIDO')}
                             </Text>
                             {!hasInteracted && (
                                 <Text style={styles.autoDismissHint}>
-                                    • Toca para ver detalles
+                                    {language === 'en' ? '• Tap to view details' : '• Toca para ver detalles'}
                                 </Text>
                             )}
                         </View>
                         <Text
                             style={styles.classificationLabel}
                             numberOfLines={showDetails ? undefined : 1}>
-                            {validation.classificationLabel}
+                            {getLocalizedClassification(validation, language)}
                         </Text>
                     </View>
 
@@ -262,7 +326,9 @@ export const CaromRefereeBanner = React.memo(function CaromRefereeBanner({
                                 style={styles.iconBtn}
                                 onPress={handleToggleDetails}
                                 activeOpacity={0.7}
-                                accessibilityLabel={showDetails ? 'Ocultar detalles' : 'Ver detalles'}>
+                                accessibilityLabel={showDetails
+                                    ? (language === 'en' ? 'Hide details' : 'Ocultar detalles')
+                                    : (language === 'en' ? 'View details' : 'Ver detalles')}>
                                 {showDetails ? (
                                     <IconChevronUp size={16} color="#94a3b8" />
                                 ) : (
@@ -275,7 +341,7 @@ export const CaromRefereeBanner = React.memo(function CaromRefereeBanner({
                             onPress={handleManualDismiss}
                             activeOpacity={0.7}
                             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                            accessibilityLabel="Cerrar veredicto">
+                            accessibilityLabel={language === 'en' ? 'Close verdict' : 'Cerrar veredicto'}>
                             <IconX size={15} color="#94a3b8" />
                         </TouchableOpacity>
                     </View>
@@ -286,14 +352,16 @@ export const CaromRefereeBanner = React.memo(function CaromRefereeBanner({
             {showDetails && validation.scoringDetails?.eventTimeline && (
                 <View style={styles.detailsBox}>
                     <View style={styles.detailsHeader}>
-                        <Text style={styles.detailsTitle}>Cronología Oficial de Contactos:</Text>
+                        <Text style={styles.detailsTitle}>
+                            {language === 'en' ? 'Official Contact Timeline:' : 'Cronología Oficial de Contactos:'}
+                        </Text>
                         <TouchableOpacity
                             style={styles.closeDetailsPill}
                             onPress={handleManualDismiss}
                             activeOpacity={0.7}
                             hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
                             <IconX size={12} color="#94a3b8" />
-                            <Text style={styles.closeDetailsPillText}>Cerrar</Text>
+                            <Text style={styles.closeDetailsPillText}>{t('common.close')}</Text>
                         </TouchableOpacity>
                     </View>
                     {validation.scoringDetails.eventTimeline.map((item, idx) => (
@@ -306,11 +374,21 @@ export const CaromRefereeBanner = React.memo(function CaromRefereeBanner({
                                         : styles.timelineDotBall,
                                 ]}
                             />
-                            <Text style={styles.timelineText}>{item.description}</Text>
+                            <Text style={styles.timelineText}>
+                                {getLocalizedTimelineDescription(item, language)}
+                            </Text>
                         </View>
                     ))}
                     {Boolean(validation.reason) && (
-                        <Text style={styles.reasonText}>{validation.reason}</Text>
+                        <Text style={styles.reasonText}>
+                            {language === 'en'
+                                ? (validation.isValid
+                                    ? `Valid UMB Carom! 🎯 (+1 point) | ${validation.scoringDetails?.cushionsBeforeSecondHit ?? 3} cushions before second ball`
+                                    : (validation.scoringDetails?.cushionsBeforeSecondHit !== undefined && validation.scoringDetails.cushionsBeforeSecondHit < 3
+                                        ? `Foul: Only ${validation.scoringDetails.cushionsBeforeSecondHit} of 3 cushions hit before second ball`
+                                        : 'Foul: Did not contact both object balls'))
+                                : validation.reason}
+                        </Text>
                     )}
                 </View>
             )}

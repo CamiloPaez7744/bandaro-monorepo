@@ -129,12 +129,12 @@ export function TrainingCatalogScreen() {
           <View style={styles.heroTopRow}>
             <View style={styles.heroTagBadge}>
               <IconSparkles size={13} color={palette.primary} strokeWidth={2.5} />
-              <Text style={styles.heroTagText}>RUTA MAESTRA • ESCUELA UMB</Text>
+              <Text style={styles.heroTagText}>{t('training.route.heroTag')}</Text>
             </View>
             <View style={styles.heroStatsRow}>
               <View style={styles.heroStatChip}>
                 <IconFlame size={14} color="#f59e0b" strokeWidth={2.5} />
-                <Text style={styles.heroStatValue}>{userStats.currentStreak} Días</Text>
+                <Text style={styles.heroStatValue}>{userStats.currentStreak} {t('common.days')}</Text>
               </View>
               <View style={styles.heroStatChip}>
                 <IconBolt size={14} color={palette.primary} strokeWidth={2.5} />
@@ -142,22 +142,26 @@ export function TrainingCatalogScreen() {
               </View>
               <View style={styles.heroStatChip}>
                 <IconTrendingUp size={14} color="#06b6d4" strokeWidth={2.5} />
-                <Text style={styles.heroStatValue}>{Math.round(userStats.accuracyAvg)}% Precisión</Text>
+                <Text style={styles.heroStatValue}>{Math.round(userStats.accuracyAvg)}% {t('common.accuracy')}</Text>
               </View>
             </View>
           </View>
 
-          <Text style={styles.heroTitle}>La Ruta del Maestro</Text>
+          <Text style={styles.heroTitle}>{t('training.route.title')}</Text>
           <Text style={styles.heroSubtitle}>
-            Metodología pedagógica progresiva desde fundamentos biomecánicos, tipos de puentes y limaje hasta sistemas maestros de competición internacional.
+            {t('training.route.subtitle')}
           </Text>
 
           {/* Progress Indicator */}
           <View style={styles.overallProgressBox}>
             <View style={styles.progressLabelRow}>
-              <Text style={styles.progressLabel}>PROGRESO EN LA RUTA ACTUAL</Text>
+              <Text style={styles.progressLabel}>{t('training.route.progressLabel')}</Text>
               <Text style={styles.progressValue}>
-                {completedModulesCount} de {totalModulesCount} módulos completados ({progressPct}%)
+                {t('training.route.modulesProgress', {
+                  completed: completedModulesCount,
+                  total: totalModulesCount,
+                  pct: progressPct,
+                })}
               </Text>
             </View>
             <View style={styles.progressBarRail}>
@@ -180,11 +184,11 @@ export function TrainingCatalogScreen() {
             <View style={styles.startSessionTextCol}>
               <View style={styles.startSessionBadgeRow}>
                 <IconSparkles size={12} color="#ffffff" />
-                <Text style={styles.startSessionBadgeText}>ENTRENAMIENTO GUIADO</Text>
+                <Text style={styles.startSessionBadgeText}>{t('training.route.startBadge')}</Text>
               </View>
-              <Text style={styles.startSessionTitle}>Iniciar Sesión de Entrenamiento</Text>
+              <Text style={styles.startSessionTitle}>{t('training.route.startTitle')}</Text>
               <Text style={styles.startSessionDesc}>
-                Elige posiciones del catálogo, arma tu jugada en el simulador o escanea tu mesa física
+                {t('training.route.startDesc')}
               </Text>
             </View>
           </View>
@@ -195,9 +199,9 @@ export function TrainingCatalogScreen() {
 
         {/* 3. Level Selector Tabs (Iniciación, Geometría, Sistemas, Competición) */}
         <View style={styles.levelSelectorSection}>
-          <Text style={styles.sectionHeading}>La Ruta de Aprendizaje</Text>
+          <Text style={styles.sectionHeading}>{t('training.route.sectionHeading')}</Text>
           <Text style={styles.sectionSubheading}>
-            Selecciona tu nivel para avanzar por los módulos y estaciones de práctica
+            {t('training.route.sectionSubheading')}
           </Text>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.levelPillsScroll}>
@@ -247,7 +251,7 @@ export function TrainingCatalogScreen() {
           <View style={styles.skillTreeContainer}>
             <View style={styles.pathHeaderWaypoint}>
               <View style={styles.waypointDot} />
-              <Text style={styles.waypointText}>ESTACIONES DE TIRO • DÍA A DÍA</Text>
+              <Text style={styles.waypointText}>{t('training.route.waypoints')}</Text>
             </View>
 
             {/* Nodes Stack */}
@@ -303,7 +307,7 @@ export function TrainingCatalogScreen() {
                       )}
                       {isBoss && (
                         <View style={styles.bossBadgeFlag}>
-                          <Text style={styles.bossBadgeFlagText}>HITO</Text>
+                          <Text style={styles.bossBadgeFlagText}>{t('training.route.milestone')}</Text>
                         </View>
                       )}
                     </TouchableOpacity>
@@ -326,10 +330,10 @@ export function TrainingCatalogScreen() {
                       <View style={styles.activeCalloutCard}>
                         <View style={styles.activeCalloutTop}>
                           <View style={styles.activeCalloutTag}>
-                            <Text style={styles.activeCalloutTagText}>SIGUIENTE RETO</Text>
+                            <Text style={styles.activeCalloutTagText}>{t('training.route.nextChallenge')}</Text>
                           </View>
                           <Text style={styles.activeCalloutStep}>
-                            {node.completedCount}/{node.positionsCount} listos
+                            {t('training.route.readyCount', { completed: node.completedCount, total: node.positionsCount })}
                           </Text>
                         </View>
                         <Text style={styles.activeCalloutTitle}>{node.title}</Text>
@@ -338,7 +342,7 @@ export function TrainingCatalogScreen() {
                           style={styles.activeCalloutActionBtn}
                           onPress={() => onStartNodePractice(node)}
                         >
-                          <Text style={styles.activeCalloutActionText}>Reanudar</Text>
+                          <Text style={styles.activeCalloutActionText}>{t('training.route.resume')}</Text>
                           <IconArrowRight size={14} color="#ffffff" strokeWidth={2.5} />
                         </TouchableOpacity>
                       </View>
@@ -347,7 +351,10 @@ export function TrainingCatalogScreen() {
                     {/* Node Text & Status */}
                     <View style={styles.nodeTextContainer}>
                       <Text style={[styles.nodeDayText, isCompleted && { color: palette.primary }]}>
-                        Día {node.dayNumber} • {isCompleted ? 'Completado' : isActive ? 'En Juego' : 'Bloqueado'}
+                        {t('training.route.dayStatus', {
+                          day: node.dayNumber,
+                          status: isCompleted ? t('common.completed') : isActive ? t('common.active') : t('common.locked'),
+                        })}
                       </Text>
                       <Text style={styles.nodeTitleText}>{node.title}</Text>
                       <Text style={styles.nodeSubText}>{node.subtitle}</Text>
@@ -367,14 +374,14 @@ export function TrainingCatalogScreen() {
                   <IconBrain size={22} color={palette.primary} strokeWidth={2} />
                 </View>
                 <View style={styles.coachHeaderTextCol}>
-                  <Text style={styles.coachTag}>ESCUELA DE BILLAR • J.M. QUETGLAS</Text>
-                  <Text style={styles.coachTitle}>Consejo del Entrenador IA</Text>
+                  <Text style={styles.coachTag}>{t('training.route.coachTag')}</Text>
+                  <Text style={styles.coachTitle}>{t('training.route.coachTitle')}</Text>
                 </View>
               </View>
 
               <View style={styles.coachQuoteBox}>
                 <Text style={styles.coachQuoteText}>
-                  “El pie de apoyo debe descansar exactamente sobre la línea de tiro. El antebrazo actúa como un péndulo puro formando 90° con el taco al momento del impacto.”
+                  {t('training.route.coachQuote')}
                 </Text>
               </View>
 
@@ -384,7 +391,7 @@ export function TrainingCatalogScreen() {
                 onPress={() => setShowTheoryModal(true)}
               >
                 <IconSchool size={16} color={palette.primary} strokeWidth={2} />
-                <Text style={styles.coachGuideBtnText}>Ver Fundamentos Biomecánicos</Text>
+                <Text style={styles.coachGuideBtnText}>{t('training.route.viewTheory')}</Text>
                 <IconArrowRight size={14} color={palette.primary} strokeWidth={2.5} />
               </TouchableOpacity>
             </View>
@@ -396,8 +403,8 @@ export function TrainingCatalogScreen() {
                   <IconBook size={20} color={palette.secondary} strokeWidth={2} />
                 </View>
                 <View style={styles.coachHeaderTextCol}>
-                  <Text style={[styles.coachTag, { color: palette.secondary }]}>SISTEMA A REFORZAR</Text>
-                  <Text style={styles.coachTitle}>Base 50: Salida - Ataque = Llegada</Text>
+                  <Text style={[styles.coachTag, { color: palette.secondary }]}>{t('training.route.reinforceTag')}</Text>
+                  <Text style={styles.coachTitle}>{t('training.route.reinforceTitle')}</Text>
                 </View>
               </View>
 
@@ -424,15 +431,15 @@ export function TrainingCatalogScreen() {
                 onPress={() => router.push('/training/session')}
               >
                 <IconPlayerPlay size={16} color="#ffffff" strokeWidth={2.5} />
-                <Text style={styles.reinforceActionBtnText}>Practicar Posición</Text>
+                <Text style={styles.reinforceActionBtnText}>{t('training.route.practicePosition')}</Text>
               </TouchableOpacity>
             </View>
 
             {/* 3. Quick Systems Library Shortcut */}
             <View style={styles.libraryShortcutCard}>
-              <Text style={styles.libraryShortcutTitle}>Sistemas Clásicos (Colombia / México)</Text>
+              <Text style={styles.libraryShortcutTitle}>{t('training.route.systemsTitle')}</Text>
               <Text style={styles.libraryShortcutDesc}>
-                Accede directamente a la biblioteca de fórmulas y diagramas de referencia.
+                {t('training.route.systemsDesc')}
               </Text>
               <View style={styles.systemsChipsRow}>
                 {TRAINING_SYSTEMS.map((sys) => (
@@ -497,8 +504,8 @@ export function TrainingCatalogScreen() {
                   <IconSchool size={22} color={palette.primary} strokeWidth={2} />
                 </View>
                 <View>
-                  <Text style={styles.theoryTag}>FUNDAMENTOS TÉCNICOS • J.M. QUETGLAS</Text>
-                  <Text style={styles.theoryTitle}>Biomecánica y Tipos de Puente</Text>
+                  <Text style={styles.theoryTag}>{t('training.theory.tag')}</Text>
+                  <Text style={styles.theoryTitle}>{t('training.theory.title')}</Text>
                 </View>
               </View>
               <TouchableOpacity
@@ -511,23 +518,23 @@ export function TrainingCatalogScreen() {
 
             <ScrollView style={styles.theoryBody}>
               <View style={styles.theorySection}>
-                <Text style={styles.theorySectionHeading}>1. Anclaje y Triángulo de Sustentación</Text>
+                <Text style={styles.theorySectionHeading}>{t('training.theory.sec1Title')}</Text>
                 <Text style={styles.theoryParagraph}>
-                  Para un jugador diestro, el pie derecho se apoya directamente sobre la línea imaginaria de tiro con un ángulo de 45° a 60°. El 60% del peso recae sobre la pierna posterior, asegurando que la cabeza y barbilla (a 10-15 cm del taco) no tengan oscilaciones.
+                  {t('training.theory.sec1Desc')}
                 </Text>
               </View>
 
               <View style={styles.theorySection}>
-                <Text style={styles.theorySectionHeading}>2. El Puente Cerrado con Anilla (Clásico)</Text>
+                <Text style={styles.theorySectionHeading}>{t('training.theory.sec2Title')}</Text>
                 <Text style={styles.theoryParagraph}>
-                  El dedo índice rodea el taco cerrando firmemente contra la yema del pulgar, formando una anilla cilíndrica. Los otros tres dedos forman un trípode abierto sobre el paño. Permite tacadas con máxima aceleración sin desvíos.
+                  {t('training.theory.sec2Desc')}
                 </Text>
               </View>
 
               <View style={styles.theorySection}>
-                <Text style={styles.theorySectionHeading}>3. Limaje Pendular de 90°</Text>
+                <Text style={styles.theorySectionHeading}>{t('training.theory.sec3Title')}</Text>
                 <Text style={styles.theoryParagraph}>
-                  El brazo superior permanece inmóvil y horizontal. El antebrazo oscila libremente desde el codo como un péndulo. Al momento de impactar la bola 1, el antebrazo debe formar un ángulo de 90° exactos con el taco, logrando una penetración de 15 a 20 cm.
+                  {t('training.theory.sec3Desc')}
                 </Text>
               </View>
             </ScrollView>
@@ -536,7 +543,7 @@ export function TrainingCatalogScreen() {
               style={styles.theoryCloseActionBtn}
               onPress={() => setShowTheoryModal(false)}
             >
-              <Text style={styles.theoryCloseActionBtnText}>Entendido, Volver a la Ruta</Text>
+              <Text style={styles.theoryCloseActionBtnText}>{t('training.theory.dismiss')}</Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>

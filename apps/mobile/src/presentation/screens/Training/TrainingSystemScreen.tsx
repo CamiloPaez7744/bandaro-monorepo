@@ -168,7 +168,7 @@ function TrainingSystemWorkspace() {
     const params = useLocalSearchParams<{ systemId: string }>();
     const insets = useSafeAreaInsets();
     const { width } = useWindowDimensions();
-    const { t } = useI18n();
+    const { t, language } = useI18n();
     const palette = getPalette(useColorScheme());
     const styles = getStyles(palette);
     const defaultOrientation: Orientation = width >= 900 ? 'horizontal' : 'vertical';
@@ -245,14 +245,14 @@ function TrainingSystemWorkspace() {
                     setGuideVisibility(saved.guideVisibility);
                     setShowSolution(saved.showSolution);
                     setTableOrientation(saved.tableOrientation);
-                    setStatusMessage('Mesa cargada');
+                    setStatusMessage(language === 'en' ? 'Table loaded' : 'Mesa cargada');
                 } catch {
-                    setStatusMessage('No fue posible cargar la mesa guardada');
+                    setStatusMessage(language === 'en' ? 'Could not load saved table' : 'No fue posible cargar la mesa guardada');
                 }
             })
             .catch(() => {
                 if (isActive) {
-                    setStatusMessage('No fue posible cargar la mesa guardada');
+                    setStatusMessage(language === 'en' ? 'Could not load saved table' : 'No fue posible cargar la mesa guardada');
                 }
             });
 
@@ -337,13 +337,13 @@ function TrainingSystemWorkspace() {
         };
 
         await AsyncStorage.setItem(storageKey, JSON.stringify(payload));
-        setStatusMessage('Mesa guardada');
+        setStatusMessage(language === 'en' ? 'Table saved' : 'Mesa guardada');
     };
 
     const loadStage = async () => {
         const raw = await AsyncStorage.getItem(storageKey);
         if (!raw) {
-            setStatusMessage('No hay una mesa guardada para esta posición');
+            setStatusMessage(language === 'en' ? 'No saved table found for this position' : 'No hay una mesa guardada para esta posición');
             return;
         }
 
@@ -356,9 +356,9 @@ function TrainingSystemWorkspace() {
             setGuideVisibility(saved.guideVisibility);
             setShowSolution(saved.showSolution);
             setTableOrientation(saved.tableOrientation);
-            setStatusMessage('Mesa cargada');
+            setStatusMessage(language === 'en' ? 'Table loaded' : 'Mesa cargada');
         } catch {
-            setStatusMessage('No fue posible leer la mesa guardada');
+            setStatusMessage(language === 'en' ? 'Could not read saved table' : 'No fue posible leer la mesa guardada');
         }
     };
 
@@ -371,7 +371,7 @@ function TrainingSystemWorkspace() {
         setGuideVisibility({ white: true, yellow: true, red: true });
         setShowSolution(false);
         setTableOrientation(defaultOrientation);
-        setStatusMessage('Mesa reiniciada');
+        setStatusMessage(language === 'en' ? 'Table reset' : 'Mesa reiniciada');
     };
 
     const findBallAtStagePoint = (stagePoint: Point2D) => {
@@ -456,7 +456,7 @@ function TrainingSystemWorkspace() {
             <TouchableOpacity
                 style={[styles.simulationButton, { backgroundColor: palette.primary }]}
                 onPress={() => router.push({ pathname: '/training/simulate', params: { systemId: system.id } })}>
-                <Text style={styles.simulationButtonText}>Abrir simulador interactivo</Text>
+                <Text style={styles.simulationButtonText}>{language === 'en' ? 'Open Interactive Simulator' : 'Abrir simulador interactivo'}</Text>
             </TouchableOpacity>
 
             <View style={[styles.simulationFrame, isSimulationWide && styles.simulationFrameWide]}>
@@ -465,7 +465,7 @@ function TrainingSystemWorkspace() {
                 <View style={styles.tableHeaderRow}>
                     <Text style={styles.cardTitle}>{t('training.system.table')}</Text>
                     <TouchableOpacity style={styles.orientationButton} onPress={() => setTableOrientation((prev) => (prev === 'horizontal' ? 'vertical' : 'horizontal'))}>
-                        <Text style={styles.orientationButtonLabel}>Mesa</Text>
+                        <Text style={styles.orientationButtonLabel}>{language === 'en' ? 'Table' : 'Mesa'}</Text>
                         <Text style={styles.orientationButtonValue}>{tableOrientation === 'horizontal' ? 'Horizontal' : 'Vertical'}</Text>
                     </TouchableOpacity>
                 </View>
@@ -497,19 +497,19 @@ function TrainingSystemWorkspace() {
 
                 <View style={styles.legendRow}>
                     <View style={styles.legendChip}>
-                        <Text style={styles.legendLabel}>Ruta</Text>
-                        <Text style={styles.legendValue}>{currentPosition.trajectory.length - 1} tramos</Text>
+                        <Text style={styles.legendLabel}>{t('training.sim.route')}</Text>
+                        <Text style={styles.legendValue}>{t('training.sim.segments', { count: currentPosition.trajectory.length - 1 })}</Text>
                     </View>
                     <View style={styles.legendChip}>
-                        <Text style={styles.legendLabel}>Solución</Text>
-                        <Text style={styles.legendValue}>{showSolution ? 'Visible' : 'Oculta'}</Text>
+                        <Text style={styles.legendLabel}>{t('training.sim.solution')}</Text>
+                        <Text style={styles.legendValue}>{showSolution ? t('common.visible') : t('common.hidden')}</Text>
                     </View>
                     <View style={styles.legendChip}>
-                        <Text style={styles.legendLabel}>Guías</Text>
-                        <Text style={styles.legendValue}>{guideVisibility.white || guideVisibility.yellow || guideVisibility.red ? 'Activas' : 'Apagadas'}</Text>
+                        <Text style={styles.legendLabel}>{t('training.sim.guides')}</Text>
+                        <Text style={styles.legendValue}>{guideVisibility.white || guideVisibility.yellow || guideVisibility.red ? t('training.sim.active') : t('training.sim.off')}</Text>
                     </View>
                     <View style={styles.legendChip}>
-                        <Text style={styles.legendLabel}>Efecto</Text>
+                        <Text style={styles.legendLabel}>{t('training.system.effect')}</Text>
                         <Text style={styles.legendValue}>{effect.label}</Text>
                     </View>
                 </View>
@@ -517,11 +517,11 @@ function TrainingSystemWorkspace() {
                 <View style={styles.guideToggleRow}>
                     {BALL_ORDER.map((ballId) => {
                         const active = guideVisibility[ballId];
-                        let label = 'Roja';
+                        let label = t('common.red');
                         if (ballId === 'white') {
-                            label = 'Blanca';
+                            label = t('common.white');
                         } else if (ballId === 'yellow') {
-                            label = 'Amarilla';
+                            label = t('common.yellow');
                         }
                         return (
                             <Pressable
@@ -561,13 +561,13 @@ function TrainingSystemWorkspace() {
 
                 <View style={styles.quickActionRow}>
                     <TouchableOpacity style={styles.quickActionButton} onPress={saveStage}>
-                        <Text style={styles.quickActionText}>Guardar posiciones</Text>
+                        <Text style={styles.quickActionText}>{t('training.sim.savePositions')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.quickActionButton} onPress={loadStage}>
-                        <Text style={styles.quickActionText}>Cargar mesa</Text>
+                        <Text style={styles.quickActionText}>{t('training.sim.loadTable')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.quickActionButton} onPress={resetStage}>
-                        <Text style={styles.quickActionText}>Restablecer</Text>
+                        <Text style={styles.quickActionText}>{t('common.reset')}</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -598,11 +598,11 @@ function TrainingSystemWorkspace() {
                             <Text style={styles.selectorSubtitle}>{effect.description}</Text>
                             <View style={styles.effectMetaRow}>
                                 <View style={styles.effectMetaChip}>
-                                    <Text style={styles.effectMetaLabel}>Potencia</Text>
+                                    <Text style={styles.effectMetaLabel}>{language === 'en' ? 'Power' : 'Potencia'}</Text>
                                     <Text style={styles.effectMetaValue}>{effect.power}%</Text>
                                 </View>
                                 <View style={styles.effectMetaChip}>
-                                    <Text style={styles.effectMetaLabel}>Contacto</Text>
+                                    <Text style={styles.effectMetaLabel}>{language === 'en' ? 'Contact' : 'Contacto'}</Text>
                                     <Text style={styles.effectMetaValue}>{selectedContact}</Text>
                                 </View>
                             </View>

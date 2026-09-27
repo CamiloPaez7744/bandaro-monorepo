@@ -8,6 +8,7 @@ import {
     type GestureResponderEvent,
 } from 'react-native';
 import { IconBolt, IconFlame } from '@/src/presentation/components/icons';
+import { useI18n } from '@/components/useLanguage';
 
 interface CaromPowerMeterProps {
     powerLevel: number; // 0..100
@@ -29,6 +30,7 @@ export const CaromPowerMeter = React.memo(function CaromPowerMeter({
     onShoot,
     disabled = false,
 }: CaromPowerMeterProps) {
+    const { language } = useI18n();
     const [isDragging, setIsDragging] = useState(false);
     const containerHeightRef = useRef<number>(260);
     const powerLevelRef = useRef(powerLevel);
@@ -151,7 +153,7 @@ export const CaromPowerMeter = React.memo(function CaromPowerMeter({
 
             {/* Indicador inferior de velocidad de banda */}
             <View style={styles.footerInfo}>
-                <Text style={styles.footerLabel}>VEL</Text>
+                <Text style={styles.footerLabel}>{language === 'en' ? 'SPD' : 'VEL'}</Text>
                 <Text style={[styles.footerValue, { color: fillColor }]}>{railSpeed}</Text>
             </View>
         </View>

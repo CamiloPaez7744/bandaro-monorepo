@@ -22,6 +22,7 @@ import {
 } from '@tabler/icons-react-native';
 
 import { useColorScheme } from '@/components/useColorScheme';
+import { useI18n } from '@/components/useLanguage';
 import { getPalette, theme } from '@/constants/theme';
 import {
   TrainingPlayTable,
@@ -119,11 +120,48 @@ const DEFAULT_POSITIONS: PositionData[] = [
   },
 ];
 
+const getLocalizedPos = (pos: PositionData, lang: string): { name: string; category: string; hint?: string } => {
+  if (lang === 'en') {
+    switch (pos.id) {
+      case 'bricole-50':
+        return {
+          name: 'Classic Short Rail Cushion-First (Bricole)',
+          category: 'Cushion First',
+          hint: 'Attack diamond 2.5 on long rail with 2 tips of spin.',
+        };
+      case 'pase-bola-caudron':
+        return {
+          name: 'Around The Table 3-Cushion Long-Short-Long',
+          category: 'Around The Table',
+          hint: '1/2 ball thickness, follow spin at 1:30.',
+        };
+      case 'cabaña-tuzul':
+        return {
+          name: 'Tuzul System Short-Angle',
+          category: 'Side Spin & Angles',
+          hint: 'Closed angle with running clockwise spin.',
+        };
+      default:
+        return {
+          name: pos.name,
+          category: pos.category,
+          hint: pos.hint,
+        };
+    }
+  }
+  return {
+    name: pos.name,
+    category: pos.category,
+    hint: pos.hint,
+  };
+};
+
 export function TrainingActiveSessionScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const isWideScreen = width >= 920;
+  const { t, language } = useI18n();
   const palette = getPalette(useColorScheme());
   const styles = getStyles(palette, isWideScreen);
 
@@ -144,7 +182,7 @@ export function TrainingActiveSessionScreen() {
   const [targetReps, setTargetReps] = useState(10);
   const [madeHits, setMadeHits] = useState(0);
   const [isSimulating, setIsSimulating] = useState(false);
-  const [quote, setQuote] = useState<TrainingQuote>(getRandomTrainingQuote());
+  const [quote, setQuote] = useState<TrainingQuote>(getRandomTrainingQuote(language));
 
   // Modals
   const [selectorModalVisible, setSelectorModalVisible] = useState(false);
@@ -152,15 +190,20 @@ export function TrainingActiveSessionScreen() {
   const [cameraModalVisible, setCameraModalVisible] = useState(false);
   const [celebrationModalVisible, setCelebrationModalVisible] = useState(false);
   const [celebrationSummary, setCelebrationSummary] = useState<TrainingCelebrationSessionSummary | null>(null);
-  const [celebrationQuote, setCelebrationQuote] = useState<CongratulationQuote>(getRandomCongratulationQuote());
+  const [celebrationQuote, setCelebrationQuote] = useState<CongratulationQuote>(getRandomCongratulationQuote(language));
 
   // Cumulative Session Records: positionId -> { target, hits }
   const [sessionResults, setSessionResults] = useState<Record<string, { target: number; hits: number }>>({});
 
+  // Sync quote when language changes
+  useEffect(() => {
+    setQuote(getRandomTrainingQuote(language));
+  }, [language]);
+
   // Refresh motivational quote on entry or new position
   const refreshQuote = useCallback(() => {
-    setQuote(getRandomTrainingQuote());
-  }, []);
+    setQuote(getRandomTrainingQuote(language));
+  }, [language]);
 
   // Handle selecting a shot from the interactive Catalog Picker
   const handleSelectCatalogShot = useCallback(
@@ -273,6 +316,7 @@ export function TrainingActiveSessionScreen() {
   }, [params.shotId, params.whiteX, params.whiteY, params.yellowX, params.yellowY, params.redX, params.redY, params.customName]);
 
   const currentPos = positions[currentPosIndex] || DEFAULT_POSITIONS[0];
+  const localizedCurrentPos = getLocalizedPos(currentPos, language);
 
   const handleToggleSolution = () => {
     setIsSimulating((prev) => !prev);
@@ -336,10 +380,11 @@ export function TrainingActiveSessionScreen() {
       accuracy: finalPct,
       positions: Object.entries(finalResults).map(([id, val]) => {
         const found = positions.find((p) => p.id === id);
+        const loc = found ? getLocalizedPos(found, language) : null;
         return {
           id,
-          name: found?.name || id,
-          category: found?.category || 'Entrenamiento',
+          name: loc?.name || found?.name || id,
+          category: loc?.category || found?.category || (language === 'en' ? 'Training' : 'Entrenamiento'),
           target: val.target,
           hits: val.hits,
           accuracy: val.target > 0 ? Math.round((val.hits / val.target) * 100) : 0,
@@ -371,7 +416,7 @@ export function TrainingActiveSessionScreen() {
       ...sessionRecord,
       savedToBackend: backendSaved,
     });
-    setCelebrationQuote(getRandomCongratulationQuote());
+    setCelebrationQuote(getRandomCongratulationQuote(language));
     setCelebrationModalVisible(true);
   };
 
@@ -393,21 +438,21 @@ export function TrainingActiveSessionScreen() {
             <TouchableOpacity
               style={styles.backBtn}
               onPress={() => router.back()}
-              accessibilityLabel="Volver"
+              accessibilityLabel={t('common.back')}
             >
               <IconArrowLeft size={20} color={palette.text} />
             </TouchableOpacity>
 
             <View style={styles.sessionTitleCol}>
-              <Text style={styles.sessionTitle}>SESIÓN DE ENTRENAMIENTO</Text>
+              <Text style={styles.sessionTitle}>{t('training.session.title')}</Text>
               <Text style={styles.sessionSubtitle}>
-                Jugada {currentPosIndex + 1} de {positions.length}
+                {t('training.session.shotProgress', { current: currentPosIndex + 1, total: positions.length })}
               </Text>
             </View>
 
             <View style={styles.sessionBadge}>
               <IconFlame size={15} color={palette.primary} />
-              <Text style={styles.sessionBadgeText}>SERIE ACTIVA</Text>
+              <Text style={styles.sessionBadgeText}>{t('training.session.activeRun')}</Text>
             </View>
           </View>
 
@@ -452,7 +497,7 @@ export function TrainingActiveSessionScreen() {
                     ]}
                     numberOfLines={1}
                   >
-                    {idx + 1}. {pos.category}
+                    {idx + 1}. {getLocalizedPos(pos, language).category}
                   </Text>
                   {hasRecorded ? (
                     <View style={styles.pillHitDot} />
@@ -466,7 +511,7 @@ export function TrainingActiveSessionScreen() {
               onPress={() => setSelectorModalVisible(true)}
             >
               <IconPlus size={14} color={palette.primary} />
-              <Text style={styles.addPositionPillText}>Nueva Jugada</Text>
+              <Text style={styles.addPositionPillText}>{t('training.session.newShot')}</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -479,12 +524,12 @@ export function TrainingActiveSessionScreen() {
             <View style={styles.positionInfoBar}>
               <View style={styles.positionTitleRow}>
                 <View style={styles.categoryBadge}>
-                  <Text style={styles.categoryText}>{currentPos.category}</Text>
+                  <Text style={styles.categoryText}>{localizedCurrentPos.category}</Text>
                 </View>
-                <Text style={styles.positionName}>{currentPos.name}</Text>
+                <Text style={styles.positionName}>{localizedCurrentPos.name}</Text>
               </View>
-              {currentPos.hint && (
-                <Text style={styles.positionHint}>{currentPos.hint}</Text>
+              {localizedCurrentPos.hint && (
+                <Text style={styles.positionHint}>{localizedCurrentPos.hint}</Text>
               )}
             </View>
 
@@ -573,9 +618,9 @@ export function TrainingActiveSessionScreen() {
         onSelectPosition={(pos) => {
           const newPos: PositionData = {
             id: `snapshot-${Date.now()}`,
-            name: pos.name || 'Posición Capturada',
-            category: 'Captura / YouTube',
-            hint: 'Posición extraída y calibrada con visión por computadora.',
+            name: pos.name || (language === 'en' ? 'Captured Position' : 'Posición Capturada'),
+            category: language === 'en' ? 'Capture / YouTube' : 'Captura / YouTube',
+            hint: language === 'en' ? 'Position extracted and calibrated with computer vision.' : 'Posición extraída y calibrada con visión por computadora.',
             difficulty: 3,
             white: pos.white,
             yellow: pos.yellow,

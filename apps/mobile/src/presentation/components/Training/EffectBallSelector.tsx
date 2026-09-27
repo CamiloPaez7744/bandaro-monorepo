@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { PanResponder, Pressable, StyleSheet, Text, View, type GestureResponderEvent, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Circle, ClipPath, Defs, G, Line, LinearGradient, RadialGradient, Stop } from 'react-native-svg';
 
+import { useI18n } from '@/components/useLanguage';
 import { BallId, SpinEffect } from '@bandaro/core';
 
 interface EffectBallSelectorProps {
@@ -34,6 +35,7 @@ function EffectBallSelectorBase(props: Readonly<EffectBallSelectorProps>) {
         onGuidesChange,
     } = props;
 
+    const { language } = useI18n();
     const [guidesVisible, setGuidesVisible] = useState(initialGuidesVisible);
 
     const ballCenter = size / 2;
@@ -212,7 +214,7 @@ function EffectBallSelectorBase(props: Readonly<EffectBallSelectorProps>) {
                         pressed && styles.guideButtonPressed,
                     ]}
                     accessibilityRole="button"
-                    accessibilityLabel="Alternar guías"
+                    accessibilityLabel={language === 'en' ? 'Toggle guides' : 'Alternar guías'}
                     accessibilityState={{ selected: guidesVisible }}>
                     <Svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <Circle cx={12} cy={12} r={3} />
@@ -221,7 +223,9 @@ function EffectBallSelectorBase(props: Readonly<EffectBallSelectorProps>) {
                         <Line x1={12} y1={3} x2={12} y2={6} />
                         <Line x1={12} y1={18} x2={12} y2={21} />
                     </Svg>
-                    <Text style={[styles.guideButtonText, guidesVisible && styles.guideButtonTextActive]}>Guías</Text>
+                    <Text style={[styles.guideButtonText, guidesVisible && styles.guideButtonTextActive]}>
+                        {language === 'en' ? 'Guides' : 'Guías'}
+                    </Text>
                 </Pressable>
             ) : null}
         </View>

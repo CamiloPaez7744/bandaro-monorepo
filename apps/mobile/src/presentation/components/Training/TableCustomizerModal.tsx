@@ -14,6 +14,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useColorScheme } from '@/components/useColorScheme';
+import { useI18n } from '@/components/useLanguage';
 import { getPalette } from '@/constants/theme';
 import {
   IconCheck,
@@ -49,14 +50,138 @@ interface TableCustomizerModalProps {
   onChangePreferences: (newPrefs: TablePreferences) => void;
 }
 
-const CUSTOM_QUICK_COLORS = [
-  { name: 'Rojo Carmesí', hex: '#b91c1c' },
-  { name: 'Púrpura Imperial', hex: '#6b21a8' },
-  { name: 'Azul Eléctrico', hex: '#0284c7' },
-  { name: 'Verde Esmeralda', hex: '#047857' },
-  { name: 'Carbón Puro', hex: '#18181b' },
-  { name: 'Ámbar Cálido', hex: '#b45309' },
+const getQuickColors = (lang: string) => [
+  { name: lang === 'en' ? 'Crimson Red' : 'Rojo Carmesí', hex: '#b91c1c' },
+  { name: lang === 'en' ? 'Imperial Purple' : 'Púrpura Imperial', hex: '#6b21a8' },
+  { name: lang === 'en' ? 'Electric Blue' : 'Azul Eléctrico', hex: '#0284c7' },
+  { name: lang === 'en' ? 'Emerald Green' : 'Verde Esmeralda', hex: '#047857' },
+  { name: lang === 'en' ? 'Pure Carbon' : 'Carbón Puro', hex: '#18181b' },
+  { name: lang === 'en' ? 'Warm Amber' : 'Ámbar Cálido', hex: '#b45309' },
 ];
+
+const getArenaSkinTexts = (skin: (typeof TABLE_ARENA_SKINS)[0], lang: string) => {
+  if (lang === 'en') {
+    switch (skin.id) {
+      case 'rebel_skull':
+        return {
+          name: 'Rebel Skull Arena',
+          subtitle: 'Street & Rock Skull Edition',
+          description: 'Bold design featuring the iconic Skull watermark, high-contrast charcoal cloth, ebony wood and chrome corner fittings.',
+        };
+      case 'tournament_umb':
+        return {
+          name: 'UMB Tournament Arena',
+          subtitle: 'Official Simonis 300 Rapide',
+          description: 'The official world championship table. Classic blue cloth, mahogany rails and satin brass corners.',
+        };
+      case 'royal_high_roller':
+        return {
+          name: 'Royal High Roller',
+          subtitle: 'Las Vegas VIP Edition',
+          description: 'Absolute luxury: midnight blue cloth with gold inlays, piano black lacquer finish and 24K gold corner plates.',
+        };
+      case 'neo_tokyo_cyber':
+        return {
+          name: 'Neo-Tokyo Cybercarom',
+          subtitle: 'Futuristic & Luminescent',
+          description: 'Cyberpunk arcade aesthetic: graphite/electric cyan cloth, black carbon fiber frame and glowing cyan neon inserts.',
+        };
+      case 'monte_carlo_luxe':
+        return {
+          name: 'Monte Carlo Grand Luxe',
+          subtitle: 'European Riviera Casino',
+          description: 'Refined emerald green baize with warm walnut borders and antique bronze finishes.',
+        };
+      default:
+        return { name: skin.name, subtitle: skin.subtitle, description: skin.description };
+    }
+  }
+  return { name: skin.name, subtitle: skin.subtitle, description: skin.description };
+};
+
+const getClothPresetTexts = (preset: (typeof CLOTH_SKIN_PRESETS)[0], lang: string) => {
+  if (lang === 'en') {
+    switch (preset.id) {
+      case 'tournament_blue':
+        return { name: 'Tournament Blue', description: 'Official UMB Simonis 300 Rapide' };
+      case 'simonis_green':
+        return { name: 'Classic Green', description: 'Traditional carom billiards green' };
+      case 'dufferin_burgundy':
+        return { name: 'Burgundy Wine', description: 'Elegant velvet garnet' };
+      case 'royal_navy':
+        return { name: 'Navy Blue', description: 'Deep midnight blue with high visibility' };
+      case 'slate_charcoal':
+        return { name: 'Anthracite Gray', description: 'Modern minimalist style' };
+      case 'golden_camel':
+        return { name: 'Golden Camel', description: 'Warm classic habano tone' };
+      default:
+        return { name: preset.name, description: preset.description };
+    }
+  }
+  return { name: preset.name, description: preset.description };
+};
+
+const getDecalName = (decal: (typeof TABLE_DECAL_DEFS)[0], lang: string) => {
+  if (lang === 'en') {
+    switch (decal.id) {
+      case 'none':
+        return 'No Decal';
+      case 'blackhole':
+        return 'Black Hole';
+      case 'skull':
+        return 'Rebel Skull';
+      case 'constelacion':
+        return 'Polar Constellation';
+      case 'pulpo':
+        return 'Carom Octopus';
+      case 'tiburon':
+        return 'Predator Shark';
+      case 'tigre':
+        return 'Royal Tiger';
+      case 'trofeo':
+        return 'UMB Trophy';
+      default:
+        return decal.name;
+    }
+  }
+  return decal.name;
+};
+
+const getCueTexts = (cue: (typeof CUE_SKIN_PRESETS)[0], lang: string) => {
+  if (lang === 'en') {
+    switch (cue.id) {
+      case 'venom_azure':
+        return {
+          name: 'Venom Azure WS',
+          tag: 'Pro Edition',
+          subtitle: 'Pro Edition • Electric Blue Neon',
+        };
+      case 'classic_gold':
+        return {
+          name: 'Classic Ebony & Gold',
+          tag: 'Selected Maple',
+          subtitle: 'Canadian Maple • 24K Gold Inlays',
+        };
+      case 'carbon_stealth':
+        return {
+          name: 'Carbon Stealth Pro',
+          tag: 'Aerospace Carbon',
+          subtitle: 'Aerospace Carbon • Matte Stealth',
+        };
+      default:
+        return {
+          name: cue.name,
+          tag: cue.subtitle.split('•')[0].trim(),
+          subtitle: cue.subtitle,
+        };
+    }
+  }
+  return {
+    name: cue.name,
+    tag: cue.subtitle.split('•')[0].trim(),
+    subtitle: cue.subtitle,
+  };
+};
 
 function TableCustomizerModalBase({
   visible,
@@ -66,6 +191,7 @@ function TableCustomizerModalBase({
 }: TableCustomizerModalProps) {
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
+  const { t, language } = useI18n();
   const colorScheme = useColorScheme();
   const palette = getPalette(colorScheme);
   const isDark = colorScheme === 'dark';
@@ -107,13 +233,19 @@ function TableCustomizerModalBase({
                 <IconSettings size={18} color="#10b981" strokeWidth={2.2} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[s.headerTitle, isMobile && { fontSize: 14 }]}>Personalizar Mesa Canónica</Text>
+                <Text style={[s.headerTitle, isMobile && { fontSize: 14 }]}>
+                  {language === 'en' ? 'Customize Canonical Table' : 'Personalizar Mesa Canónica'}
+                </Text>
                 <Text style={[s.headerSubtitle, isMobile && { fontSize: 10.5 }]} numberOfLines={1}>
-                  Configura skins, tipo de miras y paño
+                  {language === 'en' ? 'Configure skins, sight types and cloth' : 'Configura skins, tipo de miras y paño'}
                 </Text>
               </View>
             </View>
-            <TouchableOpacity style={s.closeBtn} onPress={onClose} activeOpacity={0.7}>
+            <TouchableOpacity
+              style={s.closeBtn}
+              onPress={onClose}
+              accessibilityLabel={t('common.close')}
+              activeOpacity={0.7}>
               <IconX size={18} color={isDark ? '#94a39d' : palette.muted} />
             </TouchableOpacity>
           </View>
@@ -121,9 +253,13 @@ function TableCustomizerModalBase({
           <ScrollView style={s.scroll} contentContainerStyle={[s.scrollContent, isMobile && { padding: 12, gap: 14 }]}>
             {/* SECCIÓN 0: SKINS OFICIALES DE ARENA (ESTILO 8-BALL POOL & TORNEO) */}
             <View style={s.section}>
-              <Text style={s.sectionTitle}>Skins Temáticas de Arena (Estilo Torneo)</Text>
+              <Text style={s.sectionTitle}>
+                {language === 'en' ? 'Themed Arena Skins (Tournament Style)' : 'Skins Temáticas de Arena (Estilo Torneo)'}
+              </Text>
               <Text style={s.sectionDesc}>
-                Aplica sets completos de competición inspirados en los mejores salones del mundo:
+                {language === 'en'
+                  ? 'Apply complete competition sets inspired by the world’s top halls:'
+                  : 'Aplica sets completos de competición inspirados en los mejores salones del mundo:'}
               </Text>
 
               <ScrollView
@@ -132,6 +268,7 @@ function TableCustomizerModalBase({
                 contentContainerStyle={s.arenaSkinsScroll}>
                 {TABLE_ARENA_SKINS.map((skin) => {
                   const isActive = preferences.activeSkinId === skin.id;
+                  const skinTexts = getArenaSkinTexts(skin, language);
                   return (
                     <TouchableOpacity
                       key={skin.id}
@@ -178,10 +315,10 @@ function TableCustomizerModalBase({
                         />
                       </View>
                       <Text style={[s.arenaSkinName, isActive && s.arenaSkinNameActive]}>
-                        {skin.name}
+                        {skinTexts.name}
                       </Text>
                       <Text style={s.arenaSkinSub} numberOfLines={1}>
-                        {skin.subtitle}
+                        {skinTexts.subtitle}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -192,7 +329,9 @@ function TableCustomizerModalBase({
             {/* SECCIÓN 1: POSICIÓN DE SALIDA OFICIAL (BREAK SHOT: UMB VS PBA) */}
             <View style={s.section}>
               <View style={s.sectionHeaderWithBadge}>
-                <Text style={s.sectionTitle}>1. Posición de Salida Canónica</Text>
+                <Text style={s.sectionTitle}>
+                  {language === 'en' ? '1. Canonical Break Position' : '1. Posición de Salida Canónica'}
+                </Text>
                 <View
                   style={[
                     s.badgePill,
@@ -202,12 +341,16 @@ function TableCustomizerModalBase({
                     },
                   ]}>
                   <Text style={s.badgePillText}>
-                    {preferences.breakFormat === 'umb' ? 'UMB MUNDIAL' : 'PBA TOUR'}
+                    {preferences.breakFormat === 'umb'
+                      ? (language === 'en' ? 'WORLD UMB' : 'UMB MUNDIAL')
+                      : 'PBA TOUR'}
                   </Text>
                 </View>
               </View>
               <Text style={s.sectionDesc}>
-                Configura la posición oficial de salida por defecto al reiniciar o iniciar entrenamientos:
+                {language === 'en'
+                  ? 'Configure default official break position upon restarting or starting training:'
+                  : 'Configura la posición oficial de salida por defecto al reiniciar o iniciar entrenamientos:'}
               </Text>
 
               <View style={s.optionsRow}>
@@ -226,10 +369,12 @@ function TableCustomizerModalBase({
                       s.shapeCardTitle,
                       preferences.breakFormat === 'umb' && s.shapeCardTitleActive,
                     ]}>
-                    UMB Mundial
+                    {language === 'en' ? 'World UMB' : 'UMB Mundial'}
                   </Text>
                   <Text style={s.shapeCardSub}>
-                    Salida tradicional: Roja en pie (3/4), Amarilla en salida (1/4) y Blanca a 18.25 cm
+                    {language === 'en'
+                      ? 'Traditional break: Red at foot (3/4), Yellow at head (1/4), White at 18.25 cm'
+                      : 'Salida tradicional: Roja en pie (3/4), Amarilla en salida (1/4) y Blanca a 18.25 cm'}
                   </Text>
                 </Pressable>
 
@@ -251,7 +396,9 @@ function TableCustomizerModalBase({
                     PBA Pro Tour
                   </Text>
                   <Text style={s.shapeCardSub}>
-                    Grilla de 9 spots con formaciones por sorteo (1-5-9, 3-5-7, 2-5-8...)
+                    {language === 'en'
+                      ? '9-spot grid with draw-based formations (1-5-9, 3-5-7, 2-5-8...)'
+                      : 'Grilla de 9 spots con formaciones por sorteo (1-5-9, 3-5-7, 2-5-8...)'}
                   </Text>
                 </Pressable>
               </View>
@@ -259,7 +406,9 @@ function TableCustomizerModalBase({
               {/* Sub-configuración según el formato elegido */}
               {preferences.breakFormat === 'umb' ? (
                 <View style={s.subOptionBox}>
-                  <Text style={s.subOptionTitle}>Lado de la Bola Blanca Tiradora (UMB):</Text>
+                  <Text style={s.subOptionTitle}>
+                    {language === 'en' ? 'Cue Ball Side (UMB):' : 'Lado de la Bola Blanca Tiradora (UMB):'}
+                  </Text>
                   <View style={s.subOptionRow}>
                     <TouchableOpacity
                       style={[
@@ -272,7 +421,7 @@ function TableCustomizerModalBase({
                           s.subOptionBtnText,
                           preferences.umbSide === 'right' && s.subOptionBtnTextActive,
                         ]}>
-                        Lado Derecho (Estándar 18.25 cm)
+                        {language === 'en' ? 'Right Side (Standard 18.25 cm)' : 'Lado Derecho (Estándar 18.25 cm)'}
                       </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -286,7 +435,7 @@ function TableCustomizerModalBase({
                           s.subOptionBtnText,
                           preferences.umbSide === 'left' && s.subOptionBtnTextActive,
                         ]}>
-                        Lado Izquierdo (18.25 cm)
+                        {language === 'en' ? 'Left Side (18.25 cm)' : 'Lado Izquierdo (18.25 cm)'}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -300,7 +449,9 @@ function TableCustomizerModalBase({
                       alignItems: 'center',
                       marginBottom: 8,
                     }}>
-                    <Text style={s.subOptionTitle}>Formación Táctica PBA (9 Spots):</Text>
+                    <Text style={s.subOptionTitle}>
+                      {language === 'en' ? 'PBA Tactical Formation (9 Spots):' : 'Formación Táctica PBA (9 Spots):'}
+                    </Text>
                     <TouchableOpacity
                       style={s.randomPbaBtn}
                       onPress={() => {
@@ -311,7 +462,9 @@ function TableCustomizerModalBase({
                       }}
                       activeOpacity={0.7}>
                       <IconRefresh size={12} color="#ffffff" />
-                      <Text style={s.randomPbaBtnText}>Sortear (Azar)</Text>
+                      <Text style={s.randomPbaBtnText}>
+                        {language === 'en' ? 'Draw (Random)' : 'Sortear (Azar)'}
+                      </Text>
                     </TouchableOpacity>
                   </View>
                   <View style={s.pbaFormationsGrid}>
@@ -327,7 +480,13 @@ function TableCustomizerModalBase({
                             {fId}
                           </Text>
                           <Text style={s.pbaCardName} numberOfLines={1}>
-                            {fId === '159' ? 'Canónica' : fId === '357' ? 'Invertida' : fId === '258' ? 'Central' : fId}
+                            {fId === '159'
+                              ? (language === 'en' ? 'Canonical' : 'Canónica')
+                              : fId === '357'
+                              ? (language === 'en' ? 'Inverted' : 'Invertida')
+                              : fId === '258'
+                              ? (language === 'en' ? 'Center' : 'Central')
+                              : fId}
                           </Text>
                         </TouchableOpacity>
                       );
@@ -339,14 +498,19 @@ function TableCustomizerModalBase({
 
             {/* 2. SECCIÓN: COLOR & SKINS DEL PAÑO */}
             <View style={s.section}>
-              <Text style={s.sectionTitle}>1. Skin & Color del Paño Individual</Text>
+              <Text style={s.sectionTitle}>
+                {language === 'en' ? '2. Individual Cloth Skin & Color' : '2. Skin & Color del Paño Individual'}
+              </Text>
               <Text style={s.sectionDesc}>
-                Elige un paño oficial de torneo o define tu propio color personalizado:
+                {language === 'en'
+                  ? 'Choose an official tournament cloth or define your own custom color:'
+                  : 'Elige un paño oficial de torneo o define tu propio color personalizado:'}
               </Text>
 
               <View style={s.presetsGrid}>
                 {CLOTH_SKIN_PRESETS.map((p) => {
                   const isActive = preferences.clothColor === p.id;
+                  const clothTexts = getClothPresetTexts(p, language);
                   return (
                     <Pressable
                       key={p.id}
@@ -361,10 +525,10 @@ function TableCustomizerModalBase({
                       </View>
                       <View style={s.presetInfo}>
                         <Text style={[s.presetName, isActive && s.presetNameActive]}>
-                          {p.name}
+                          {clothTexts.name}
                         </Text>
                         <Text style={s.presetDesc} numberOfLines={1}>
-                          {p.description}
+                          {clothTexts.description}
                         </Text>
                       </View>
                     </Pressable>
@@ -379,7 +543,9 @@ function TableCustomizerModalBase({
                     {isCustomColor && <IconCheck size={14} color="#ffffff" strokeWidth={3} />}
                   </View>
                   <View style={s.customInputWrapper}>
-                    <Text style={s.customInputLabel}>Color Hexadecimal Libre</Text>
+                    <Text style={s.customInputLabel}>
+                      {language === 'en' ? 'Custom Hex Color' : 'Color Hexadecimal Libre'}
+                    </Text>
                     <TextInput
                       style={s.hexInput}
                       value={customHex}
@@ -394,7 +560,7 @@ function TableCustomizerModalBase({
 
                 {/* Quick custom swatches */}
                 <View style={s.quickPaletteRow}>
-                  {CUSTOM_QUICK_COLORS.map((c) => (
+                  {getQuickColors(language).map((c) => (
                     <TouchableOpacity
                       key={c.hex}
                       style={[
@@ -415,11 +581,15 @@ function TableCustomizerModalBase({
               </View>
             </View>
 
-            {/* 2. SECCIÓN: FORMA DE LAS MIRAS (DIAMANTES VS PUNTOS) */}
+            {/* 3. SECCIÓN: FORMA DE LAS MIRAS (DIAMANTES VS PUNTOS) */}
             <View style={s.section}>
-              <Text style={s.sectionTitle}>2. Forma de las Miras (Marcadores)</Text>
+              <Text style={s.sectionTitle}>
+                {language === 'en' ? '3. Sight / Marker Shape' : '3. Forma de las Miras (Marcadores)'}
+              </Text>
               <Text style={s.sectionDesc}>
-                Elige entre rombos alargados o puntos circulares tradicionales:
+                {language === 'en'
+                  ? 'Choose between elongated diamonds or traditional circular spots:'
+                  : 'Elige entre rombos alargados o puntos circulares tradicionales:'}
               </Text>
 
               <View style={s.optionsRow}>
@@ -437,10 +607,12 @@ function TableCustomizerModalBase({
                       s.shapeCardTitle,
                       preferences.diamondShape === 'rhombus' && s.shapeCardTitleActive,
                     ]}>
-                    Diamantes (Rombos)
+                    {language === 'en' ? 'Diamonds (Rhombuses)' : 'Diamantes (Rombos)'}
                   </Text>
                   <Text style={s.shapeCardSub}>
-                    Apuntan con precisión hacia el centro de la mesa
+                    {language === 'en'
+                      ? 'Point with precision towards the center of the table'
+                      : 'Apuntan con precisión hacia el centro de la mesa'}
                   </Text>
                 </Pressable>
 
@@ -458,20 +630,26 @@ function TableCustomizerModalBase({
                       s.shapeCardTitle,
                       preferences.diamondShape === 'circle' && s.shapeCardTitleActive,
                     ]}>
-                    Puntos Circulares
+                    {language === 'en' ? 'Circular Spots' : 'Puntos Circulares'}
                   </Text>
                   <Text style={s.shapeCardSub}>
-                    Marcadores redondos tradicionales de nácar / marfil
+                    {language === 'en'
+                      ? 'Traditional round mother-of-pearl / ivory markers'
+                      : 'Marcadores redondos tradicionales de nácar / marfil'}
                   </Text>
                 </Pressable>
               </View>
             </View>
 
-            {/* 3. SECCIÓN: CONTEO DE MIRAS Y ESQUINAS */}
+            {/* 4. SECCIÓN: CONTEO DE MIRAS Y ESQUINAS */}
             <View style={s.section}>
-              <Text style={s.sectionTitle}>3. Conteo de Miras & Esquinas</Text>
+              <Text style={s.sectionTitle}>
+                {language === 'en' ? '4. Sight Count & Corners' : '4. Conteo de Miras & Esquinas'}
+              </Text>
               <Text style={s.sectionDesc}>
-                Distribución de marcadores a lo largo de las bandas:
+                {language === 'en'
+                  ? 'Distribution of markers along the cushions:'
+                  : 'Distribución de marcadores a lo largo de las bandas:'}
               </Text>
 
               <View style={s.optionsRow}>
@@ -486,11 +664,15 @@ function TableCustomizerModalBase({
                       s.countCardBadge,
                       preferences.diamondCount === '9_5' && s.countCardBadgeActive,
                     ]}>
-                    9 y 5
+                    {language === 'en' ? '9 & 5' : '9 y 5'}
                   </Text>
-                  <Text style={s.countCardTitle}>Con Esquinas</Text>
+                  <Text style={s.countCardTitle}>
+                    {language === 'en' ? 'With Corners' : 'Con Esquinas'}
+                  </Text>
                   <Text style={s.countCardSub}>
-                    9 en banda larga, 5 en banda corta (Estándar UMB)
+                    {language === 'en'
+                      ? '9 on long cushion, 5 on short cushion (UMB Standard)'
+                      : '9 en banda larga, 5 en banda corta (Estándar UMB)'}
                   </Text>
                 </Pressable>
 
@@ -505,11 +687,15 @@ function TableCustomizerModalBase({
                       s.countCardBadge,
                       preferences.diamondCount === '7_3' && s.countCardBadgeActive,
                     ]}>
-                    7 y 3
+                    {language === 'en' ? '7 & 3' : '7 y 3'}
                   </Text>
-                  <Text style={s.countCardTitle}>Sin Esquinas</Text>
+                  <Text style={s.countCardTitle}>
+                    {language === 'en' ? 'Without Corners' : 'Sin Esquinas'}
+                  </Text>
                   <Text style={s.countCardSub}>
-                    7 en banda larga, 3 en banda corta (Interiores)
+                    {language === 'en'
+                      ? '7 on long cushion, 3 on short cushion (Inner only)'
+                      : '7 en banda larga, 3 en banda corta (Interiores)'}
                   </Text>
                 </Pressable>
               </View>
@@ -517,9 +703,13 @@ function TableCustomizerModalBase({
               {/* Interruptor específico para diamantes de esquina */}
               <View style={s.switchRow}>
                 <View style={s.switchTextCol}>
-                  <Text style={s.switchLabel}>Mostrar Miras de Esquina</Text>
+                  <Text style={s.switchLabel}>
+                    {language === 'en' ? 'Show Corner Sights' : 'Mostrar Miras de Esquina'}
+                  </Text>
                   <Text style={s.switchSub}>
-                    Coloca dos marcadores en cada esquina alineados con el filo de la banda
+                    {language === 'en'
+                      ? 'Places two markers at each corner aligned with cushion edge'
+                      : 'Coloca dos marcadores en cada esquina alineados con el filo de la banda'}
                   </Text>
                 </View>
                 <Switch
@@ -534,15 +724,21 @@ function TableCustomizerModalBase({
               </View>
             </View>
 
-            {/* 4. SECCIÓN: GUÍAS TÁCTICAS Y SISTEMA DE DIAMANTES */}
+            {/* 5. SECCIÓN: GUÍAS TÁCTICAS Y SISTEMA DE DIAMANTES */}
             <View style={s.section}>
-              <Text style={s.sectionTitle}>4. Guías Tácticas & Cuadrícula</Text>
+              <Text style={s.sectionTitle}>
+                {language === 'en' ? '5. Tactical Guides & Grid' : '5. Guías Tácticas & Cuadrícula'}
+              </Text>
 
               <View style={s.switchRow}>
                 <View style={s.switchTextCol}>
-                  <Text style={s.switchLabel}>Cuadrícula Táctica 8×4</Text>
+                  <Text style={s.switchLabel}>
+                    {language === 'en' ? '8×4 Tactical Grid' : 'Cuadrícula Táctica 8×4'}
+                  </Text>
                   <Text style={s.switchSub}>
-                    Líneas punteadas que unen los diamantes en módulos de 35.5 cm
+                    {language === 'en'
+                      ? 'Dashed lines connecting diamonds in 35.5 cm modules'
+                      : 'Líneas punteadas que unen los diamantes en módulos de 35.5 cm'}
                   </Text>
                 </View>
                 <Switch
@@ -555,9 +751,13 @@ function TableCustomizerModalBase({
 
               <View style={s.switchRow}>
                 <View style={s.switchTextCol}>
-                  <Text style={s.switchLabel}>Numeración de Diamantes</Text>
+                  <Text style={s.switchLabel}>
+                    {language === 'en' ? 'Diamond Numbering' : 'Numeración de Diamantes'}
+                  </Text>
                   <Text style={s.switchSub}>
-                    Valores del Sistema Base 50 (0..80 en larga, 0..40 en corta)
+                    {language === 'en'
+                      ? 'Base 50 System values (0..80 long cushion, 0..40 short cushion)'
+                      : 'Valores del Sistema Base 50 (0..80 en larga, 0..40 en corta)'}
                   </Text>
                 </View>
                 <Switch
@@ -569,15 +769,17 @@ function TableCustomizerModalBase({
               </View>
             </View>
 
-            {/* 5. SECCIÓN: TONO DEL PASAMANOS (MADERA) */}
+            {/* 6. SECCIÓN: TONO DEL PASAMANOS (MADERA) */}
             <View style={s.section}>
-              <Text style={s.sectionTitle}>5. Acabado de la Madera</Text>
+              <Text style={s.sectionTitle}>
+                {language === 'en' ? '6. Wood Finish' : '6. Acabado de la Madera'}
+              </Text>
               <View style={s.woodRow}>
                 {(
                   [
-                    { id: 'ebony', label: 'Ébano Negro', color: '#1e120c' },
-                    { id: 'mahogany', label: 'Caoba Real', color: '#3b1812' },
-                    { id: 'walnut', label: 'Nogal Cálido', color: '#3a2718' },
+                    { id: 'ebony', label: language === 'en' ? 'Black Ebony' : 'Ébano Negro', color: '#1e120c' },
+                    { id: 'mahogany', label: language === 'en' ? 'Royal Mahogany' : 'Caoba Real', color: '#3b1812' },
+                    { id: 'walnut', label: language === 'en' ? 'Warm Walnut' : 'Nogal Cálido', color: '#3a2718' },
                   ] as const
                 ).map((w) => {
                   const isActive = preferences.woodFinish === w.id;
@@ -596,20 +798,24 @@ function TableCustomizerModalBase({
               </View>
             </View>
 
-            {/* 6. SECCIÓN: CANTONERAS METÁLICAS DE ESQUINA */}
+            {/* 7. SECCIÓN: CANTONERAS METÁLICAS DE ESQUINA */}
             <View style={s.section}>
-              <Text style={s.sectionTitle}>6. Cantoneras Metálicas de Esquina</Text>
+              <Text style={s.sectionTitle}>
+                {language === 'en' ? '7. Metal Corner Castings' : '7. Cantoneras Metálicas de Esquina'}
+              </Text>
               <Text style={s.sectionDesc}>
-                Herrajes de refuerzo pulidos con remaches estilo arcade de billar:
+                {language === 'en'
+                  ? 'Polished reinforcement fittings with arcade carom styling:'
+                  : 'Herrajes de refuerzo pulidos con remaches estilo arcade de billar:'}
               </Text>
               <View style={s.woodRow}>
                 {(
                   [
-                    { id: 'brass', label: 'Bronce', color: '#b45309' },
-                    { id: 'gold_24k', label: 'Oro 24K', color: '#f59e0b' },
-                    { id: 'chrome', label: 'Cromo', color: '#94a3b8' },
-                    { id: 'neon_cyan', label: 'Neón', color: '#06b6d4' },
-                    { id: 'antique_bronze', label: 'Antiguo', color: '#78350f' },
+                    { id: 'brass', label: language === 'en' ? 'Brass' : 'Bronce', color: '#b45309' },
+                    { id: 'gold_24k', label: language === 'en' ? '24K Gold' : 'Oro 24K', color: '#f59e0b' },
+                    { id: 'chrome', label: language === 'en' ? 'Chrome' : 'Cromo', color: '#94a3b8' },
+                    { id: 'neon_cyan', label: language === 'en' ? 'Neon' : 'Neón', color: '#06b6d4' },
+                    { id: 'antique_bronze', label: language === 'en' ? 'Antique' : 'Antiguo', color: '#78350f' },
                   ] as const
                 ).map((m) => {
                   const isActive = preferences.cornerMetal === m.id;
@@ -628,15 +834,21 @@ function TableCustomizerModalBase({
               </View>
             </View>
 
-            {/* 7. SECCIÓN: EFECTOS VISUALES & ILUMINACIÓN DE TORNEO */}
+            {/* 8. SECCIÓN: EFECTOS VISUALES & ILUMINACIÓN DE TORNEO */}
             <View style={s.section}>
-              <Text style={s.sectionTitle}>7. Iluminación Cenital & Atmósfera</Text>
+              <Text style={s.sectionTitle}>
+                {language === 'en' ? '8. Spotlight & Atmosphere' : '8. Iluminación Cenital & Atmósfera'}
+              </Text>
 
               <View style={s.switchRow}>
                 <View style={s.switchTextCol}>
-                  <Text style={s.switchLabel}>Foco Cenital de Torneo</Text>
+                  <Text style={s.switchLabel}>
+                    {language === 'en' ? 'Tournament Spotlight' : 'Foco Cenital de Torneo'}
+                  </Text>
                   <Text style={s.switchSub}>
-                    Iluminación oval difusa sobre el paño inspirada en mesas de competición
+                    {language === 'en'
+                      ? 'Diffuse oval lighting on the cloth inspired by tournament tables'
+                      : 'Iluminación oval difusa sobre el paño inspirada en mesas de competición'}
                   </Text>
                 </View>
                 <Switch
@@ -648,13 +860,17 @@ function TableCustomizerModalBase({
               </View>
             </View>
 
-            {/* 6. SECCIÓN: CALCOMANÍAS & MARCA DE AGUA DEL PAÑO (STICKERS / SKINS) */}
+            {/* 9. SECCIÓN: CALCOMANÍAS & MARCA DE AGUA DEL PAÑO (STICKERS / SKINS) */}
             <View style={s.section}>
               <View style={s.switchRow}>
                 <View style={s.switchTextCol}>
-                  <Text style={s.sectionTitle}>6. Calcomanía de Paño (Stickers / Decals)</Text>
+                  <Text style={s.sectionTitle}>
+                    {language === 'en' ? '9. Cloth Decal (Stickers / Watermark)' : '9. Calcomanía de Paño (Stickers / Decals)'}
+                  </Text>
                   <Text style={s.switchSub}>
-                    Graba una ilustración o emblema central en el paño con efecto marca de agua
+                    {language === 'en'
+                      ? 'Engrave a central illustration or emblem onto the cloth with watermark effect'
+                      : 'Graba una ilustración o emblema central en el paño con efecto marca de agua'}
                   </Text>
                 </View>
                 <Switch
@@ -668,7 +884,7 @@ function TableCustomizerModalBase({
               {preferences.showTableDecal && (
                 <>
                   <Text style={[s.sectionDesc, { marginTop: 10 }]}>
-                    Selecciona el diseño central para la mesa:
+                    {language === 'en' ? 'Select central table design:' : 'Selecciona el diseño central para la mesa:'}
                   </Text>
 
                   <View style={s.decalVisualGrid}>
@@ -696,7 +912,7 @@ function TableCustomizerModalBase({
                             )}
                           </View>
                           <Text style={[s.decalVisualName, isSelected && s.decalVisualNameActive]} numberOfLines={1}>
-                            {decal.name}
+                            {getDecalName(decal, language)}
                           </Text>
                           {isSelected && (
                             <View style={s.decalVisualCheckDot}>
@@ -711,13 +927,15 @@ function TableCustomizerModalBase({
                   {/* Selector de Transparencia / Marca de Agua */}
                   {preferences.tableDecal !== 'none' && (
                     <View style={s.opacitySection}>
-                      <Text style={s.opacityTitle}>Intensidad de la Marca de Agua (Transparencia):</Text>
+                      <Text style={s.opacityTitle}>
+                        {language === 'en' ? 'Watermark Opacity (Intensity):' : 'Intensidad de la Marca de Agua (Transparencia):'}
+                      </Text>
                       <View style={s.opacityOptionsRow}>
                         {[
-                          { label: 'Muy Sutil (10%)', val: 0.10 },
-                          { label: 'Marca de Agua (20%) ⭐', val: 0.20 },
-                          { label: 'Marcado (30%)', val: 0.30 },
-                          { label: 'Intenso (45%)', val: 0.45 },
+                          { label: language === 'en' ? 'Subtle (10%)' : 'Muy Sutil (10%)', val: 0.10 },
+                          { label: language === 'en' ? 'Watermark (20%) ⭐' : 'Marca de Agua (20%) ⭐', val: 0.20 },
+                          { label: language === 'en' ? 'Pronounced (30%)' : 'Marcado (30%)', val: 0.30 },
+                          { label: language === 'en' ? 'Vibrant (45%)' : 'Intenso (45%)', val: 0.45 },
                         ].map((op) => {
                           const isActive = Math.abs((preferences.decalOpacity ?? 0.20) - op.val) < 0.04;
                           return (
@@ -740,9 +958,13 @@ function TableCustomizerModalBase({
 
             {/* SECCIÓN: MODELO DE TACO DE BILLAR */}
             <View style={s.section}>
-              <Text style={s.sectionTitle}>Taco de Billar Oficial (Cue Skin)</Text>
+              <Text style={s.sectionTitle}>
+                {language === 'en' ? 'Official Billiard Cue (Cue Skin)' : 'Taco de Billar Oficial (Cue Skin)'}
+              </Text>
               <Text style={s.sectionDesc}>
-                Elige el diseño visual de tu taco de competición:
+                {language === 'en'
+                  ? 'Choose the visual design of your competition cue:'
+                  : 'Elige el diseño visual de tu taco de competición:'}
               </Text>
 
               <View style={[s.cuesGrid, !isMobile && s.cuesGridWide]}>
@@ -750,6 +972,7 @@ function TableCustomizerModalBase({
                   const isSelected = (preferences.cueSkin ?? 'venom_azure') === cue.id;
                   const isCarbon = cue.id === 'carbon_stealth';
                   const isClassic = cue.id === 'classic_gold';
+                  const cueTexts = getCueTexts(cue, language);
 
                   return (
                     <TouchableOpacity
@@ -792,11 +1015,11 @@ function TableCustomizerModalBase({
                       {/* 2. Cue Info Row (Name + Edition Tag) */}
                       <View style={s.cueInfoRow}>
                         <Text style={[s.visualCueName, isSelected && { color: cue.accentColor }]}>
-                          {cue.name}
+                          {cueTexts.name}
                         </Text>
                         <View style={[s.cueTagPill, { borderColor: `${cue.accentColor}60`, backgroundColor: `${cue.accentColor}18` }]}>
                           <Text style={[s.cueTagPillText, { color: cue.accentColor }]}>
-                            {cue.subtitle.split('•')[0].trim()}
+                            {cueTexts.tag}
                           </Text>
                         </View>
                       </View>
@@ -820,12 +1043,12 @@ function TableCustomizerModalBase({
               onPress={() => update(DEFAULT_TABLE_PREFERENCES)}
               activeOpacity={0.7}>
               <IconRefresh size={16} color={isDark ? '#94a39d' : palette.muted} />
-              <Text style={s.resetBtnText}>Restablecer</Text>
+              <Text style={s.resetBtnText}>{language === 'en' ? 'Reset' : 'Restablecer'}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={s.applyBtn} onPress={onClose} activeOpacity={0.8}>
               <IconCheck size={18} color="#0a100d" strokeWidth={2.6} />
-              <Text style={s.applyBtnText}>Listo</Text>
+              <Text style={s.applyBtnText}>{t('common.done')}</Text>
             </TouchableOpacity>
           </View>
         </View>

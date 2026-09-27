@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { useColorScheme } from '@/components/useColorScheme';
+import { useI18n } from '@/components/useLanguage';
 import { getPalette } from '@/constants/theme';
 import { NumberAnchor, Formula } from './SystemNumberingOverlay';
 
@@ -20,12 +21,12 @@ const VARIABLE_COLORS = {
     custom: '#f59e0b',
 };
 
-const VARIABLE_LABELS = {
-    arrival: 'Banda de llegada',
-    attack: 'Banda de ataque',
-    departure: 'Banda de salida',
-    custom: 'Personalizado',
-};
+const getVariableLabels = (lang: string) => ({
+    arrival: lang === 'en' ? 'Arrival' : 'Llegada',
+    attack: lang === 'en' ? 'Attack' : 'Ataque',
+    departure: lang === 'en' ? 'Departure' : 'Salida',
+    custom: lang === 'en' ? 'Custom' : 'Personalizado',
+});
 
 export function SystemNumberingControl({
     anchors,
@@ -33,9 +34,11 @@ export function SystemNumberingControl({
     onAnchorsChange,
     onFormulaChange,
 }: SystemNumberingControlProps) {
+    const { language } = useI18n();
     const colorScheme = useColorScheme();
     const palette = getPalette(colorScheme);
     const isDark = colorScheme === 'dark';
+    const varLabels = getVariableLabels(language);
 
     const styles = getStyles(palette, isDark);
 
@@ -85,13 +88,13 @@ export function SystemNumberingControl({
         <ScrollView style={styles.container}>
             {/* Number Anchors Section */}
             <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Números en Diamantes</Text>
+                <Text style={styles.sectionTitle}>{language === 'en' ? 'Diamond Numbers' : 'Números en Diamantes'}</Text>
 
                 {/* Add new anchor */}
                 <View style={styles.inputGroup}>
                     <TextInput
                         style={styles.input}
-                        placeholder="Número"
+                        placeholder={language === 'en' ? 'Number' : 'Número'}
                         value={newAnchorValue}
                         onChangeText={setNewAnchorValue}
                         placeholderTextColor={palette.muted}
@@ -103,7 +106,7 @@ export function SystemNumberingControl({
                             onPress={() => setNewAnchorSide('top')}
                         >
                             <Text style={[styles.selectText, newAnchorSide === 'top' && styles.selectTextActive]}>
-                                Arriba
+                                {language === 'en' ? 'Top' : 'Arriba'}
                             </Text>
                         </TouchableOpacity>
                         <TouchableOpacity
@@ -111,7 +114,7 @@ export function SystemNumberingControl({
                             onPress={() => setNewAnchorSide('bottom')}
                         >
                             <Text style={[styles.selectText, newAnchorSide === 'bottom' && styles.selectTextActive]}>
-                                Abajo
+                                {language === 'en' ? 'Bottom' : 'Abajo'}
                             </Text>
                         </TouchableOpacity>
                         <TouchableOpacity
@@ -119,7 +122,7 @@ export function SystemNumberingControl({
                             onPress={() => setNewAnchorSide('left')}
                         >
                             <Text style={[styles.selectText, newAnchorSide === 'left' && styles.selectTextActive]}>
-                                Izq
+                                {language === 'en' ? 'Left' : 'Izq'}
                             </Text>
                         </TouchableOpacity>
                         <TouchableOpacity
@@ -127,14 +130,14 @@ export function SystemNumberingControl({
                             onPress={() => setNewAnchorSide('right')}
                         >
                             <Text style={[styles.selectText, newAnchorSide === 'right' && styles.selectTextActive]}>
-                                Der
+                                {language === 'en' ? 'Right' : 'Der'}
                             </Text>
                         </TouchableOpacity>
                     </View>
 
                     <TextInput
                         style={styles.input}
-                        placeholder="Índice diamante (0-8)"
+                        placeholder={language === 'en' ? 'Diamond index (0-8)' : 'Índice diamante (0-8)'}
                         value={newAnchorIndex}
                         onChangeText={setNewAnchorIndex}
                         keyboardType="numeric"
@@ -142,7 +145,7 @@ export function SystemNumberingControl({
                     />
 
                     <View style={styles.row}>
-                        {(Object.keys(VARIABLE_LABELS) as Array<keyof typeof VARIABLE_LABELS>).map((type) => (
+                        {(Object.keys(varLabels) as Array<keyof typeof varLabels>).map((type) => (
                             <TouchableOpacity
                                 key={type}
                                 style={[
@@ -157,14 +160,14 @@ export function SystemNumberingControl({
                                         newAnchorType === type && styles.typeTextActive,
                                     ]}
                                 >
-                                    {VARIABLE_LABELS[type].split(' ')[0]}
+                                    {varLabels[type]}
                                 </Text>
                             </TouchableOpacity>
                         ))}
                     </View>
 
                     <TouchableOpacity style={styles.addButton} onPress={addAnchor}>
-                        <Text style={styles.addButtonText}>Agregar Número</Text>
+                        <Text style={styles.addButtonText}>{language === 'en' ? 'Add Number' : 'Agregar Número'}</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -189,24 +192,24 @@ export function SystemNumberingControl({
 
             {/* Formula Section */}
             <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Fórmula del Sistema</Text>
+                <Text style={styles.sectionTitle}>{language === 'en' ? 'System Formula' : 'Fórmula del Sistema'}</Text>
 
                 <TextInput
                     style={[styles.input, styles.formulaInput]}
-                    placeholder="Ej: {arrival} + {attack} = {departure}"
+                    placeholder={language === 'en' ? 'Ex: {arrival} + {attack} = {departure}' : 'Ej: {arrival} + {attack} = {departure}'}
                     value={formulaExpression}
                     onChangeText={setFormulaExpression}
                     placeholderTextColor={palette.muted}
                 />
 
                 <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Variables:</Text>
+                    <Text style={styles.label}>{language === 'en' ? 'Variables:' : 'Variables:'}</Text>
 
                     <View style={styles.variableRow}>
                         <View style={[styles.variableIndicator, { backgroundColor: VARIABLE_COLORS.arrival }]} />
                         <TextInput
                             style={styles.variableInput}
-                            placeholder="Banda de llegada"
+                            placeholder={varLabels.arrival}
                             value={arrivalValue}
                             onChangeText={setArrivalValue}
                             placeholderTextColor={palette.muted}
@@ -217,7 +220,7 @@ export function SystemNumberingControl({
                         <View style={[styles.variableIndicator, { backgroundColor: VARIABLE_COLORS.attack }]} />
                         <TextInput
                             style={styles.variableInput}
-                            placeholder="Banda de ataque"
+                            placeholder={varLabels.attack}
                             value={attackValue}
                             onChangeText={setAttackValue}
                             placeholderTextColor={palette.muted}
@@ -228,7 +231,7 @@ export function SystemNumberingControl({
                         <View style={[styles.variableIndicator, { backgroundColor: VARIABLE_COLORS.departure }]} />
                         <TextInput
                             style={styles.variableInput}
-                            placeholder="Banda de salida"
+                            placeholder={varLabels.departure}
                             value={departureValue}
                             onChangeText={setDepartureValue}
                             placeholderTextColor={palette.muted}
@@ -237,7 +240,7 @@ export function SystemNumberingControl({
                 </View>
 
                 <TouchableOpacity style={styles.addButton} onPress={updateFormula}>
-                    <Text style={styles.addButtonText}>Actualizar Fórmula</Text>
+                    <Text style={styles.addButtonText}>{language === 'en' ? 'Update Formula' : 'Actualizar Fórmula'}</Text>
                 </TouchableOpacity>
             </View>
         </ScrollView>

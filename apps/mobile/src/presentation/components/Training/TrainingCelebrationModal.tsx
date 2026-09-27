@@ -21,7 +21,11 @@ import {
 
 import { getPalette, theme } from '@/constants/theme';
 import { useColorScheme } from '@/components/useColorScheme';
-import type { CongratulationQuote } from '@/src/presentation/screens/Training/congratulationQuotes';
+import { useI18n } from '@/components/useLanguage';
+import {
+    type CongratulationQuote,
+    getLocalizedCongratulationQuote,
+} from '@/src/presentation/screens/Training/congratulationQuotes';
 
 export interface TrainingCelebrationSessionSummary {
     id: string;
@@ -55,6 +59,8 @@ export function TrainingCelebrationModal({
     onClose,
     onNewSession,
 }: TrainingCelebrationModalProps) {
+    const { t, language } = useI18n();
+    const localizedQuote = getLocalizedCongratulationQuote(quote, language);
     const palette = getPalette(useColorScheme());
     const styles = getStyles(palette);
 
@@ -93,7 +99,7 @@ export function TrainingCelebrationModal({
                         <TouchableOpacity
                             style={styles.closeBtn}
                             onPress={onClose}
-                            accessibilityLabel="Cerrar modal"
+                            accessibilityLabel={t('common.close')}
                         >
                             <IconX size={18} color={palette.muted} />
                         </TouchableOpacity>
@@ -103,17 +109,17 @@ export function TrainingCelebrationModal({
                     <View style={styles.quoteSection}>
                         <View style={styles.highlightBadge}>
                             <IconSparkles size={13} color="#F59E0B" />
-                            <Text style={styles.highlightText}>{quote.highlight}</Text>
+                            <Text style={styles.highlightText}>{localizedQuote.highlight}</Text>
                         </View>
 
-                        <Text style={styles.titleText}>{quote.title}</Text>
-                        <Text style={styles.messageText}>{quote.message}</Text>
+                        <Text style={styles.titleText}>{localizedQuote.title}</Text>
+                        <Text style={styles.messageText}>{localizedQuote.message}</Text>
                     </View>
 
                     {/* Stats Scorecard Grid */}
                     <View style={styles.statsCard}>
                         <View style={styles.statCol}>
-                            <Text style={styles.statLabel}>CARAMBOLAS</Text>
+                            <Text style={styles.statLabel}>{t('training.celebration.carambolas')}</Text>
                             <Text style={styles.statValue}>
                                 {session.totalHits}
                                 <Text style={styles.statSubValue}>/{session.totalTarget}</Text>
@@ -123,7 +129,7 @@ export function TrainingCelebrationModal({
                         <View style={styles.statDivider} />
 
                         <View style={styles.statCol}>
-                            <Text style={styles.statLabel}>EFECTIVIDAD</Text>
+                            <Text style={styles.statLabel}>{t('training.celebration.accuracy')}</Text>
                             <Text style={[styles.statValue, { color: accuracyColor }]}>
                                 {session.accuracy}%
                             </Text>
@@ -132,7 +138,7 @@ export function TrainingCelebrationModal({
                         <View style={styles.statDivider} />
 
                         <View style={styles.statCol}>
-                            <Text style={styles.statLabel}>JUGADAS</Text>
+                            <Text style={styles.statLabel}>{t('training.celebration.shots')}</Text>
                             <Text style={styles.statValue}>{session.positionsCount}</Text>
                         </View>
                     </View>
@@ -141,14 +147,14 @@ export function TrainingCelebrationModal({
                     <View style={styles.syncRow}>
                         <IconCloudCheck size={16} color="#10B981" />
                         <Text style={styles.syncText}>
-                            Estadísticas guardadas y sincronizadas en el servidor
+                            {t('training.celebration.synced')}
                         </Text>
                     </View>
 
                     {/* Detailed Breakdown of Positions */}
                     {session.positions && session.positions.length > 0 && (
                         <View style={styles.breakdownSection}>
-                            <Text style={styles.breakdownTitle}>DESGLOSE POR JUGADA</Text>
+                            <Text style={styles.breakdownTitle}>{t('training.celebration.breakdown')}</Text>
                             <ScrollView
                                 style={styles.breakdownScroll}
                                 showsVerticalScrollIndicator={false}
@@ -213,7 +219,7 @@ export function TrainingCelebrationModal({
                                 onPress={onNewSession}
                             >
                                 <IconRotateClockwise size={18} color={palette.text} />
-                                <Text style={styles.secondaryBtnText}>Nueva Serie</Text>
+                                <Text style={styles.secondaryBtnText}>{t('training.celebration.newRun')}</Text>
                             </TouchableOpacity>
                         ) : null}
 
@@ -222,7 +228,7 @@ export function TrainingCelebrationModal({
                             activeOpacity={0.85}
                             onPress={onClose}
                         >
-                            <Text style={styles.primaryBtnText}>Volver al Menú</Text>
+                            <Text style={styles.primaryBtnText}>{t('training.celebration.backMenu')}</Text>
                             <IconArrowRight size={18} color="#FFFFFF" strokeWidth={2.2} />
                         </TouchableOpacity>
                     </View>

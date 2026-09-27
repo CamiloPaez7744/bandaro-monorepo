@@ -53,7 +53,7 @@ export function LoginScreen() {
       });
       router.replace('/(tabs)/profile');
     } catch (error) {
-      Alert.alert('Error con Google', error instanceof Error ? error.message : 'No se pudo iniciar sesión con Google.');
+      Alert.alert(t('common.error'), error instanceof Error ? error.message : t('auth.login.googleError'));
     } finally {
       setSocialLoading(null);
     }
@@ -70,7 +70,7 @@ export function LoginScreen() {
       });
       router.replace('/(tabs)/profile');
     } catch (error) {
-      Alert.alert('Error con Microsoft', error instanceof Error ? error.message : 'No se pudo iniciar sesión con Microsoft.');
+      Alert.alert(t('common.error'), error instanceof Error ? error.message : t('auth.login.microsoftError'));
     } finally {
       setSocialLoading(null);
     }
@@ -84,7 +84,7 @@ export function LoginScreen() {
       await login({ email: 'demo@bandaro.app', password: 'Password123!' });
       router.replace('/(tabs)/training');
     } catch (error) {
-      Alert.alert('Error Demo', error instanceof Error ? error.message : 'Error al iniciar sesión demo.');
+      Alert.alert(t('common.error'), error instanceof Error ? error.message : t('auth.login.demoError'));
     } finally {
       setSubmitting(false);
     }
@@ -114,7 +114,7 @@ export function LoginScreen() {
             disabled={submitting}
           >
             <IconSparkles size={16} color={palette.primary} />
-            <Text style={styles.demoBadgeText}>Entrar con Usuario Demo (14 días de racha en BD)</Text>
+            <Text style={styles.demoBadgeText}>{t('auth.login.demoBadge')}</Text>
           </TouchableOpacity>
 
           {/* Social OAuth Logins: Google & Microsoft */}
@@ -132,7 +132,7 @@ export function LoginScreen() {
                   <View style={styles.socialIconCircle}>
                     <Text style={styles.googleIconText}>G</Text>
                   </View>
-                  <Text style={styles.socialBtnText}>Continuar con Google</Text>
+                  <Text style={styles.socialBtnText}>{t('auth.login.google')}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -150,7 +150,7 @@ export function LoginScreen() {
                   <View style={styles.socialIconCircle}>
                     <Text style={styles.msIconText}>⊞</Text>
                   </View>
-                  <Text style={styles.socialBtnText}>Continuar con Microsoft</Text>
+                  <Text style={styles.socialBtnText}>{t('auth.login.microsoft')}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -159,7 +159,7 @@ export function LoginScreen() {
           {/* Divider */}
           <View style={styles.dividerRow}>
             <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>o con correo electrónico</Text>
+            <Text style={styles.dividerText}>{t('auth.login.orEmail')}</Text>
             <View style={styles.dividerLine} />
           </View>
 

@@ -93,7 +93,7 @@ export function TrainingSimulationScreen() {
     const { width } = useWindowDimensions();
     const isMobile = width < 768;
 
-    const { t } = useI18n();
+    const { t, language } = useI18n();
     const palette = getPalette(useColorScheme());
     const styles = getStyles(palette, isMobile);
 
@@ -345,7 +345,7 @@ export function TrainingSimulationScreen() {
     if (params.systemId && !system) {
         return (
             <View style={[styles.notFound, { paddingTop: insets.top + theme.spacing.lg }]}>
-                <Text style={styles.notFoundTitle}>Sistema no encontrado</Text>
+                <Text style={styles.notFoundTitle}>{language === 'en' ? 'System not found' : 'Sistema no encontrado'}</Text>
                 <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
                     <Text style={styles.backButtonText}>{t('training.system.back')}</Text>
                 </TouchableOpacity>
@@ -353,7 +353,7 @@ export function TrainingSimulationScreen() {
         );
     }
 
-    const titleText = system?.name ?? params.customName ?? (params.snapshotId ? 'Snapshot' : 'Simulador Carambola');
+    const titleText = system?.name ?? params.customName ?? (params.snapshotId ? 'Snapshot' : (language === 'en' ? 'Carom Simulator' : 'Simulador Carambola'));
 
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
@@ -374,15 +374,15 @@ export function TrainingSimulationScreen() {
                             style={styles.circleIconBtn}
                             onPress={() => router.back()}
                             accessibilityRole="button"
-                            accessibilityLabel="Volver">
+                            accessibilityLabel={t('common.back')}>
                             <IconArrowLeft size={isMobile ? 16 : 18} color="#f8fafc" strokeWidth={2.2} />
                         </TouchableOpacity>
 
                         <View style={styles.titleColumn}>
                             <View style={styles.systemTagRow}>
-                                <Text style={styles.systemTag}>3-BANDAS</Text>
+                                <Text style={styles.systemTag}>{t('training.sim.tag')}</Text>
                                 <View style={styles.systemDot} />
-                                <Text style={styles.modeTag}>{isEditMode ? 'EDITAR' : 'TIRO'}</Text>
+                                <Text style={styles.modeTag}>{isEditMode ? t('training.sim.edit') : t('training.sim.shot')}</Text>
                             </View>
                             <Text style={styles.title} numberOfLines={1}>
                                 {titleText}
@@ -402,7 +402,7 @@ export function TrainingSimulationScreen() {
                                 router.push({
                                     pathname: '/training/session',
                                     params: {
-                                        customName: system?.name ? `Práctica: ${system.name}` : 'Posición de Simulador',
+                                        customName: system?.name ? `${t('common.practice')}: ${system.name}` : (language === 'en' ? 'Simulator Position' : 'Posición de Simulador'),
                                         whiteX: String(Math.round(whiteB ? whiteB.pos.x : 50)),
                                         whiteY: String(Math.round(whiteB ? whiteB.pos.y : 71)),
                                         yellowX: String(Math.round(yellowB ? yellowB.pos.x : 142)),
@@ -414,7 +414,7 @@ export function TrainingSimulationScreen() {
                             }}
                             disabled={state.isSimulating}>
                             <IconTarget size={14} color="#fff" strokeWidth={2.5} />
-                            {!isMobile && <Text style={styles.trainBtnText}>Entrenar</Text>}
+                            {!isMobile && <Text style={styles.trainBtnText}>{t('common.practice')}</Text>}
                         </TouchableOpacity>
 
                         {/* Alternar Modo Edición / Puntería */}
@@ -425,7 +425,7 @@ export function TrainingSimulationScreen() {
                             ]}
                             onPress={() => setIsEditMode((prev) => !prev)}
                             disabled={state.isSimulating}
-                            accessibilityLabel="Modo Edición">
+                            accessibilityLabel={t('training.sim.editMode')}>
                             {isEditMode ? (
                                 <IconPencil size={isMobile ? 14 : 15} color="#fbbf24" strokeWidth={2.2} />
                             ) : (
@@ -438,7 +438,7 @@ export function TrainingSimulationScreen() {
                             style={styles.toolIconOnlyBtn}
                             onPress={() => setShowCustomizer(true)}
                             disabled={state.isSimulating}
-                            accessibilityLabel="Personalizar Mesa">
+                            accessibilityLabel={t('training.sim.customizeTable')}>
                             <IconPalette size={isMobile ? 14 : 16} color="#94a3b8" strokeWidth={2} />
                         </TouchableOpacity>
 
@@ -450,7 +450,7 @@ export function TrainingSimulationScreen() {
                             ]}
                             onPress={() => setShowRuler((prev) => !prev)}
                             disabled={state.isSimulating}
-                            accessibilityLabel="Regla de Bandas">
+                            accessibilityLabel={t('training.sim.cushionRuler')}>
                             <IconRuler2 size={isMobile ? 14 : 16} color={showRuler ? '#00d2ff' : '#94a3b8'} strokeWidth={2} />
                         </TouchableOpacity>
 
@@ -462,7 +462,7 @@ export function TrainingSimulationScreen() {
                             ]}
                             onPress={() => setShowNumberingModal(true)}
                             disabled={state.isSimulating}
-                            accessibilityLabel="Sistemas de Bandas">
+                            accessibilityLabel={t('training.sim.systems')}>
                             <IconNumbers size={isMobile ? 14 : 16} color={showNumbering ? '#00d2ff' : '#94a3b8'} strokeWidth={2} />
                         </TouchableOpacity>
 
@@ -471,7 +471,7 @@ export function TrainingSimulationScreen() {
                             style={styles.toolIconOnlyBtn}
                             onPress={handleReset}
                             disabled={state.isSimulating}
-                            accessibilityLabel="Reiniciar Mesa">
+                            accessibilityLabel={t('training.sim.resetTable')}>
                             <IconRefresh size={isMobile ? 14 : 16} color="#94a3b8" strokeWidth={2} />
                         </TouchableOpacity>
                     </View>
@@ -586,7 +586,7 @@ export function TrainingSimulationScreen() {
                                             )}
                                         </View>
                                         <Text style={[styles.ballOptionText, state.cueBallId === 'white' && styles.ballOptionTextActive]}>
-                                            Blanca
+                                            {t('common.white')}
                                         </Text>
                                     </TouchableOpacity>
 
@@ -608,7 +608,7 @@ export function TrainingSimulationScreen() {
                                             )}
                                         </View>
                                         <Text style={[styles.ballOptionText, state.cueBallId === 'yellow' && styles.ballOptionTextActive]}>
-                                            Amarilla
+                                            {t('common.yellow')}
                                         </Text>
                                     </TouchableOpacity>
                                 </View>
@@ -620,7 +620,7 @@ export function TrainingSimulationScreen() {
                                     ]}
                                     onPress={() => setShowBallStudioModal(true)}
                                     disabled={state.isSimulating}
-                                    accessibilityLabel="Módulo de Bolas y Salida Oficial">
+                                    accessibilityLabel={language === 'en' ? 'Ball Studio and Official Break' : 'Módulo de Bolas y Salida Oficial'}>
                                     <Text style={styles.ballStudioBadgeFlag}>
                                         {tablePreferences.breakFormat === 'umb' ? '🌍' : '🇰🇷'}
                                     </Text>
@@ -645,7 +645,7 @@ export function TrainingSimulationScreen() {
                                     <TouchableOpacity
                                         style={styles.clearTrailsBtn}
                                         onPress={clearTrails}
-                                        accessibilityLabel="Limpiar Trazas">
+                                        accessibilityLabel={t('training.sim.clearTrails')}>
                                         <IconTrash size={12} color="#ef4444" strokeWidth={2} />
                                     </TouchableOpacity>
                                 )}
@@ -665,7 +665,7 @@ export function TrainingSimulationScreen() {
                                 ]}
                                 onPress={() => executeShot()}
                                 disabled={state.isSimulating}
-                                accessibilityLabel="Tirar">
+                                accessibilityLabel={t('training.sim.shoot')}>
                                 {state.isSimulating ? (
                                     <IconLoader2 size={16} color="#ffffff" strokeWidth={2.5} />
                                 ) : (
@@ -698,7 +698,7 @@ export function TrainingSimulationScreen() {
                                         )}
                                     </View>
                                     <Text style={[styles.ballOptionText, state.cueBallId === 'white' && styles.ballOptionTextActive]}>
-                                        Blanca
+                                        {t('common.white')}
                                     </Text>
                                 </TouchableOpacity>
 
@@ -720,7 +720,7 @@ export function TrainingSimulationScreen() {
                                         )}
                                     </View>
                                     <Text style={[styles.ballOptionText, state.cueBallId === 'yellow' && styles.ballOptionTextActive]}>
-                                        Amarilla
+                                        {t('common.yellow')}
                                     </Text>
                                 </TouchableOpacity>
                             </View>
@@ -732,7 +732,7 @@ export function TrainingSimulationScreen() {
                                 ]}
                                 onPress={() => setShowBallStudioModal(true)}
                                 disabled={state.isSimulating}
-                                accessibilityLabel="Módulo de Bolas, Skins y Salida">
+                                accessibilityLabel={language === 'en' ? 'Ball Studio, Skins and Break' : 'Módulo de Bolas, Skins y Salida'}>
                                 <View style={styles.ballStudioTriggerInner}>
                                     <Text style={styles.ballStudioTriggerBadge}>
                                         {tablePreferences.breakFormat === 'umb' ? '🌍 UMB' : `🇰🇷 PBA ${tablePreferences.pbaFormation ?? '159'}`}
@@ -773,9 +773,9 @@ export function TrainingSimulationScreen() {
                                 <TouchableOpacity
                                     style={styles.clearTrailsBtn}
                                     onPress={clearTrails}
-                                    accessibilityLabel="Limpiar Trazas">
+                                    accessibilityLabel={t('training.sim.clearTrails')}>
                                     <IconTrash size={14} color="#ef4444" strokeWidth={2} />
-                                    <Text style={styles.clearTrailsText}>Trazas</Text>
+                                    <Text style={styles.clearTrailsText}>{t('training.sim.clearTrails')}</Text>
                                 </TouchableOpacity>
                             )}
 
@@ -784,7 +784,7 @@ export function TrainingSimulationScreen() {
                                 onPress={() => setShowGuides((prev) => !prev)}>
                                 <IconEye size={13} color={showGuides ? '#00d2ff' : '#64748b'} strokeWidth={2.2} />
                                 <Text style={[styles.guidePillText, showGuides && styles.guidePillTextActive]}>
-                                    {showGuides ? 'Guías ON' : 'Guías OFF'}
+                                    {showGuides ? `${t('training.sim.guides')} ${t('training.sim.active')}` : `${t('training.sim.guides')} ${t('training.sim.off')}`}
                                 </Text>
                             </TouchableOpacity>
                         </View>
@@ -796,7 +796,7 @@ export function TrainingSimulationScreen() {
                             ]}
                             onPress={() => executeShot()}
                             disabled={state.isSimulating}
-                            accessibilityLabel="Tirar">
+                            accessibilityLabel={t('training.sim.shoot')}>
                             {state.isSimulating ? (
                                 <IconLoader2 size={18} color="#ffffff" strokeWidth={2.5} />
                             ) : (

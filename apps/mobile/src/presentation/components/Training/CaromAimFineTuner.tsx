@@ -8,6 +8,7 @@ import {
     IconCompass,
 } from '@/src/presentation/components/icons';
 import { Vec2, vec2 } from '@bandaro/core';
+import { useI18n } from '@/components/useLanguage';
 
 interface CaromAimFineTunerProps {
     aimDirection: Vec2;
@@ -26,6 +27,7 @@ export const CaromAimFineTuner = React.memo(function CaromAimFineTuner({
     disabled = false,
     compact = false,
 }: CaromAimFineTunerProps) {
+    const { language } = useI18n();
     const currentAngleRad = Math.atan2(aimDirection.y, aimDirection.x);
     let currentAngleDeg = (currentAngleRad * 180) / Math.PI;
     if (currentAngleDeg < 0) currentAngleDeg += 360;
@@ -47,7 +49,7 @@ export const CaromAimFineTuner = React.memo(function CaromAimFineTuner({
                     onPress={() => adjustAngle(-0.25)}
                     disabled={disabled}
                     activeOpacity={0.7}
-                    accessibilityLabel="Girar izquierda">
+                    accessibilityLabel={language === 'en' ? 'Rotate left' : 'Girar izquierda'}>
                     <IconChevronLeft size={13} color="#e2e8f0" />
                 </TouchableOpacity>
 
@@ -60,7 +62,7 @@ export const CaromAimFineTuner = React.memo(function CaromAimFineTuner({
                     onPress={() => adjustAngle(0.25)}
                     disabled={disabled}
                     activeOpacity={0.7}
-                    accessibilityLabel="Girar derecha">
+                    accessibilityLabel={language === 'en' ? 'Rotate right' : 'Girar derecha'}>
                     <IconChevronRight size={13} color="#e2e8f0" />
                 </TouchableOpacity>
             </View>
@@ -80,7 +82,8 @@ export const CaromAimFineTuner = React.memo(function CaromAimFineTuner({
                     style={[styles.btn, disabled && styles.btnDisabled]}
                     onPress={() => adjustAngle(-0.5)}
                     disabled={disabled}
-                    activeOpacity={0.7}>
+                    activeOpacity={0.7}
+                    accessibilityLabel={language === 'en' ? 'Rotate left fast (-0.5°)' : 'Girar izquierda rápido (-0.5°)'}>
                     <IconChevronsLeft size={14} color="#94a3b8" />
                 </TouchableOpacity>
 
@@ -89,7 +92,8 @@ export const CaromAimFineTuner = React.memo(function CaromAimFineTuner({
                     style={[styles.btn, styles.btnFine, disabled && styles.btnDisabled]}
                     onPress={() => adjustAngle(-0.1)}
                     disabled={disabled}
-                    activeOpacity={0.7}>
+                    activeOpacity={0.7}
+                    accessibilityLabel={language === 'en' ? 'Rotate left fine (-0.1°)' : 'Girar izquierda fino (-0.1°)'}>
                     <IconChevronLeft size={14} color="#e2e8f0" />
                 </TouchableOpacity>
 
@@ -98,7 +102,8 @@ export const CaromAimFineTuner = React.memo(function CaromAimFineTuner({
                     style={[styles.btn, styles.btnFine, disabled && styles.btnDisabled]}
                     onPress={() => adjustAngle(0.1)}
                     disabled={disabled}
-                    activeOpacity={0.7}>
+                    activeOpacity={0.7}
+                    accessibilityLabel={language === 'en' ? 'Rotate right fine (+0.1°)' : 'Girar derecha fino (+0.1°)'}>
                     <IconChevronRight size={14} color="#e2e8f0" />
                 </TouchableOpacity>
 
@@ -107,7 +112,8 @@ export const CaromAimFineTuner = React.memo(function CaromAimFineTuner({
                     style={[styles.btn, disabled && styles.btnDisabled]}
                     onPress={() => adjustAngle(0.5)}
                     disabled={disabled}
-                    activeOpacity={0.7}>
+                    activeOpacity={0.7}
+                    accessibilityLabel={language === 'en' ? 'Rotate right fast (+0.5°)' : 'Girar derecha rápido (+0.5°)'}>
                     <IconChevronsRight size={14} color="#94a3b8" />
                 </TouchableOpacity>
             </View>

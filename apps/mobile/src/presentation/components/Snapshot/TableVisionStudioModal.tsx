@@ -19,6 +19,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { useRouter } from 'expo-router';
 import Svg, { Circle, Line, Polygon, Text as SvgText, Rect, G } from 'react-native-svg';
+import { useI18n } from '@/components/useLanguage';
 import {
   IconAdjustments,
   IconAlertCircle,
@@ -198,13 +199,13 @@ export interface GeometryValidationResult {
   severity: 'success' | 'warning' | 'error';
 }
 
-export function validateCornersGeometry(corners: Point2D[]): GeometryValidationResult {
+export function validateCornersGeometry(corners: Point2D[], isEn = false): GeometryValidationResult {
   if (!corners || corners.length !== 4) {
     return {
       isValid: false,
       isConvex: false,
       aspectRatio: 0,
-      message: 'Faltan esquinas para la calibración',
+      message: isEn ? 'Missing corners for calibration' : 'Faltan esquinas para la calibración',
       severity: 'error',
     };
   }
@@ -233,7 +234,7 @@ export function validateCornersGeometry(corners: Point2D[]): GeometryValidationR
       isValid: false,
       isConvex: false,
       aspectRatio: 0,
-      message: 'Esquinas cruzadas o invertidas (cuadrilátero no convexo)',
+      message: isEn ? 'Crossed or inverted corners (non-convex quadrilateral)' : 'Esquinas cruzadas o invertidas (cuadrilátero no convexo)',
       severity: 'error',
     };
   }
@@ -253,7 +254,7 @@ export function validateCornersGeometry(corners: Point2D[]): GeometryValidationR
       isValid: false,
       isConvex: false,
       aspectRatio: 0,
-      message: 'El área de la mesa es demasiado pequeña.',
+      message: isEn ? 'Table area is too small.' : 'El área de la mesa es demasiado pequeña.',
       severity: 'error',
     };
   }
@@ -266,7 +267,7 @@ export function validateCornersGeometry(corners: Point2D[]): GeometryValidationR
       isValid: true,
       isConvex: true,
       aspectRatio: ratio,
-      message: `Proporción cuadrada (~${ratio.toFixed(2)}:1). Revisa esquinas cortas/largas.`,
+      message: isEn ? `Square ratio (~${ratio.toFixed(2)}:1). Check short/long rails.` : `Proporción cuadrada (~${ratio.toFixed(2)}:1). Revisa esquinas cortas/largas.`,
       severity: 'warning',
     };
   }
@@ -276,7 +277,7 @@ export function validateCornersGeometry(corners: Point2D[]): GeometryValidationR
       isValid: true,
       isConvex: true,
       aspectRatio: ratio,
-      message: `Mesa muy alargada (~${ratio.toFixed(2)}:1). Ajusta perspectiva.`,
+      message: isEn ? `Very elongated table (~${ratio.toFixed(2)}:1). Adjust perspective.` : `Mesa muy alargada (~${ratio.toFixed(2)}:1). Ajusta perspectiva.`,
       severity: 'warning',
     };
   }
@@ -285,7 +286,7 @@ export function validateCornersGeometry(corners: Point2D[]): GeometryValidationR
     isValid: true,
     isConvex: true,
     aspectRatio: ratio,
-    message: `Geometría válida (~${ratio.toFixed(2)}:1) • Perspectiva consistente`,
+    message: isEn ? `Valid geometry (~${ratio.toFixed(2)}:1) • Consistent perspective` : `Geometría válida (~${ratio.toFixed(2)}:1) • Perspectiva consistente`,
     severity: 'success',
   };
 }
@@ -296,6 +297,8 @@ function TableVisionStudioModalBase({
   onSelectPosition,
 }: TableVisionStudioModalProps) {
   const router = useRouter();
+  const { language } = useI18n();
+  const isEn = language === 'en';
   const { width: winWidth, height: winHeight } = useWindowDimensions();
   const isLandscape = winWidth > winHeight;
   const isWide = winWidth >= 800 || (isLandscape && winWidth >= 550);
@@ -372,14 +375,14 @@ function TableVisionStudioModalBase({
   const thirdBallMeta = useMemo(() => {
     switch (thirdBallColor) {
       case 'blue':
-        return { label: 'Azul', color: '#2563eb', accent: '#ffffff', emoji: '🔵' };
+        return { label: isEn ? 'Blue' : 'Azul', color: '#2563eb', accent: '#ffffff', emoji: '🔵' };
       case 'orange':
-        return { label: 'Naranja', color: '#f97316', accent: '#ffffff', emoji: '🟠' };
+        return { label: isEn ? 'Orange' : 'Naranja', color: '#f97316', accent: '#ffffff', emoji: '🟠' };
       case 'red':
       default:
-        return { label: 'Roja', color: '#ef4444', accent: '#ffffff', emoji: '🔴' };
+        return { label: isEn ? 'Red' : 'Roja', color: '#ef4444', accent: '#ffffff', emoji: '🔴' };
     }
-  }, [thirdBallColor]);
+  }, [thirdBallColor, isEn]);
 
   // Tactical toggles
   const [swapCue, setSwapCue] = useState(false);
@@ -662,7 +665,7 @@ function TableVisionStudioModalBase({
     } else {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permiso requerido', 'Se necesita acceso a la galería de fotos.');
+        Alert.alert(isEn ? 'Permission required' : 'Permiso requerido', isEn ? 'Photo gallery access is needed.' : 'Se necesita acceso a la galería de fotos.');
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -699,7 +702,7 @@ function TableVisionStudioModalBase({
     } else {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permiso requerido', 'Se necesita acceso a la cámara.');
+        Alert.alert(isEn ? 'Permission required' : 'Permiso requerido', isEn ? 'Camera access is needed.' : 'Se necesita acceso a la cámara.');
         return;
       }
       const result = await ImagePicker.launchCameraAsync({ quality: 0.9 });
@@ -1362,16 +1365,38 @@ function TableVisionStudioModalBase({
     [selectedTargetType, activeCornerIdx, nudgeStep, triggerLoupeBriefly]
   );
 
-  const geomValidation = useMemo(() => validateCornersGeometry(corners), [corners]);
+  const geomValidation = useMemo(() => validateCornersGeometry(corners, isEn), [corners, isEn]);
 
   const cornerShortLabels = useMemo(() => {
+    if (isEn) {
+      if (tableOrientation === 'vertical') {
+        return ['Bot-Left', 'Top-Left', 'Top-Right', 'Bot-Right'];
+      }
+      return ['Top-Left', 'Top-Right', 'Bot-Right', 'Bot-Left'];
+    }
     if (tableOrientation === 'vertical') {
       return ['Inf-Izq', 'Sup-Izq', 'Sup-Der', 'Inf-Der'];
     }
     return ['Sup-Izq', 'Sup-Der', 'Inf-Der', 'Inf-Izq'];
-  }, [tableOrientation]);
+  }, [tableOrientation, isEn]);
 
   const cornerFullNames = useMemo(() => {
+    if (isEn) {
+      if (tableOrientation === 'vertical') {
+        return [
+          'Corner 1: Bottom Left (Head)',
+          'Corner 2: Top Left (Foot)',
+          'Corner 3: Top Right (Foot)',
+          'Corner 4: Bottom Right (Head)',
+        ];
+      }
+      return [
+        'Corner 1: Top Left (Head)',
+        'Corner 2: Top Right (Foot)',
+        'Corner 3: Bottom Right (Foot)',
+        'Corner 4: Bottom Left (Head)',
+      ];
+    }
     if (tableOrientation === 'vertical') {
       return [
         'Esquina 1: Inferior Izquierda (Entrada)',
@@ -1386,7 +1411,7 @@ function TableVisionStudioModalBase({
       'Esquina 3: Inferior Derecha (Fondo)',
       'Esquina 4: Inferior Izquierda (Entrada)',
     ];
-  }, [tableOrientation]);
+  }, [tableOrientation, isEn]);
 
   const handleResetCorners = useCallback(() => {
     const orig = initialCornersRef.current;
@@ -1434,7 +1459,9 @@ function TableVisionStudioModalBase({
           <View style={s.header}>
             <View style={s.headerTitleWrap}>
               <IconSparkles size={20} color={C.primary} strokeWidth={2} />
-              <Text style={s.headerTitle}>Estudio de Visión de Mesa</Text>
+              <Text style={s.headerTitle}>
+                {isEn ? 'Table Vision Studio' : 'Estudio de Visión de Mesa'}
+              </Text>
             </View>
             <Pressable style={s.closeBtn} onPress={onClose}>
               <IconX size={18} color={C.textMuted} strokeWidth={2.5} />
@@ -1445,9 +1472,15 @@ function TableVisionStudioModalBase({
           {step === 'processing' ? (
             <View style={s.loadingContainer}>
               <ActivityIndicator size="large" color={C.primary} />
-              <Text style={s.loadingTitle}>Detectando bandas, diamantes y bolas...</Text>
+              <Text style={s.loadingTitle}>
+                {isEn
+                  ? 'Detecting cushions, diamonds, and balls...'
+                  : 'Detectando bandas, diamantes y bolas...'}
+              </Text>
               <Text style={s.loadingSub}>
-                Calculando cuadrícula proyectiva 8×4 y profundidad de juego
+                {isEn
+                  ? 'Calculating 8×4 projective grid and playing depth'
+                  : 'Calculando cuadrícula proyectiva 8×4 y profundidad de juego'}
               </Text>
             </View>
           ) : step === 'select' ? (
@@ -1460,8 +1493,9 @@ function TableVisionStudioModalBase({
               )}
 
               <Text style={s.sectionPrompt}>
-                Sube o pega una foto de la mesa (partidas de YouTube, capturas de pantalla, tomas
-                desde esquinas o fotos con tu celular).
+                {isEn
+                  ? 'Upload or paste a photo of the table (YouTube matches, screenshots, corner angles, or photos from your phone).'
+                  : 'Sube o pega una foto de la mesa (partidas de YouTube, capturas de pantalla, tomas desde esquinas o fotos con tu celular).'}
               </Text>
 
               {/* Action Buttons */}
@@ -1470,16 +1504,24 @@ function TableVisionStudioModalBase({
                   <View style={[s.cardIconCircle, { backgroundColor: C.primaryDim }]}>
                     <IconFolder size={24} color={C.primary} strokeWidth={2} />
                   </View>
-                  <Text style={s.cardTitle}>Subir Imagen o Captura</Text>
-                  <Text style={s.cardSub}>Desde tus archivos o galería</Text>
+                  <Text style={s.cardTitle}>
+                    {isEn ? 'Upload Image or Capture' : 'Subir Imagen o Captura'}
+                  </Text>
+                  <Text style={s.cardSub}>
+                    {isEn ? 'From your files or gallery' : 'Desde tus archivos o galería'}
+                  </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity style={s.uploadCard} onPress={takePhoto}>
                   <View style={[s.cardIconCircle, { backgroundColor: 'rgba(6, 182, 212, 0.15)' }]}>
                     <IconCamera size={24} color={C.accentCyan} strokeWidth={2} />
                   </View>
-                  <Text style={s.cardTitle}>Tomar Fotografía</Text>
-                  <Text style={s.cardSub}>Usar la cámara de tu teléfono</Text>
+                  <Text style={s.cardTitle}>
+                    {isEn ? 'Take Photo' : 'Tomar Fotografía'}
+                  </Text>
+                  <Text style={s.cardSub}>
+                    {isEn ? 'Use your phone camera' : 'Usar la cámara de tu teléfono'}
+                  </Text>
                 </TouchableOpacity>
               </View>
 
@@ -1488,8 +1530,15 @@ function TableVisionStudioModalBase({
                 <View style={s.clipboardNotice}>
                   <IconClipboard size={18} color={C.textMuted} strokeWidth={2} />
                   <Text style={s.clipboardText}>
-                    💡 Puedes presionar <Text style={s.boldText}>Ctrl + V</Text> directamente para pegar
-                    cualquier captura de YouTube que tengas copiada.
+                    {isEn ? (
+                      <>
+                        💡 You can press <Text style={s.boldText}>Ctrl + V</Text> directly to paste any copied YouTube screenshot.
+                      </>
+                    ) : (
+                      <>
+                        💡 Puedes presionar <Text style={s.boldText}>Ctrl + V</Text> directamente para pegar cualquier captura de YouTube que tengas copiada.
+                      </>
+                    )}
                   </Text>
                 </View>
               )}
@@ -1505,14 +1554,22 @@ function TableVisionStudioModalBase({
                 <View style={[s.imagePanel, isWide && s.imagePanelWide]}>
                   <View style={s.panelHeader}>
                     <View style={s.panelHeaderLeft}>
-                      <Text style={s.panelTitle}>Calibrador Proyectivo de Mesa</Text>
+                      <Text style={s.panelTitle}>
+                        {isEn ? 'Table Projective Calibrator' : 'Calibrador Proyectivo de Mesa'}
+                      </Text>
                       {visionData?.cameraAngle && (
                         <View style={s.badgeAngle}>
                           <Text style={s.badgeAngleText}>
                             {visionData.cameraAngle === 'corner_perspective'
-                              ? 'Ángulo de Esquina'
+                              ? isEn
+                                ? 'Corner Perspective'
+                                : 'Ángulo de Esquina'
                               : visionData.cameraAngle === 'broadcast_side'
-                              ? 'Tomas de TV'
+                              ? isEn
+                                ? 'TV Broadcast'
+                                : 'Tomas de TV'
+                              : isEn
+                              ? 'Overhead Camera'
                               : 'Cámara Cenital'}
                           </Text>
                         </View>
@@ -1576,7 +1633,13 @@ function TableVisionStudioModalBase({
                                 tableCoverage === 'half' && s.actionBtnTextActive,
                               ]}
                             >
-                              {tableCoverage === 'full' ? 'Mesa Completa' : 'Media Mesa'}
+                              {tableCoverage === 'full'
+                                ? isEn
+                                  ? 'Full Table'
+                                  : 'Mesa Completa'
+                                : isEn
+                                ? 'Half Table'
+                                : 'Media Mesa'}
                             </Text>
                           )}
                         </TouchableOpacity>
@@ -1592,7 +1655,13 @@ function TableVisionStudioModalBase({
                           >
                             <IconArrowsExchange size={13} color={C.accentCyan} strokeWidth={2} />
                             <Text style={s.zoneSwitcherText}>
-                              {halfTableZone === 'half_1' ? 'Zona 1/2' : 'Zona 2/2'}
+                              {halfTableZone === 'half_1'
+                                ? isEn
+                                  ? 'Zone 1/2'
+                                  : 'Zona 1/2'
+                                : isEn
+                                ? 'Zone 2/2'
+                                : 'Zona 2/2'}
                             </Text>
                           </TouchableOpacity>
                         )}
@@ -1620,7 +1689,11 @@ function TableVisionStudioModalBase({
                                 canvasZoom === 'expanded' && s.actionBtnTextActive,
                               ]}
                             >
-                              {canvasZoom === 'expanded' ? 'Zoom 72%' : 'Ajustar'}
+                              {canvasZoom === 'expanded'
+                                ? 'Zoom 72%'
+                                : isEn
+                                ? 'Fit'
+                                : 'Ajustar'}
                             </Text>
                           )}
                         </TouchableOpacity>
@@ -1647,7 +1720,13 @@ function TableVisionStudioModalBase({
                               showFineControls && s.canvasControlBtnTextActive,
                             ]}
                           >
-                            {isWide ? 'Ajuste Fino' : 'Control'}
+                            {isWide
+                              ? isEn
+                                ? 'Fine Adjustment'
+                                : 'Ajuste Fino'
+                              : isEn
+                              ? 'Controls'
+                              : 'Control'}
                           </Text>
                         </TouchableOpacity>
 
@@ -1657,7 +1736,9 @@ function TableVisionStudioModalBase({
                           activeOpacity={0.7}
                         >
                           <IconAdjustments size={15} color={C.primary} strokeWidth={2} />
-                          <Text style={s.canvasSettingsBtnText}>Filtros</Text>
+                          <Text style={s.canvasSettingsBtnText}>
+                            {isEn ? 'Filters' : 'Filtros'}
+                          </Text>
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -1986,10 +2067,10 @@ function TableVisionStudioModalBase({
                             <View style={[s.loupeStatusDot, { backgroundColor: activeScopeColor }]} />
                             <Text style={s.loupeTooltipText}>
                               {dragTarget === 'corner' || (!dragTarget && selectedTargetType === 'corner')
-                                ? `Esquina ${cornerShortLabels[activeCornerIdx]}`
+                                ? `${isEn ? 'Corner' : 'Esquina'} ${cornerShortLabels[activeCornerIdx]}`
                                 : (dragTarget || selectedTargetType) === 'red'
-                                ? `Bola ${thirdBallMeta.label.toUpperCase()}`
-                                : `Bola ${(dragTarget || selectedTargetType)?.toUpperCase()}`}
+                                ? `${isEn ? 'Ball' : 'Bola'} ${thirdBallMeta.label.toUpperCase()}`
+                                : `${isEn ? 'Ball' : 'Bola'} ${(dragTarget || selectedTargetType) === 'white' ? (isEn ? 'WHITE' : 'BLANCA') : (dragTarget || selectedTargetType) === 'yellow' ? (isEn ? 'YELLOW' : 'AMARILLA') : (dragTarget || selectedTargetType)?.toUpperCase()}`}
                             </Text>
                           </View>
                         </View>
@@ -2005,14 +2086,14 @@ function TableVisionStudioModalBase({
                         <View style={s.fineControlsHeaderLeft}>
                           <IconDeviceGamepad2 size={16} color={C.accentCyan} strokeWidth={2} />
                           <Text style={s.fineControlsTitle} numberOfLines={1}>
-                            Ajuste de Puntos
+                            {isEn ? 'Point Adjustment' : 'Ajuste de Puntos'}
                           </Text>
                           {/* Step Speed / Precision Pills */}
                           <View style={s.stepPillsGroup}>
                             {[
-                              { val: 0.001, label: '0.1% Fino' },
-                              { val: 0.004, label: '0.4% Normal' },
-                              { val: 0.012, label: '1.2% Rápido' },
+                              { val: 0.001, label: isEn ? '0.1% Fine' : '0.1% Fino' },
+                              { val: 0.004, label: isEn ? '0.4% Normal' : '0.4% Normal' },
+                              { val: 0.012, label: isEn ? '1.2% Fast' : '1.2% Rápido' },
                             ].map((opt) => (
                               <TouchableOpacity
                                 key={`step-${opt.val}`}
@@ -2037,7 +2118,9 @@ function TableVisionStudioModalBase({
                           onPress={() => setShowFineControls(false)}
                           activeOpacity={0.7}
                         >
-                          <Text style={s.fineControlsCloseText}>Ocultar</Text>
+                          <Text style={s.fineControlsCloseText}>
+                            {isEn ? 'Hide' : 'Ocultar'}
+                          </Text>
                           <IconChevronUp size={14} color={C.textMuted} strokeWidth={2} />
                         </TouchableOpacity>
                       </View>
@@ -2049,10 +2132,14 @@ function TableVisionStudioModalBase({
                           <View style={s.selectorSection}>
                             <View style={s.selectorSectionHeader}>
                               <View style={s.selectorHeaderLeft}>
-                                <Text style={s.selectorSectionLabel}>Esquinas</Text>
+                                <Text style={s.selectorSectionLabel}>
+                                  {isEn ? 'Corners' : 'Esquinas'}
+                                </Text>
                                 <Text style={s.selectorActiveTag} numberOfLines={1}>
                                   {selectedTargetType === 'corner'
                                     ? cornerFullNames[activeCornerIdx]
+                                    : isEn
+                                    ? 'Select a corner'
                                     : 'Selecciona una esquina'}
                                 </Text>
                               </View>
@@ -2062,14 +2149,14 @@ function TableVisionStudioModalBase({
                                   onPress={() => handleCycleTarget(-1)}
                                   activeOpacity={0.7}
                                 >
-                                  <Text style={s.navArrowText}>◀ Ant.</Text>
+                                  <Text style={s.navArrowText}>{isEn ? '◀ Prev' : '◀ Ant.'}</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                   style={s.navArrowBtn}
                                   onPress={() => handleCycleTarget(1)}
                                   activeOpacity={0.7}
                                 >
-                                  <Text style={s.navArrowText}>Sig. ▶</Text>
+                                  <Text style={s.navArrowText}>{isEn ? 'Next ▶' : 'Sig. ▶'}</Text>
                                 </TouchableOpacity>
                               </View>
                             </View>
@@ -2141,25 +2228,53 @@ function TableVisionStudioModalBase({
                               activeOpacity={0.7}
                             >
                               <IconRotateClockwise size={12} color={C.textMuted} strokeWidth={2} />
-                              <Text style={s.resetCornersText}>Restablecer</Text>
+                              <Text style={s.resetCornersText}>
+                                {isEn ? 'Reset' : 'Restablecer'}
+                              </Text>
                             </TouchableOpacity>
                           </View>
 
                           {/* Ball Tabs */}
                           <View style={s.selectorSection}>
                             <View style={s.selectorSectionHeader}>
-                              <Text style={s.selectorSectionLabel}>Bolas</Text>
+                              <Text style={s.selectorSectionLabel}>
+                                {isEn ? 'Balls' : 'Bolas'}
+                              </Text>
                               {selectedTargetType !== 'corner' && (
                                 <Text style={s.selectorActiveTag}>
-                                  Activa: {selectedTargetType === 'white' ? 'Blanca' : selectedTargetType === 'yellow' ? 'Amarilla' : thirdBallMeta.label}
+                                  {isEn ? 'Active:' : 'Activa:'}{' '}
+                                  {selectedTargetType === 'white'
+                                    ? isEn
+                                      ? 'White'
+                                      : 'Blanca'
+                                    : selectedTargetType === 'yellow'
+                                    ? isEn
+                                      ? 'Yellow'
+                                      : 'Amarilla'
+                                    : thirdBallMeta.label}
                                 </Text>
                               )}
                             </View>
                             <View style={s.ballGridRow}>
                               {[
-                                { id: 'white' as const, label: 'Blanca', color: '#ffffff', pos: whiteImagePos },
-                                { id: 'yellow' as const, label: 'Amarilla', color: '#fbbf24', pos: yellowImagePos },
-                                { id: 'red' as const, label: thirdBallMeta.label, color: thirdBallMeta.color, pos: redImagePos },
+                                {
+                                  id: 'white' as const,
+                                  label: isEn ? 'White' : 'Blanca',
+                                  color: '#ffffff',
+                                  pos: whiteImagePos,
+                                },
+                                {
+                                  id: 'yellow' as const,
+                                  label: isEn ? 'Yellow' : 'Amarilla',
+                                  color: '#fbbf24',
+                                  pos: yellowImagePos,
+                                },
+                                {
+                                  id: 'red' as const,
+                                  label: thirdBallMeta.label,
+                                  color: thirdBallMeta.color,
+                                  pos: redImagePos,
+                                },
                               ].map((b) => (
                                 <TouchableOpacity
                                   key={`btab-${b.id}`}
@@ -2190,15 +2305,17 @@ function TableVisionStudioModalBase({
 
                             {/* Selector rápido para color de la tercera bola (Roja, Naranja, Azul) */}
                             <View style={s.thirdBallColorRow}>
-                              <Text style={s.thirdBallColorPrompt}>Color Bola 3:</Text>
+                              <Text style={s.thirdBallColorPrompt}>
+                                {isEn ? 'Ball 3 Color:' : 'Color Bola 3:'}
+                              </Text>
                               {(['red', 'orange', 'blue'] as const).map((cOption) => {
                                 const isCurrent = thirdBallColor === cOption;
                                 const optMeta =
                                   cOption === 'blue'
-                                    ? { label: 'Azul (PBA)', color: '#2563eb' }
+                                    ? { label: isEn ? 'Blue (PBA)' : 'Azul (PBA)', color: '#2563eb' }
                                     : cOption === 'orange'
-                                    ? { label: 'Naranja', color: '#f97316' }
-                                    : { label: 'Roja (UMB)', color: '#ef4444' };
+                                    ? { label: isEn ? 'Orange' : 'Naranja', color: '#f97316' }
+                                    : { label: isEn ? 'Red (UMB)' : 'Roja (UMB)', color: '#ef4444' };
                                 return (
                                   <TouchableOpacity
                                     key={`color-opt-${cOption}`}
@@ -2270,11 +2387,17 @@ function TableVisionStudioModalBase({
                               activeOpacity={0.7}
                             >
                               <IconRefresh size={14} color={C.primary} strokeWidth={2} />
-                              <Text style={s.recalibrateCardText}>Re-detectar</Text>
+                              <Text style={s.recalibrateCardText}>
+                                {isEn ? 'Re-detect' : 'Re-detectar'}
+                              </Text>
                             </TouchableOpacity>
                             <Text style={s.dpadHelperText}>
                               {selectedTargetType === 'corner'
-                                ? `Moviendo ${cornerShortLabels[activeCornerIdx]} (±${(nudgeStep * 100).toFixed(1)}%)`
+                                ? isEn
+                                  ? `Moving ${cornerShortLabels[activeCornerIdx]} (±${(nudgeStep * 100).toFixed(1)}%)`
+                                  : `Moviendo ${cornerShortLabels[activeCornerIdx]} (±${(nudgeStep * 100).toFixed(1)}%)`
+                                : isEn
+                                ? `Moving ${selectedTargetType === 'white' ? 'white' : selectedTargetType === 'yellow' ? 'yellow' : thirdBallMeta.label.toLowerCase()} ball (±${(nudgeStep * 100).toFixed(1)}%)`
                                 : `Moviendo bola ${selectedTargetType === 'white' ? 'blanca' : selectedTargetType === 'yellow' ? 'amarilla' : thirdBallMeta.label.toLowerCase()} (±${(nudgeStep * 100).toFixed(1)}%)`}
                             </Text>
                           </View>
@@ -2290,7 +2413,7 @@ function TableVisionStudioModalBase({
                       <View style={s.openControlsHintLeft}>
                         <IconDeviceGamepad2 size={15} color={C.accentCyan} strokeWidth={2} />
                         <Text style={s.openControlsHintText} numberOfLines={1}>
-                          Control de esquinas y D-Pad
+                          {isEn ? 'Corner & D-Pad Controls' : 'Control de esquinas y D-Pad'}
                         </Text>
                       </View>
                       <IconChevronDown size={15} color={C.accentCyan} strokeWidth={2} />
@@ -2301,7 +2424,9 @@ function TableVisionStudioModalBase({
                 {/* Right/Bottom: 2D Rectified Table Preview */}
                 <View style={[s.tablePanel, isWide && s.tablePanelWide]}>
                   <View style={s.panelHeader}>
-                    <Text style={s.panelTitle}>Mesa Rectificada Canónica 2:1</Text>
+                    <Text style={s.panelTitle}>
+                      {isEn ? 'Canonical 2:1 Rectified Table' : 'Mesa Rectificada Canónica 2:1'}
+                    </Text>
                     <TouchableOpacity
                       style={s.settingsGearBtn}
                       onPress={() => setCustomizerVisible(true)}
@@ -2314,7 +2439,9 @@ function TableVisionStudioModalBase({
                         ]}
                       />
                       <IconSettings size={15} color={C.text} strokeWidth={2} />
-                      <Text style={s.settingsGearBtnText}>Personalizar Mesa</Text>
+                      <Text style={s.settingsGearBtnText}>
+                        {isEn ? 'Customize Table' : 'Personalizar Mesa'}
+                      </Text>
                     </TouchableOpacity>
                   </View>
 
@@ -2333,17 +2460,17 @@ function TableVisionStudioModalBase({
                   <View style={s.toolsRow}>
                     <TouchableOpacity style={s.toolBtn} onPress={handleRotate90}>
                       <IconRotateClockwise size={16} color={C.text} strokeWidth={2} />
-                      <Text style={s.toolBtnText}>Rotar 90°</Text>
+                      <Text style={s.toolBtnText}>{isEn ? 'Rotate 90°' : 'Rotar 90°'}</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity style={s.toolBtn} onPress={handleRotate180}>
                       <IconRotateClockwise size={16} color={C.accentCyan} strokeWidth={2} />
-                      <Text style={s.toolBtnText}>Rotar 180°</Text>
+                      <Text style={s.toolBtnText}>{isEn ? 'Rotate 180°' : 'Rotar 180°'}</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity style={s.toolBtn} onPress={handleMirror}>
                       <IconArrowsExchange size={16} color={C.text} strokeWidth={2} />
-                      <Text style={s.toolBtnText}>Invertir Lados</Text>
+                      <Text style={s.toolBtnText}>{isEn ? 'Flip Sides' : 'Invertir Lados'}</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity style={s.toolBtn} onPress={handleSwapCue}>
@@ -2353,7 +2480,9 @@ function TableVisionStudioModalBase({
                           { backgroundColor: swapCue ? C.accentYellow : '#ffffff' },
                         ]}
                       />
-                      <Text style={s.toolBtnText}>Cambiar Tacador</Text>
+                      <Text style={s.toolBtnText}>
+                        {isEn ? 'Switch Cue Ball' : 'Cambiar Tacador'}
+                      </Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -2370,17 +2499,19 @@ function TableVisionStudioModalBase({
                           { backgroundColor: thirdBallMeta.color },
                         ]}
                       />
-                      <Text style={s.toolBtnText}>Bola 3: {thirdBallMeta.label}</Text>
+                      <Text style={s.toolBtnText}>
+                        {isEn ? 'Ball 3:' : 'Bola 3:'} {thirdBallMeta.label}
+                      </Text>
                     </TouchableOpacity>
                   </View>
 
                   {/* Position Coordinates Summary */}
                   <View style={s.coordsSummary}>
                     <Text style={s.coordsItem}>
-                      ⚪ Blanca: <Text style={s.coordVal}>{whiteBall.x}cm, {whiteBall.y}cm</Text>
+                      ⚪ {isEn ? 'White:' : 'Blanca:'} <Text style={s.coordVal}>{whiteBall.x}cm, {whiteBall.y}cm</Text>
                     </Text>
                     <Text style={s.coordsItem}>
-                      🟡 Amarilla: <Text style={s.coordVal}>{yellowBall.x}cm, {yellowBall.y}cm</Text>
+                      🟡 {isEn ? 'Yellow:' : 'Amarilla:'} <Text style={s.coordVal}>{yellowBall.x}cm, {yellowBall.y}cm</Text>
                     </Text>
                     <Text style={s.coordsItem}>
                       {thirdBallMeta.emoji} {thirdBallMeta.label}: <Text style={s.coordVal}>{redBall.x}cm, {redBall.y}cm</Text>
@@ -2396,7 +2527,9 @@ function TableVisionStudioModalBase({
                   onPress={() => setStep('select')}
                   activeOpacity={0.7}
                 >
-                  <Text style={s.cancelBtnText}>Elegir Otra Foto</Text>
+                  <Text style={s.cancelBtnText}>
+                    {isEn ? 'Choose Another Photo' : 'Elegir Otra Foto'}
+                  </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -2405,7 +2538,9 @@ function TableVisionStudioModalBase({
                   activeOpacity={0.7}
                 >
                   <IconDeviceGamepad2 size={16} color={C.text} strokeWidth={2} />
-                  <Text style={s.secondaryActionText}>Simulador</Text>
+                  <Text style={s.secondaryActionText}>
+                    {isEn ? 'Simulator' : 'Simulador'}
+                  </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -2414,7 +2549,9 @@ function TableVisionStudioModalBase({
                   activeOpacity={0.8}
                 >
                   <IconCheck size={18} color="#0a100d" strokeWidth={2.5} />
-                  <Text style={s.primaryActionText}>Cargar en Mesa de Entrenamiento</Text>
+                  <Text style={s.primaryActionText}>
+                    {isEn ? 'Load into Training Table' : 'Cargar en Mesa de Entrenamiento'}
+                  </Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>

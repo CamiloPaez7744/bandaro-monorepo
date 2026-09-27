@@ -24,6 +24,7 @@ import {
 
 import { getPalette, theme } from '@/constants/theme';
 import { useColorScheme } from '@/components/useColorScheme';
+import { useI18n } from '@/components/useLanguage';
 
 export interface RecordHitsOverlayProps {
   targetReps: number;
@@ -54,6 +55,7 @@ export function RecordHitsOverlay({
   onFinishSession,
   isLastPosition = false,
 }: RecordHitsOverlayProps) {
+  const { t } = useI18n();
   const palette = getPalette(useColorScheme());
   const styles = getStyles(palette);
 
@@ -100,7 +102,7 @@ export function RecordHitsOverlay({
             <IconEye size={17} color={palette.primary} />
           )}
           <Text style={styles.ctrlBtnText}>
-            {isSimulating ? 'Simulando...' : 'Ver Solución'}
+            {isSimulating ? t('common.simulating') : t('training.system.showSolution')}
           </Text>
         </TouchableOpacity>
 
@@ -111,14 +113,14 @@ export function RecordHitsOverlay({
         >
           <IconRefresh size={17} color={palette.muted} />
           <Text style={[styles.ctrlBtnText, { color: palette.muted }]}>
-            Reiniciar Posición
+            {t('common.reset')}
           </Text>
         </TouchableOpacity>
       </View>
 
       {/* 2. Repetitions Quick-Select Bar */}
       <View style={styles.repsSelectorRow}>
-        <Text style={styles.repsSelectorLabel}>OBJETIVO DE TIROS:</Text>
+        <Text style={styles.repsSelectorLabel}>{t('training.session.targetLabel')}</Text>
         <View style={styles.repsChips}>
           {PRESET_REPS.map((reps) => {
             const isSelected = targetReps === reps;
@@ -159,7 +161,9 @@ export function RecordHitsOverlay({
                 !PRESET_REPS.includes(targetReps) && styles.repChipTextActive,
               ]}
             >
-              {!PRESET_REPS.includes(targetReps) ? `${targetReps} (Libre)` : 'Otro'}
+              {!PRESET_REPS.includes(targetReps)
+                ? t('training.session.customFree', { reps: targetReps })
+                : t('training.session.customOther')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -169,8 +173,8 @@ export function RecordHitsOverlay({
       <View style={styles.recordCard}>
         <View style={styles.recordHeader}>
           <View>
-            <Text style={styles.recordTitle}>Registro de Aciertos</Text>
-            <Text style={styles.recordSubtitle}>Anota los tiros convertidos</Text>
+            <Text style={styles.recordTitle}>{t('training.session.recordTitle')}</Text>
+            <Text style={styles.recordSubtitle}>{t('training.session.recordSubtitle')}</Text>
           </View>
 
           {/* Stepper Counter */}
@@ -186,7 +190,7 @@ export function RecordHitsOverlay({
 
             <View style={styles.countDisplay}>
               <Text style={styles.countMain}>{madeHits}</Text>
-              <Text style={styles.countTotal}>de {targetReps}</Text>
+              <Text style={styles.countTotal}>{t('training.session.ofTotal', { total: targetReps })}</Text>
             </View>
 
             <TouchableOpacity
@@ -207,7 +211,7 @@ export function RecordHitsOverlay({
         {/* Accuracy Progress & Difficulty */}
         <View style={styles.metricsRow}>
           <View style={styles.difficultyGroup}>
-            <Text style={styles.metricLabel}>Dificultad:</Text>
+            <Text style={styles.metricLabel}>{t('common.difficulty')}</Text>
             <View style={styles.starsRow}>
               {[1, 2, 3, 4, 5].map((s) =>
                 s <= difficulty ? (
@@ -220,7 +224,7 @@ export function RecordHitsOverlay({
           </View>
 
           <View style={styles.accuracyPill}>
-            <Text style={styles.accuracyLabel}>Efectividad:</Text>
+            <Text style={styles.accuracyLabel}>{t('common.effectiveness')}</Text>
             <Text style={styles.accuracyValue}>{accuracyPct}%</Text>
           </View>
         </View>
@@ -242,7 +246,7 @@ export function RecordHitsOverlay({
             activeOpacity={0.8}
             onPress={onNextPosition}
           >
-            <Text style={styles.btnSecondaryText}>Siguiente Jugada</Text>
+            <Text style={styles.btnSecondaryText}>{t('training.session.nextShot')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -250,7 +254,7 @@ export function RecordHitsOverlay({
             activeOpacity={0.8}
             onPress={onFinishSession}
           >
-            <Text style={styles.btnPrimaryText}>Finalizar Sesión</Text>
+            <Text style={styles.btnPrimaryText}>{t('training.session.finishSession')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -271,14 +275,14 @@ export function RecordHitsOverlay({
             onPress={(e) => e.stopPropagation()}
           >
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Definir Repeticiones</Text>
+              <Text style={styles.modalTitle}>{t('training.session.setReps')}</Text>
               <TouchableOpacity onPress={() => setShowConfigModal(false)}>
                 <IconX size={20} color={palette.muted} />
               </TouchableOpacity>
             </View>
 
             <Text style={styles.modalDesc}>
-              Ingresa el número de tiros objetivo para esta jugada (1 a 100):
+              {t('training.session.repsInputDesc')}
             </Text>
 
             <TextInput
@@ -295,14 +299,14 @@ export function RecordHitsOverlay({
                 style={styles.modalCancelBtn}
                 onPress={() => setShowConfigModal(false)}
               >
-                <Text style={styles.modalCancelText}>Cancelar</Text>
+                <Text style={styles.modalCancelText}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.modalSaveBtn}
                 onPress={handleSaveCustomReps}
               >
                 <IconCheck size={16} color="#000000" />
-                <Text style={styles.modalSaveText}>Guardar</Text>
+                <Text style={styles.modalSaveText}>{t('common.save')}</Text>
               </TouchableOpacity>
             </View>
           </Pressable>

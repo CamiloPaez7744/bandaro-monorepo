@@ -6,6 +6,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { SpinEffect, POWER_LEVELS, PowerLevel } from '@bandaro/core';
 import { getPalette, theme } from '@/constants/theme';
 import { useColorScheme } from '@/components/useColorScheme';
+import { useI18n } from '@/components/useLanguage';
 
 interface SpinControlProps {
     spin: SpinEffect;
@@ -13,8 +14,30 @@ interface SpinControlProps {
     disabled?: boolean;
 }
 
+function getLocalizedPowerInfo(level: number, language: string) {
+    if (language === 'en') {
+        switch (level) {
+            case 1:
+                return { label: 'Very Soft', description: 'Ball barely reaches the short rail (1 length)' };
+            case 2:
+                return { label: 'Soft', description: 'Reaches the short rail and returns to start position (2 lengths)' };
+            case 3:
+                return { label: 'Medium', description: 'Rebounds off 2 short rails and returns to opposite (3 lengths)' };
+            case 4:
+                return { label: 'Strong', description: 'Rebounds off 3 rails and returns to start (4 lengths)' };
+            case 5:
+                return { label: 'Very Strong', description: 'Maximum power for 5 table lengths (5 lengths)' };
+            default:
+                return { label: 'Medium', description: 'Standard playing speed' };
+        }
+    }
+    const defaultPower = POWER_LEVELS.find((p) => p.level === level) ?? POWER_LEVELS[2];
+    return { label: defaultPower.label, description: defaultPower.description };
+}
+
 function SpinControlBase(props: Readonly<SpinControlProps>) {
     const { spin, onSpinChange, disabled = false } = props;
+    const { language } = useI18n();
     const palette = getPalette(useColorScheme());
 
     const ballSize = 140;
@@ -52,9 +75,21 @@ function SpinControlBase(props: Readonly<SpinControlProps>) {
     const indicatorY = ballRadius + spin.y * (ballRadius - 15);
 
     const getSpinLabel = (): string => {
-        if (spin.magnitude < 0.1) return 'Centro';
+        if (spin.magnitude < 0.1) return language === 'en' ? 'Center' : 'Centro';
 
         const angle = Math.atan2(spin.y, spin.x) * (180 / Math.PI);
+
+        if (language === 'en') {
+            if (angle >= -22.5 && angle < 22.5) return 'Right';
+            if (angle >= 22.5 && angle < 67.5) return 'Bottom-Right';
+            if (angle >= 67.5 && angle < 112.5) return 'Bottom';
+            if (angle >= 112.5 && angle < 157.5) return 'Bottom-Left';
+            if (angle >= 157.5 || angle < -157.5) return 'Left';
+            if (angle >= -157.5 && angle < -112.5) return 'Top-Left';
+            if (angle >= -112.5 && angle < -67.5) return 'Top';
+            if (angle >= -67.5 && angle < -22.5) return 'Top-Right';
+            return 'Spin';
+        }
 
         if (angle >= -22.5 && angle < 22.5) return 'Derecha';
         if (angle >= 22.5 && angle < 67.5) return 'Abajo-Derecha';
@@ -70,7 +105,7 @@ function SpinControlBase(props: Readonly<SpinControlProps>) {
 
     return (
         <View style={styles.spinContainer}>
-            <Text style={[styles.spinTitle, { color: palette.text }]}>Efecto</Text>
+            <Text style={[styles.spinTitle, { color: palette.text }]}>{language === 'en' ? 'Spin' : 'Efecto'}</Text>
 
             <GestureDetector gesture={handleSpinGesture()}>
                 <View style={[styles.spinBallContainer, { width: ballSize, height: ballSize }]}>
@@ -106,14 +141,14 @@ function SpinControlBase(props: Readonly<SpinControlProps>) {
 
             <Text style={[styles.spinLabel, { color: palette.text }]}>{getSpinLabel()}</Text>
             <Text style={[styles.spinMagnitude, { color: palette.muted }]}>
-                Intensidad: {Math.round(spin.magnitude * 100)}%
+                {language === 'en' ? 'Intensity' : 'Intensidad'}: {Math.round(spin.magnitude * 100)}%
             </Text>
 
             <Pressable
                 style={[styles.resetButton, { backgroundColor: `${palette.primary}22` }]}
                 onPress={handleReset}
                 disabled={disabled}>
-                <Text style={[styles.resetButtonText, { color: palette.primary }]}>Centrar</Text>
+                <Text style={[styles.resetButtonText, { color: palette.primary }]}>{language === 'en' ? 'Center' : 'Centrar'}</Text>
             </Pressable>
         </View>
     );
@@ -129,13 +164,14 @@ interface PowerControlProps {
 
 function PowerControlBase(props: Readonly<PowerControlProps>) {
     const { powerLevel, onPowerChange, disabled = false } = props;
+    const { language } = useI18n();
     const palette = getPalette(useColorScheme());
 
-    const currentPower = POWER_LEVELS.find((p) => p.level === powerLevel) ?? POWER_LEVELS[2];
+    const powerInfo = getLocalizedPowerInfo(powerLevel, language);
 
     return (
         <View style={styles.powerContainer}>
-            <Text style={[styles.powerTitle, { color: palette.text }]}>Potencia</Text>
+            <Text style={[styles.powerTitle, { color: palette.text }]}>{language === 'en' ? 'Power' : 'Potencia'}</Text>
 
             <View style={styles.powerLevelsRow}>
                 {POWER_LEVELS.map((level) => {
@@ -165,8 +201,8 @@ function PowerControlBase(props: Readonly<PowerControlProps>) {
             </View>
 
             <View style={[styles.powerInfoCard, { backgroundColor: `${palette.primary}10`, borderColor: `${palette.primary}20` }]}>
-                <Text style={[styles.powerLabel, { color: palette.text }]}>{currentPower.label}</Text>
-                <Text style={[styles.powerDescription, { color: palette.muted }]}>{currentPower.description}</Text>
+                <Text style={[styles.powerLabel, { color: palette.text }]}>{powerInfo.label}</Text>
+                <Text style={[styles.powerDescription, { color: palette.muted }]}>{powerInfo.description}</Text>
             </View>
         </View>
     );
@@ -182,11 +218,12 @@ interface CueBallSelectorProps {
 
 function CueBallSelectorBase(props: Readonly<CueBallSelectorProps>) {
     const { cueBallId, onCueBallChange, disabled = false } = props;
+    const { language } = useI18n();
     const palette = getPalette(useColorScheme());
 
     return (
         <View style={styles.cueBallContainer}>
-            <Text style={[styles.cueBallTitle, { color: palette.text }]}>Bola de ataque</Text>
+            <Text style={[styles.cueBallTitle, { color: palette.text }]}>{language === 'en' ? 'Cue Ball' : 'Bola de ataque'}</Text>
 
             <View style={styles.cueBallOptionsRow}>
                 <Pressable
@@ -211,7 +248,7 @@ function CueBallSelectorBase(props: Readonly<CueBallSelectorProps>) {
                         <Circle cx={13} cy={13} r={4} fill="rgba(255,255,255,0.8)" />
                     </Svg>
                     <Text style={[styles.cueBallLabel, { color: cueBallId === 'white' ? '#1e293b' : palette.text }]}>
-                        Blanca
+                        {language === 'en' ? 'White' : 'Blanca'}
                     </Text>
                 </Pressable>
 
@@ -237,7 +274,7 @@ function CueBallSelectorBase(props: Readonly<CueBallSelectorProps>) {
                         <Circle cx={13} cy={13} r={4} fill="rgba(255,255,255,0.8)" />
                     </Svg>
                     <Text style={[styles.cueBallLabel, { color: cueBallId === 'yellow' ? '#713f12' : palette.text }]}>
-                        Amarilla
+                        {language === 'en' ? 'Yellow' : 'Amarilla'}
                     </Text>
                 </Pressable>
             </View>

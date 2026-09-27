@@ -6,6 +6,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { SpinEffect } from '@bandaro/core';
 import { getPalette, theme } from '@/constants/theme';
 import { useColorScheme } from '@/components/useColorScheme';
+import { useI18n } from '@/components/useLanguage';
 
 interface SpinControlEnhancedProps {
     spin: SpinEffect;
@@ -25,6 +26,7 @@ function SpinControlEnhancedBase(props: Readonly<SpinControlEnhancedProps>) {
         showImpactBar = true,
         size = 180,
     } = props;
+    const { language } = useI18n();
     const palette = getPalette(useColorScheme());
 
     const ballRadius = size / 2;
@@ -81,11 +83,11 @@ function SpinControlEnhancedBase(props: Readonly<SpinControlEnhancedProps>) {
         if (spin.magnitude < 0.1) {
             return { label: 'Neutral', color: palette.primary, percentage: 0 };
         } else if (spin.magnitude < 0.4) {
-            return { label: 'Bajo', color: palette.primary, percentage };
+            return { label: language === 'en' ? 'Low' : 'Bajo', color: palette.primary, percentage };
         } else if (spin.magnitude < 0.75) {
-            return { label: 'Medio', color: palette.primary, percentage };
+            return { label: language === 'en' ? 'Medium' : 'Medio', color: palette.primary, percentage };
         } else {
-            return { label: 'Extremo', color: '#ef4444', percentage };
+            return { label: language === 'en' ? 'Extreme' : 'Extremo', color: '#ef4444', percentage };
         }
     };
 
@@ -196,7 +198,7 @@ function SpinControlEnhancedBase(props: Readonly<SpinControlEnhancedProps>) {
 
                 <View style={styles.infoGrid}>
                     <View style={[styles.infoCard, { backgroundColor: palette.card, borderLeftColor: palette.primary }]}>
-                        <Text style={[styles.infoLabel, { color: palette.muted }]}>Eje X</Text>
+                        <Text style={[styles.infoLabel, { color: palette.muted }]}>{language === 'en' ? 'X Axis' : 'Eje X'}</Text>
                         <View style={styles.infoValueRow}>
                             <Text style={[styles.infoValue, { color: palette.primary }]}>{mmX}</Text>
                             <Text style={[styles.infoUnit, { color: palette.muted }]}>mm</Text>
@@ -204,7 +206,7 @@ function SpinControlEnhancedBase(props: Readonly<SpinControlEnhancedProps>) {
                     </View>
 
                     <View style={[styles.infoCard, { backgroundColor: palette.card, borderLeftColor: palette.primary }]}>
-                        <Text style={[styles.infoLabel, { color: palette.muted }]}>Eje Y</Text>
+                        <Text style={[styles.infoLabel, { color: palette.muted }]}>{language === 'en' ? 'Y Axis' : 'Eje Y'}</Text>
                         <View style={styles.infoValueRow}>
                             <Text style={[styles.infoValue, { color: palette.primary }]}>{mmY}</Text>
                             <Text style={[styles.infoUnit, { color: palette.muted }]}>mm</Text>
@@ -214,18 +216,18 @@ function SpinControlEnhancedBase(props: Readonly<SpinControlEnhancedProps>) {
                     {showImpactBar && (
                         <View style={[styles.impactCard, { backgroundColor: palette.card }]}>
                             <View style={styles.impactHeader}>
-                                <Text style={[styles.infoLabel, { color: palette.muted }]}>Nivel de Impacto</Text>
+                                <Text style={[styles.infoLabel, { color: palette.muted }]}>{language === 'en' ? 'Impact Level' : 'Nivel de Impacto'}</Text>
                                 <Text style={[styles.impactValue, { color: impact.color }]}>{impact.label}</Text>
                             </View>
                             <View style={[styles.impactBarBg, { backgroundColor: `${palette.primary}20` }]}>
                                 <View 
-                                    style={[
-                                        styles.impactBarFill, 
-                                        { 
-                                            width: `${impact.percentage}%`,
-                                            backgroundColor: impact.color,
-                                        }
-                                    ]} 
+                                     style={[
+                                         styles.impactBarFill, 
+                                         { 
+                                             width: `${impact.percentage}%`,
+                                             backgroundColor: impact.color,
+                                         }
+                                     ]} 
                                 />
                             </View>
                         </View>
@@ -235,7 +237,7 @@ function SpinControlEnhancedBase(props: Readonly<SpinControlEnhancedProps>) {
 
             {showPresets && (
                 <View style={styles.presetsSection}>
-                    <Text style={[styles.presetsTitle, { color: palette.muted }]}>Presets Rápidos</Text>
+                    <Text style={[styles.presetsTitle, { color: palette.muted }]}>{language === 'en' ? 'Quick Presets' : 'Presets Rápidos'}</Text>
                     <View style={styles.presetsRow}>
                         <Pressable
                             style={[styles.presetButton, { backgroundColor: palette.card, borderColor: `${palette.primary}20` }]}
@@ -274,7 +276,9 @@ function SpinControlEnhancedBase(props: Readonly<SpinControlEnhancedProps>) {
             <View style={[styles.tipCard, { backgroundColor: `${palette.primary}15`, borderColor: `${palette.primary}30` }]}>
                 <Text style={[styles.tipTitle, { color: palette.primary }]}>💡 Coach Tip</Text>
                 <Text style={[styles.tipText, { color: palette.text }]}>
-                    Mantén el taco nivelado para reacciones consistentes en tiros de Follow. Evita curvas no intencionales verificando la altura de tu puente.
+                    {language === 'en'
+                        ? 'Keep your cue level for consistent reactions on follow shots. Avoid unintentional curves by checking your bridge height.'
+                        : 'Mantén el taco nivelado para reacciones consistentes en tiros de Follow. Evita curvas no intencionales verificando la altura de tu puente.'}
                 </Text>
             </View>
         </View>

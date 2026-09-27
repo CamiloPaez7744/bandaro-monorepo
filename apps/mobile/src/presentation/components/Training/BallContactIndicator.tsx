@@ -5,6 +5,7 @@ import Svg, { Circle, Defs, G, Line, Path, RadialGradient, Stop } from 'react-na
 import { Ball, BallId, Vec2, vec2Sub, vec2Length, vec2Normalize, vec2Dot } from '@bandaro/core';
 import { getPalette } from '@/constants/theme';
 import { useColorScheme } from '@/components/useColorScheme';
+import { useI18n } from '@/components/useLanguage';
 
 interface BallContactIndicatorProps {
     cueBall: Ball;
@@ -111,6 +112,7 @@ function calculateContact(
 
 function BallContactIndicatorBase(props: Readonly<BallContactIndicatorProps>) {
     const { cueBall, targetBall, aimDirection, disabled = false } = props;
+    const { language } = useI18n();
     const palette = getPalette(useColorScheme());
 
     const contactInfo = useMemo(
@@ -149,18 +151,36 @@ function BallContactIndicatorBase(props: Readonly<BallContactIndicatorProps>) {
     };
 
     const getContactLabel = (): string => {
+        if (language === 'en') {
+            const sideLabel = contactInfo.contactSide === 'left' ? 'L' : contactInfo.contactSide === 'right' ? 'R' : '';
+            switch (contactInfo.contactType) {
+                case 'full':
+                    return 'Full';
+                case 'half':
+                    return `1/2 ${sideLabel}`.trim();
+                case 'quarter':
+                    return `1/4 ${sideLabel}`.trim();
+                case 'eighth':
+                    return `1/8 ${sideLabel}`.trim();
+                case 'thin':
+                    return `Thin ${sideLabel}`.trim();
+                case 'none':
+                    return 'No contact';
+            }
+        }
+
         const sideLabel = contactInfo.contactSide === 'left' ? 'Izq' : contactInfo.contactSide === 'right' ? 'Der' : '';
         switch (contactInfo.contactType) {
             case 'full':
                 return 'Llena';
             case 'half':
-                return `1/2 ${sideLabel}`;
+                return `1/2 ${sideLabel}`.trim();
             case 'quarter':
-                return `1/4 ${sideLabel}`;
+                return `1/4 ${sideLabel}`.trim();
             case 'eighth':
-                return `1/8 ${sideLabel}`;
+                return `1/8 ${sideLabel}`.trim();
             case 'thin':
-                return `Fina ${sideLabel}`;
+                return `Fina ${sideLabel}`.trim();
             case 'none':
                 return 'Sin contacto';
         }
@@ -174,7 +194,7 @@ function BallContactIndicatorBase(props: Readonly<BallContactIndicatorProps>) {
 
     return (
         <View style={styles.container}>
-            <Text style={[styles.title, { color: palette.text }]}>Toma de Bola</Text>
+            <Text style={[styles.title, { color: palette.text }]}>{language === 'en' ? 'Ball Contact' : 'Toma de Bola'}</Text>
 
             <View style={[styles.indicatorContainer, { width: size, height: size }]}>
                 <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
@@ -276,7 +296,7 @@ function BallContactIndicatorBase(props: Readonly<BallContactIndicatorProps>) {
                             {contactInfo.contactPercentage.toFixed(0)}%
                         </Text>
                         <Text style={[styles.angleText, { color: palette.muted }]}>
-                            Corte: {contactInfo.cutAngle.toFixed(1)}°
+                            {language === 'en' ? 'Cut' : 'Corte'}: {contactInfo.cutAngle.toFixed(1)}°
                         </Text>
                     </>
                 )}

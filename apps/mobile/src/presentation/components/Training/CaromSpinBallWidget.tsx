@@ -2,6 +2,7 @@ import { memo, useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Circle, Defs, Line, RadialGradient, Stop } from 'react-native-svg';
 import { BallId, SpinEffect } from '@bandaro/core';
+import { useI18n } from '@/components/useLanguage';
 
 interface CaromSpinBallWidgetProps {
     spin: SpinEffect;
@@ -15,9 +16,11 @@ interface CaromSpinBallWidgetProps {
  * Returns a human-friendly label for current spin:
  * e.g., "E0 • Centro", "E2 • 3h Der", "E1 • 12h Corrido", "E3 • 6h Pique"
  */
-function getSpinShortLabel(spin: SpinEffect, compact = false): string {
+function getSpinShortLabel(spin: SpinEffect, compact = false, lang = 'es'): string {
+    const isEn = lang === 'en';
+    const centerText = isEn ? 'Center' : 'Centro';
     const mag = spin.magnitude;
-    if (mag < 0.12) return compact ? 'E0 Centro' : 'E0 • Centro';
+    if (mag < 0.12) return compact ? `E0 ${centerText}` : `E0 • ${centerText}`;
 
     const level = Math.min(4, Math.max(1, Math.round(mag / 0.23)));
 
@@ -25,13 +28,13 @@ function getSpinShortLabel(spin: SpinEffect, compact = false): string {
     if (angleDeg < 0) angleDeg += 360;
 
     let dir = '';
-    if (angleDeg >= 337.5 || angleDeg < 22.5) dir = compact ? '3h' : '3h (Der)';
+    if (angleDeg >= 337.5 || angleDeg < 22.5) dir = compact ? '3h' : (isEn ? '3h (R)' : '3h (Der)');
     else if (angleDeg >= 22.5 && angleDeg < 67.5) dir = '1:30';
-    else if (angleDeg >= 67.5 && angleDeg < 112.5) dir = compact ? '12h' : '12h (Corr)';
+    else if (angleDeg >= 67.5 && angleDeg < 112.5) dir = compact ? '12h' : (isEn ? '12h (Follow)' : '12h (Corr)');
     else if (angleDeg >= 112.5 && angleDeg < 157.5) dir = '10:30';
-    else if (angleDeg >= 157.5 && angleDeg < 202.5) dir = compact ? '9h' : '9h (Izq)';
+    else if (angleDeg >= 157.5 && angleDeg < 202.5) dir = compact ? '9h' : (isEn ? '9h (L)' : '9h (Izq)');
     else if (angleDeg >= 202.5 && angleDeg < 247.5) dir = '7:30';
-    else if (angleDeg >= 247.5 && angleDeg < 292.5) dir = compact ? '6h' : '6h (Pique)';
+    else if (angleDeg >= 247.5 && angleDeg < 292.5) dir = compact ? '6h' : (isEn ? '6h (Draw)' : '6h (Pique)');
     else dir = '4:30';
 
     return `E${level} ${compact ? '' : '• '}${dir}`;
@@ -44,6 +47,7 @@ export const CaromSpinBallWidget = memo(function CaromSpinBallWidget({
     disabled = false,
     compact = false,
 }: CaromSpinBallWidgetProps) {
+    const { t, language } = useI18n();
     const size = compact ? 38 : 50;
     const center = size / 2;
     const radius = compact ? 16 : 21;
@@ -55,7 +59,7 @@ export const CaromSpinBallWidget = memo(function CaromSpinBallWidget({
 
     const isYellow = cueBallId === 'yellow';
     const gradientId = useMemo(() => `widgetBallGrad-${Math.random().toString(36).slice(2, 7)}`, []);
-    const shortLabel = useMemo(() => getSpinShortLabel(spin, compact), [spin, compact]);
+    const shortLabel = useMemo(() => getSpinShortLabel(spin, compact, language), [spin, compact, language]);
 
     return (
         <TouchableOpacity
@@ -64,7 +68,7 @@ export const CaromSpinBallWidget = memo(function CaromSpinBallWidget({
             disabled={disabled}
             activeOpacity={0.75}
             accessibilityRole="button"
-            accessibilityLabel="Selector de Efecto Profesional">
+            accessibilityLabel={t('training.effect.title')}>
             <View style={[styles.ballWrapper, compact && { width: 38, height: 38 }]}>
                 <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
                     <Defs>
@@ -138,7 +142,9 @@ export const CaromSpinBallWidget = memo(function CaromSpinBallWidget({
 
             <View style={[styles.textContainer, compact && styles.textContainerCompact]}>
                 <View style={styles.labelRow}>
-                    <Text style={[styles.labelTitle, compact && { fontSize: 7.5 }]}>EFECTO</Text>
+                    <Text style={[styles.labelTitle, compact && { fontSize: 7.5 }]}>
+                        {language === 'en' ? 'SPIN' : 'EFECTO'}
+                    </Text>
                     <View style={styles.liveDot} />
                 </View>
                 <Text style={[styles.labelValue, compact && { fontSize: 9.5 }]} numberOfLines={1}>

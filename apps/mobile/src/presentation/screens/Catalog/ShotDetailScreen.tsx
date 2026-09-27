@@ -142,6 +142,10 @@ export function ShotDetailScreen({ shotId: propShotId, onClose, onSimulate }: Sh
     const [isSimulating, setIsSimulating] = useState(false);
     const [selectedLang, setSelectedLang] = useState<CatalogLanguage>(language === 'en' ? 'en' : 'es');
 
+    useEffect(() => {
+        setSelectedLang(language === 'en' ? 'en' : 'es');
+    }, [language]);
+
     const scrollViewRef = useRef<ScrollView>(null);
 
     const handleTriggerSimulation = useCallback(() => {
@@ -282,8 +286,8 @@ export function ShotDetailScreen({ shotId: propShotId, onClose, onSimulate }: Sh
                             },
                         ]}
                         accessibilityRole="button"
-                        accessibilityLabel="Tocar la mesa para simular trayectoria"
-                        {...(Platform.OS === 'web' ? ({ title: 'Toca la mesa para simular trayectoria' } as any) : {})}
+                        accessibilityLabel={selectedLang === 'en' ? 'Tap table to simulate trajectory' : 'Tocar la mesa para simular trayectoria'}
+                        {...(Platform.OS === 'web' ? ({ title: selectedLang === 'en' ? 'Tap table to simulate trajectory' : 'Toca la mesa para simular trayectoria' } as any) : {})}
                     >
                         <TrainingPlayTable
                             whiteBall={shot.white}

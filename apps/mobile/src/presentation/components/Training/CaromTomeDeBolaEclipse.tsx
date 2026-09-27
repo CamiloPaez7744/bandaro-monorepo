@@ -26,6 +26,7 @@ import {
     vec2Normalize,
     vec2Sub,
 } from '@bandaro/core';
+import { useI18n } from '@/components/useLanguage';
 
 interface CaromTomeDeBolaEclipseProps {
     balls: Ball[];
@@ -56,7 +57,8 @@ function calculateTomeDeBola(
     balls: Ball[],
     cueBallId: BallId,
     aimDirection: Vec2,
-    trajectory: TrajectoryPrediction | null
+    trajectory: TrajectoryPrediction | null,
+    lang = 'es'
 ): TomeCalculation | null {
     const cueBall = balls.find((b) => b.id === cueBallId);
     if (!cueBall) return null;
@@ -139,15 +141,15 @@ function calculateTomeDeBola(
         side = 'miss';
     }
 
-    let fractionLabel = 'Sin contacto';
+    let fractionLabel = lang === 'en' ? 'No contact' : 'Sin contacto';
     if (directContact) {
-        if (fraction >= 0.90) fractionLabel = '1/1 Llena';
-        else if (fraction >= 0.70) fractionLabel = '3/4 Bola';
-        else if (fraction >= 0.45) fractionLabel = '1/2 Bola';
-        else if (fraction >= 0.32) fractionLabel = '3/8 Bola';
-        else if (fraction >= 0.20) fractionLabel = '1/4 Bola';
-        else if (fraction >= 0.10) fractionLabel = '1/8 Bola';
-        else fractionLabel = '1/16 Fina';
+        if (fraction >= 0.90) fractionLabel = lang === 'en' ? '1/1 Full' : '1/1 Llena';
+        else if (fraction >= 0.70) fractionLabel = lang === 'en' ? '3/4 Ball' : '3/4 Bola';
+        else if (fraction >= 0.45) fractionLabel = lang === 'en' ? '1/2 Ball' : '1/2 Bola';
+        else if (fraction >= 0.32) fractionLabel = lang === 'en' ? '3/8 Ball' : '3/8 Bola';
+        else if (fraction >= 0.20) fractionLabel = lang === 'en' ? '1/4 Ball' : '1/4 Bola';
+        else if (fraction >= 0.10) fractionLabel = lang === 'en' ? '1/8 Ball' : '1/8 Bola';
+        else fractionLabel = lang === 'en' ? '1/16 Thin' : '1/16 Fina';
     }
 
     return {
@@ -172,12 +174,13 @@ export const CaromTomeDeBolaEclipse = memo(function CaromTomeDeBolaEclipse({
     disabled = false,
     compact = false,
 }: CaromTomeDeBolaEclipseProps) {
+    const { language } = useI18n();
     const { width: windowWidth } = useWindowDimensions();
     const [showPresets, setShowPresets] = useState(false);
 
     const tome = useMemo(
-        () => calculateTomeDeBola(balls, cueBallId, aimDirection, trajectory),
-        [balls, cueBallId, aimDirection, trajectory]
+        () => calculateTomeDeBola(balls, cueBallId, aimDirection, trajectory, language),
+        [balls, cueBallId, aimDirection, trajectory, language]
     );
 
     const size = compact ? 46 : 60;
@@ -239,7 +242,7 @@ export const CaromTomeDeBolaEclipse = memo(function CaromTomeDeBolaEclipse({
                 disabled={disabled}
                 activeOpacity={0.8}
                 accessibilityRole="button"
-                accessibilityLabel="Tome de Bola Eclipse">
+                accessibilityLabel={language === 'en' ? 'Ball Fullness (Eclipse)' : 'Tome de Bola Eclipse'}>
                 
                 {/* Visualizador tipo Eclipse */}
                 <View style={[styles.eclipseWrap, compact && { width: 48, height: 38 }]}>
@@ -322,7 +325,7 @@ export const CaromTomeDeBolaEclipse = memo(function CaromTomeDeBolaEclipse({
                 <View style={[styles.metricsCol, compact && styles.metricsColCompact]}>
                     <View style={styles.badgeRow}>
                         <Text style={[styles.fractionTitle, compact && { fontSize: 8.5 }]}>
-                            {tome?.fractionLabel ?? 'Tome'}
+                            {tome?.fractionLabel ?? (language === 'en' ? 'Contact' : 'Tome')}
                         </Text>
                         <Text style={[styles.percentageText, compact && { fontSize: 8 }]}>
                             {tome?.directContact ? `${tome.percentage}%` : '--'}
@@ -339,7 +342,7 @@ export const CaromTomeDeBolaEclipse = memo(function CaromTomeDeBolaEclipse({
                         </Text>
                         {tome?.side !== 'center' && tome?.side !== 'miss' && (
                             <Text style={[styles.sideBadge, compact && { fontSize: 7 }]}>
-                                {tome?.side === 'right' ? 'Der' : 'Izq'}
+                                {tome?.side === 'right' ? (language === 'en' ? 'R' : 'Der') : (language === 'en' ? 'L' : 'Izq')}
                             </Text>
                         )}
                     </View>
@@ -349,7 +352,9 @@ export const CaromTomeDeBolaEclipse = memo(function CaromTomeDeBolaEclipse({
             {/* Selector Rápido Popover de Tomes (Mobile safe) */}
             {showPresets && (
                 <View style={[styles.presetsPopover, { maxWidth: Math.min(280, windowWidth - 20) }]}>
-                    <Text style={styles.presetsTitle}>ENCUADRE RÁPIDO DE TOME</Text>
+                    <Text style={styles.presetsTitle}>
+                        {language === 'en' ? 'QUICK FULLNESS PRESETS' : 'ENCUADRE RÁPIDO DE TOME'}
+                    </Text>
                     <View style={styles.presetsRow}>
                         <TouchableOpacity
                             style={styles.presetPill}
@@ -379,7 +384,7 @@ export const CaromTomeDeBolaEclipse = memo(function CaromTomeDeBolaEclipse({
                         <TouchableOpacity
                             style={styles.presetPill}
                             onPress={() => snapToFraction(1.0)}>
-                            <Text style={styles.presetPillText}>Llena</Text>
+                            <Text style={styles.presetPillText}>{language === 'en' ? 'Full' : 'Llena'}</Text>
                         </TouchableOpacity>
                     </View>
                 </View>

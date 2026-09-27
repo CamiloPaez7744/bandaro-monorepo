@@ -30,6 +30,7 @@ import {
     type TablePreferences,
 } from './tablePreferences';
 import { useColorScheme } from '@/components/useColorScheme';
+import { useI18n } from '@/components/useLanguage';
 import { getPalette } from '@/constants/theme';
 
 interface CaromBallStudioModalProps {
@@ -42,6 +43,54 @@ interface CaromBallStudioModalProps {
     onClose: () => void;
 }
 
+const getSkinTexts = (preset: (typeof BALL_SKIN_PRESETS)[0], lang: string) => {
+    if (lang === 'en') {
+        switch (preset.id) {
+            case 'aramith_pro_cup':
+                return {
+                    name: 'Super Aramith Pro-Cup (UMB)',
+                    subtitle: 'Official World UMB Standard',
+                    origin: 'Belgium 🇧🇪',
+                    description: 'Pure phenolic resin with the iconic 6 red measle dots for maximum spin reading accuracy.',
+                };
+            case 'cosmo_helix_pba':
+                return {
+                    name: 'Cosmo Helix Vision (PBA)',
+                    subtitle: 'Official Korean PBA Tour Standard',
+                    origin: 'South Korea 🇰🇷',
+                    description: 'Vision technology for 4K TV broadcasts with 6 high-contrast neon cyan dots and rotation rings.',
+                };
+            case 'dynaspheres':
+                return {
+                    name: 'Dynaspheres Platinum Carom',
+                    subtitle: 'Dynamic Compass Rotor Design',
+                    origin: 'Belgium / International 🌐',
+                    description: 'Concentric rotor pattern in platinum gray and cobalt to visualize the exact gyroscopic axis.',
+                };
+            case 'classic_solid':
+                return {
+                    name: 'Classic Traditional (Solid Vintage)',
+                    subtitle: 'Smooth Ivory & Ruby Finish',
+                    origin: 'Vintage 🏛️',
+                    description: 'Smooth traditional competition balls with a subtle single identification dot.',
+                };
+            default:
+                return {
+                    name: preset.name,
+                    subtitle: preset.subtitle,
+                    origin: preset.origin,
+                    description: preset.description,
+                };
+        }
+    }
+    return {
+        name: preset.name,
+        subtitle: preset.subtitle,
+        origin: preset.origin,
+        description: preset.description,
+    };
+};
+
 export const CaromBallStudioModal = memo(function CaromBallStudioModal({
     visible,
     cueBallId,
@@ -53,6 +102,7 @@ export const CaromBallStudioModal = memo(function CaromBallStudioModal({
 }: CaromBallStudioModalProps) {
     const { width: windowWidth, height: windowHeight } = useWindowDimensions();
     const isMobile = windowWidth < 768;
+    const { t, language } = useI18n();
     const colorScheme = useColorScheme();
     const palette = getPalette(colorScheme);
     const isDark = colorScheme === 'dark';
@@ -159,15 +209,16 @@ export const CaromBallStudioModal = memo(function CaromBallStudioModal({
                                 <Text style={{ fontSize: 18 }}>⚪</Text>
                             </View>
                             <View>
-                                <Text style={s.headerTitle}>Estudio de Bolas y Salida</Text>
+                                <Text style={s.headerTitle}>{language === 'en' ? 'Ball Studio & Break Setup' : 'Estudio de Bolas y Salida'}</Text>
                                 <Text style={s.headerSub}>
-                                    Skins oficiales de competición y configuración de break
+                                    {language === 'en' ? 'Official competition skins and break shot configuration' : 'Skins oficiales de competición y configuración de break'}
                                 </Text>
                             </View>
                         </View>
                         <TouchableOpacity
                             style={s.closeBtn}
                             onPress={onClose}
+                            accessibilityLabel={t('common.close')}
                             activeOpacity={0.7}
                             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                             <IconX size={18} color="#94a3b8" />
@@ -177,7 +228,12 @@ export const CaromBallStudioModal = memo(function CaromBallStudioModal({
                     {/* Podio Showroom de las 3 Bolas en 3D */}
                     <View style={s.podiumShowroom}>
                         <Text style={s.podiumLabel}>
-                            Set Actual: {BALL_SKIN_PRESETS.find((p) => p.id === currentBallSkin)?.name}
+                            {language === 'en' ? 'Current Set: ' : 'Set Actual: '}{
+                                (() => {
+                                    const found = BALL_SKIN_PRESETS.find((p) => p.id === currentBallSkin);
+                                    return found ? getSkinTexts(found, language).name : '';
+                                })()
+                            }
                         </Text>
                         <View style={s.ballsRow}>
                             {/* Bola Blanca */}
@@ -235,11 +291,11 @@ export const CaromBallStudioModal = memo(function CaromBallStudioModal({
                                 </Svg>
                                 <View style={s.ballLabelWrap}>
                                     <Text style={[s.ballPodiumName, cueBallId === 'white' && s.ballPodiumNameActive]}>
-                                        Blanca
+                                        {t('common.white')}
                                     </Text>
                                     {cueBallId === 'white' && (
                                         <View style={s.cueBadge}>
-                                            <Text style={s.cueBadgeText}>TIRADORA</Text>
+                                            <Text style={s.cueBadgeText}>{language === 'en' ? 'CUE BALL' : 'TIRADORA'}</Text>
                                         </View>
                                     )}
                                 </View>
@@ -300,11 +356,11 @@ export const CaromBallStudioModal = memo(function CaromBallStudioModal({
                                 </Svg>
                                 <View style={s.ballLabelWrap}>
                                     <Text style={[s.ballPodiumName, cueBallId === 'yellow' && s.ballPodiumNameActive]}>
-                                        Amarilla
+                                        {t('common.yellow')}
                                     </Text>
                                     {cueBallId === 'yellow' && (
                                         <View style={s.cueBadge}>
-                                            <Text style={s.cueBadgeText}>TIRADORA</Text>
+                                            <Text style={s.cueBadgeText}>{language === 'en' ? 'CUE BALL' : 'TIRADORA'}</Text>
                                         </View>
                                     )}
                                 </View>
@@ -332,8 +388,8 @@ export const CaromBallStudioModal = memo(function CaromBallStudioModal({
                                     <Circle cx={20} cy={19} r={5} fill="rgba(255,255,255,0.75)" />
                                 </Svg>
                                 <View style={s.ballLabelWrap}>
-                                    <Text style={s.ballPodiumName}>Roja</Text>
-                                    <Text style={s.ballRoleSub}>1ª OBJETIVO</Text>
+                                    <Text style={s.ballPodiumName}>{t('common.red')}</Text>
+                                    <Text style={s.ballRoleSub}>{language === 'en' ? '1st OBJECT' : '1ª OBJETIVO'}</Text>
                                 </View>
                             </View>
                         </View>
@@ -345,21 +401,21 @@ export const CaromBallStudioModal = memo(function CaromBallStudioModal({
                             style={[s.tabBtn, activeTab === 'skins' && s.tabBtnActive]}
                             onPress={() => setActiveTab('skins')}>
                             <Text style={[s.tabBtnText, activeTab === 'skins' && s.tabBtnTextActive]}>
-                                Sets de Bolas (Skins)
+                                {language === 'en' ? 'Ball Sets (Skins)' : 'Sets de Bolas (Skins)'}
                             </Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                             style={[s.tabBtn, activeTab === 'break' && s.tabBtnActive]}
                             onPress={() => setActiveTab('break')}>
                             <Text style={[s.tabBtnText, activeTab === 'break' && s.tabBtnTextActive]}>
-                                Salida (Break Shot)
+                                {language === 'en' ? 'Break Shot' : 'Salida (Break Shot)'}
                             </Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                             style={[s.tabBtn, activeTab === 'tactical' && s.tabBtnActive]}
                             onPress={() => setActiveTab('tactical')}>
                             <Text style={[s.tabBtnText, activeTab === 'tactical' && s.tabBtnTextActive]}>
-                                Ajustes de Bola
+                                {language === 'en' ? 'Ball Settings' : 'Ajustes de Bola'}
                             </Text>
                         </TouchableOpacity>
                     </View>
@@ -371,14 +427,19 @@ export const CaromBallStudioModal = memo(function CaromBallStudioModal({
                         showsVerticalScrollIndicator={false}>
                         {activeTab === 'skins' && (
                             <View style={s.tabSection}>
-                                <Text style={s.sectionTitle}>Sets Oficiales de Competición</Text>
+                                <Text style={s.sectionTitle}>
+                                    {language === 'en' ? 'Official Competition Sets' : 'Sets Oficiales de Competición'}
+                                </Text>
                                 <Text style={s.sectionDesc}>
-                                    Selecciona el diseño y marcajes de bolas según el circuito profesional:
+                                    {language === 'en'
+                                        ? 'Select ball design and markings according to pro circuit:'
+                                        : 'Selecciona el diseño y marcajes de bolas según el circuito profesional:'}
                                 </Text>
 
                                 <View style={s.skinsList}>
                                     {BALL_SKIN_PRESETS.map((preset) => {
                                         const isSelected = currentBallSkin === preset.id;
+                                        const skinTexts = getSkinTexts(preset, language);
                                         return (
                                             <TouchableOpacity
                                                 key={preset.id}
@@ -387,9 +448,9 @@ export const CaromBallStudioModal = memo(function CaromBallStudioModal({
                                                 activeOpacity={0.8}>
                                                 <View style={s.skinCardHeader}>
                                                     <View style={s.skinMetaRow}>
-                                                        <Text style={s.skinOrigin}>{preset.origin}</Text>
+                                                        <Text style={s.skinOrigin}>{skinTexts.origin}</Text>
                                                         <Text style={[s.skinName, isSelected && s.skinNameActive]}>
-                                                            {preset.name}
+                                                            {skinTexts.name}
                                                         </Text>
                                                     </View>
                                                     {isSelected && (
@@ -398,8 +459,8 @@ export const CaromBallStudioModal = memo(function CaromBallStudioModal({
                                                         </View>
                                                     )}
                                                 </View>
-                                                <Text style={s.skinSub}>{preset.subtitle}</Text>
-                                                <Text style={s.skinDesc}>{preset.description}</Text>
+                                                <Text style={s.skinSub}>{skinTexts.subtitle}</Text>
+                                                <Text style={s.skinDesc}>{skinTexts.description}</Text>
                                             </TouchableOpacity>
                                         );
                                     })}
@@ -409,9 +470,13 @@ export const CaromBallStudioModal = memo(function CaromBallStudioModal({
 
                         {activeTab === 'break' && (
                             <View style={s.tabSection}>
-                                <Text style={s.sectionTitle}>Formato Canónico de Salida</Text>
+                                <Text style={s.sectionTitle}>
+                                    {language === 'en' ? 'Canonical Break Format' : 'Formato Canónico de Salida'}
+                                </Text>
                                 <Text style={s.sectionDesc}>
-                                    Elige entre la salida tradicional de la federación mundial (UMB) o el sistema de 9 spots del tour coreano (PBA):
+                                    {language === 'en'
+                                        ? 'Choose between world federation traditional break (UMB) or Korean tour 9-spot system (PBA):'
+                                        : 'Elige entre la salida tradicional de la federación mundial (UMB) o el sistema de 9 spots del tour coreano (PBA):'}
                                 </Text>
 
                                 {/* Selector UMB vs PBA */}
@@ -428,10 +493,12 @@ export const CaromBallStudioModal = memo(function CaromBallStudioModal({
                                                 s.formatCardTitle,
                                                 currentBreakFormat === 'umb' && s.formatCardTitleActive,
                                             ]}>
-                                            UMB Mundial
+                                            {language === 'en' ? 'World UMB' : 'UMB Mundial'}
                                         </Text>
                                         <Text style={s.formatCardDesc}>
-                                            Líneas fijas 1/4 y 3/4. Tiradora a 18.25 cm
+                                            {language === 'en'
+                                                ? 'Fixed 1/4 & 3/4 lines. Cue ball at 18.25 cm'
+                                                : 'Líneas fijas 1/4 y 3/4. Tiradora a 18.25 cm'}
                                         </Text>
                                     </Pressable>
 
@@ -450,7 +517,9 @@ export const CaromBallStudioModal = memo(function CaromBallStudioModal({
                                             PBA Pro Tour
                                         </Text>
                                         <Text style={s.formatCardDesc}>
-                                            Grilla de 9 spots con formaciones por sorteo
+                                            {language === 'en'
+                                                ? '9-spot grid with draw-based formations'
+                                                : 'Grilla de 9 spots con formaciones por sorteo'}
                                         </Text>
                                     </Pressable>
                                 </View>
@@ -459,7 +528,7 @@ export const CaromBallStudioModal = memo(function CaromBallStudioModal({
                                 {currentBreakFormat === 'umb' ? (
                                     <View style={s.breakDetailBox}>
                                         <Text style={s.breakDetailTitle}>
-                                            Lado de la Bola Blanca Tiradora (UMB):
+                                            {language === 'en' ? 'Cue Ball Side (UMB):' : 'Lado de la Bola Blanca Tiradora (UMB):'}
                                         </Text>
                                         <View style={s.umbSideRow}>
                                             <TouchableOpacity
@@ -473,7 +542,7 @@ export const CaromBallStudioModal = memo(function CaromBallStudioModal({
                                                         s.sideBtnText,
                                                         currentUmbSide === 'right' && s.sideBtnTextActive,
                                                     ]}>
-                                                    Derecha (Estándar 18.25 cm)
+                                                    {language === 'en' ? 'Right (Standard 18.25 cm)' : 'Derecha (Estándar 18.25 cm)'}
                                                 </Text>
                                             </TouchableOpacity>
                                             <TouchableOpacity
@@ -487,26 +556,30 @@ export const CaromBallStudioModal = memo(function CaromBallStudioModal({
                                                         s.sideBtnText,
                                                         currentUmbSide === 'left' && s.sideBtnTextActive,
                                                     ]}>
-                                                    Izquierda (18.25 cm)
+                                                    {language === 'en' ? 'Left (18.25 cm)' : 'Izquierda (18.25 cm)'}
                                                 </Text>
                                             </TouchableOpacity>
                                         </View>
                                         <Text style={s.breakNote}>
-                                            Roja en Punto Alto ($X=213, Y=71$), Amarilla en Centro Salida ($X=71, Y=71$).
+                                            {language === 'en'
+                                                ? 'Red at High Spot (X=213, Y=71), Yellow at Break Center (X=71, Y=71).'
+                                                : 'Roja en Punto Alto ($X=213, Y=71$), Amarilla en Centro Salida ($X=71, Y=71$).'}
                                         </Text>
                                     </View>
                                 ) : (
                                     <View style={s.breakDetailBox}>
                                         <View style={s.pbaHeaderRow}>
                                             <Text style={s.breakDetailTitle}>
-                                                Formación Táctica PBA (9 Spots):
+                                                {language === 'en' ? 'PBA Tactical Formation (9 Spots):' : 'Formación Táctica PBA (9 Spots):'}
                                             </Text>
                                             <TouchableOpacity
                                                 style={s.randomBtn}
                                                 onPress={handleRandomizePba}
                                                 activeOpacity={0.7}>
                                                 <IconRefresh size={12} color="#ffffff" />
-                                                <Text style={s.randomBtnText}>Sortear Cartas</Text>
+                                                <Text style={s.randomBtnText}>
+                                                    {language === 'en' ? 'Draw Cards' : 'Sortear Cartas'}
+                                                </Text>
                                             </TouchableOpacity>
                                         </View>
 
@@ -523,7 +596,7 @@ export const CaromBallStudioModal = memo(function CaromBallStudioModal({
                                                             {fId}
                                                         </Text>
                                                         <Text style={s.pbaCardLabel}>
-                                                            {fId === '159' ? 'Canónica' : fId === '357' ? 'Invertida' : fId === '258' ? 'Central' : fId}
+                                                            {fId === '159' ? (language === 'en' ? 'Canonical' : 'Canónica') : fId === '357' ? (language === 'en' ? 'Inverted' : 'Invertida') : fId === '258' ? (language === 'en' ? 'Center' : 'Central') : fId}
                                                         </Text>
                                                     </TouchableOpacity>
                                                 );
@@ -542,7 +615,9 @@ export const CaromBallStudioModal = memo(function CaromBallStudioModal({
                                         activeOpacity={0.8}>
                                         <IconRefresh size={14} color="#0f172a" strokeWidth={2.5} />
                                         <Text style={s.applyBreakBtnText}>
-                                            Colocar Bolas en Salida Seleccionada Ahora
+                                            {language === 'en'
+                                                ? 'Place Balls on Selected Break Now'
+                                                : 'Colocar Bolas en Salida Seleccionada Ahora'}
                                         </Text>
                                     </TouchableOpacity>
                                 )}
@@ -551,17 +626,25 @@ export const CaromBallStudioModal = memo(function CaromBallStudioModal({
 
                         {activeTab === 'tactical' && (
                             <View style={s.tabSection}>
-                                <Text style={s.sectionTitle}>Ajustes Tácticos de Bola</Text>
+                                <Text style={s.sectionTitle}>
+                                    {language === 'en' ? 'Tactical Ball Settings' : 'Ajustes Tácticos de Bola'}
+                                </Text>
                                 <Text style={s.sectionDesc}>
-                                    Controla la bola de tiro y la visibilidad de los marcadores en la mesa:
+                                    {language === 'en'
+                                        ? 'Control cue ball and marker visibility on the table:'
+                                        : 'Controla la bola de tiro y la visibilidad de los marcadores en la mesa:'}
                                 </Text>
 
                                 <View style={s.tacticalOptionBox}>
                                     <View style={s.tacticalRow}>
                                         <View style={{ flex: 1 }}>
-                                            <Text style={s.tacticalTitle}>Bola de Ataque Activa</Text>
+                                            <Text style={s.tacticalTitle}>
+                                                {language === 'en' ? 'Active Cue Ball' : 'Bola de Ataque Activa'}
+                                            </Text>
                                             <Text style={s.tacticalSub}>
-                                                Selecciona con cuál bola ejecutarás el tiro
+                                                {language === 'en'
+                                                    ? 'Select which ball you will shoot with'
+                                                    : 'Selecciona con cuál bola ejecutarás el tiro'}
                                             </Text>
                                         </View>
                                         <View style={s.cueBallSwitch}>
@@ -576,7 +659,7 @@ export const CaromBallStudioModal = memo(function CaromBallStudioModal({
                                                         s.cueSwitchBtnText,
                                                         cueBallId === 'white' && s.cueSwitchBtnTextActive,
                                                     ]}>
-                                                    Blanca
+                                                    {language === 'en' ? 'White' : 'Blanca'}
                                                 </Text>
                                             </TouchableOpacity>
                                             <TouchableOpacity
@@ -590,7 +673,7 @@ export const CaromBallStudioModal = memo(function CaromBallStudioModal({
                                                         s.cueSwitchBtnText,
                                                         cueBallId === 'yellow' && s.cueSwitchBtnTextActive,
                                                     ]}>
-                                                    Amarilla
+                                                    {language === 'en' ? 'Yellow' : 'Amarilla'}
                                                 </Text>
                                             </TouchableOpacity>
                                         </View>
@@ -600,9 +683,13 @@ export const CaromBallStudioModal = memo(function CaromBallStudioModal({
                                 <View style={s.tacticalOptionBox}>
                                     <View style={s.tacticalRow}>
                                         <View style={{ flex: 1 }}>
-                                            <Text style={s.tacticalTitle}>Puntos de Rotación (Measle Dots)</Text>
+                                            <Text style={s.tacticalTitle}>
+                                                {language === 'en' ? 'Rotation Dots (Measle Dots)' : 'Puntos de Rotación (Measle Dots)'}
+                                            </Text>
                                             <Text style={s.tacticalSub}>
-                                                Muestra los 6 puntos de giro sobre la mesa para leer efectos
+                                                {language === 'en'
+                                                    ? 'Show 6 rotation dots on the table to read spin'
+                                                    : 'Muestra los 6 puntos de giro sobre la mesa para leer efectos'}
                                             </Text>
                                         </View>
                                         <TouchableOpacity
@@ -619,10 +706,18 @@ export const CaromBallStudioModal = memo(function CaromBallStudioModal({
                                 </View>
 
                                 <View style={s.specsBox}>
-                                    <Text style={s.specsTitle}>Especificaciones Técnicas Oficiales:</Text>
-                                    <Text style={s.specsItem}>• Diámetro: 61.5 mm (Reglamento UMB / PBA)</Text>
-                                    <Text style={s.specsItem}>• Peso: ~210 gramos</Text>
-                                    <Text style={s.specsItem}>• Material: Resina fenólica de alta densidad</Text>
+                                    <Text style={s.specsTitle}>
+                                        {language === 'en' ? 'Official Technical Specifications:' : 'Especificaciones Técnicas Oficiales:'}
+                                    </Text>
+                                    <Text style={s.specsItem}>
+                                        {language === 'en' ? '• Diameter: 61.5 mm (UMB / PBA Rules)' : '• Diámetro: 61.5 mm (Reglamento UMB / PBA)'}
+                                    </Text>
+                                    <Text style={s.specsItem}>
+                                        {language === 'en' ? '• Weight: ~210 grams' : '• Peso: ~210 gramos'}
+                                    </Text>
+                                    <Text style={s.specsItem}>
+                                        {language === 'en' ? '• Material: High-density phenolic resin' : '• Material: Resina fenólica de alta densidad'}
+                                    </Text>
                                 </View>
                             </View>
                         )}
@@ -631,7 +726,7 @@ export const CaromBallStudioModal = memo(function CaromBallStudioModal({
                     {/* Footer */}
                     <View style={s.footer}>
                         <TouchableOpacity style={s.doneBtn} onPress={onClose} activeOpacity={0.8}>
-                            <Text style={s.doneBtnText}>Listo</Text>
+                            <Text style={s.doneBtnText}>{t('common.done')}</Text>
                         </TouchableOpacity>
                     </View>
                 </View>

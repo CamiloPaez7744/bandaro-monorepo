@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { useColorScheme } from '@/components/useColorScheme';
+import { useI18n } from '@/components/useLanguage';
 import { getPalette } from '@/constants/theme';
 import {
   IconAdjustments,
@@ -87,10 +88,13 @@ function CanvasViewSettingsModalBase({
   onOpenTableCustomizer,
 }: CanvasViewSettingsModalProps) {
   const colorScheme = useColorScheme();
+  const { language } = useI18n();
   const palette = getPalette(colorScheme);
   const isDark = colorScheme === 'dark';
   const C = getC(palette, isDark);
   const s = getStyles(C, isDark);
+  const isEn = language === 'en';
+
   return (
     <Modal
       visible={visible}
@@ -108,7 +112,9 @@ function CanvasViewSettingsModalBase({
               <View style={s.headerIconWrap}>
                 <IconAdjustments size={18} color={C.primary} strokeWidth={2} />
               </View>
-              <Text style={s.headerTitle}>Ajustes de Vista del Lienzo</Text>
+              <Text style={s.headerTitle}>
+                {isEn ? 'Canvas View Settings' : 'Ajustes de Vista del Lienzo'}
+              </Text>
             </View>
             <TouchableOpacity
               style={s.closeBtn}
@@ -122,14 +128,18 @@ function CanvasViewSettingsModalBase({
           <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent}>
             {/* Section 1: Visual Overlays */}
             <View style={s.section}>
-              <Text style={s.sectionTitle}>CAPAS VISUALES EN LA FOTO</Text>
+              <Text style={s.sectionTitle}>
+                {isEn ? 'VISUAL OVERLAYS ON PHOTO' : 'CAPAS VISUALES EN LA FOTO'}
+              </Text>
 
               {/* Wood Rails */}
               <View style={s.switchRow}>
                 <View style={s.switchLabelWrap}>
-                  <Text style={s.switchTitle}>Madera del Pasamanos</Text>
+                  <Text style={s.switchTitle}>
+                    {isEn ? 'Wood Rails' : 'Madera del Pasamanos'}
+                  </Text>
                   <Text style={s.switchSub}>
-                    Muestra el perímetro exterior de madera
+                    {isEn ? 'Shows outer wood perimeter' : 'Muestra el perímetro exterior de madera'}
                   </Text>
                 </View>
                 <Switch
@@ -144,10 +154,10 @@ function CanvasViewSettingsModalBase({
               <View style={s.switchRow}>
                 <View style={s.switchLabelWrap}>
                   <Text style={s.switchTitle}>
-                    Cuadrícula Táctica {tableCoverage === 'half' ? '(4×4)' : '(8×4)'}
+                    {isEn ? 'Tactical Grid' : 'Cuadrícula Táctica'} {tableCoverage === 'half' ? '(4×4)' : '(8×4)'}
                   </Text>
                   <Text style={s.switchSub}>
-                    Líneas guía entre diamantes proyectadas en la mesa
+                    {isEn ? 'Guide lines between diamonds projected on table' : 'Líneas guía entre diamantes proyectadas en la mesa'}
                   </Text>
                 </View>
                 <Switch
@@ -161,9 +171,11 @@ function CanvasViewSettingsModalBase({
               {/* Diamonds */}
               <View style={s.switchRow}>
                 <View style={s.switchLabelWrap}>
-                  <Text style={s.switchTitle}>Diamantes en Bandas</Text>
+                  <Text style={s.switchTitle}>
+                    {isEn ? 'Cushion Diamonds' : 'Diamantes en Bandas'}
+                  </Text>
                   <Text style={s.switchSub}>
-                    Incrustaciones de referencia en los pasamanos
+                    {isEn ? 'Reference inlays on wooden rails' : 'Incrustaciones de referencia en los pasamanos'}
                   </Text>
                 </View>
                 <Switch
@@ -177,9 +189,11 @@ function CanvasViewSettingsModalBase({
               {/* Corner Diamonds */}
               <View style={s.switchRow}>
                 <View style={s.switchLabelWrap}>
-                  <Text style={s.switchTitle}>Diamantes en las Esquinas</Text>
+                  <Text style={s.switchTitle}>
+                    {isEn ? 'Corner Diamonds' : 'Diamantes en las Esquinas'}
+                  </Text>
                   <Text style={s.switchSub}>
-                    Puntos de esquina alineados a las bandas contrarias
+                    {isEn ? 'Corner points aligned with opposing rails' : 'Puntos de esquina alineados a las bandas contrarias'}
                   </Text>
                 </View>
                 <Switch
@@ -193,10 +207,14 @@ function CanvasViewSettingsModalBase({
 
             {/* Section 2: Mode & Orientation */}
             <View style={s.section}>
-              <Text style={s.sectionTitle}>ORIENTACIÓN Y COBERTURA</Text>
+              <Text style={s.sectionTitle}>
+                {isEn ? 'ORIENTATION & COVERAGE' : 'ORIENTACIÓN Y COBERTURA'}
+              </Text>
 
               {/* Orientation */}
-              <Text style={s.subLabel}>Orientación de la Mesa</Text>
+              <Text style={s.subLabel}>
+                {isEn ? 'Table Orientation' : 'Orientación de la Mesa'}
+              </Text>
               <View style={s.segmentedRow}>
                 <TouchableOpacity
                   style={[
@@ -211,7 +229,7 @@ function CanvasViewSettingsModalBase({
                       tableOrientation === 'horizontal' && s.segBtnTextActive,
                     ]}
                   >
-                    ▭ Horizontal (Larga Arriba)
+                    {isEn ? '▭ Horizontal (Long Rail Top)' : '▭ Horizontal (Larga Arriba)'}
                   </Text>
                 </TouchableOpacity>
 
@@ -228,14 +246,14 @@ function CanvasViewSettingsModalBase({
                       tableOrientation === 'vertical' && s.segBtnTextActive,
                     ]}
                   >
-                    ▯ Vertical (Larga a los Lados)
+                    {isEn ? '▯ Vertical (Long Rail Sides)' : '▯ Vertical (Larga a los Lados)'}
                   </Text>
                 </TouchableOpacity>
               </View>
 
               {/* Coverage */}
               <Text style={[s.subLabel, { marginTop: 12 }]}>
-                Cobertura de Mesa
+                {isEn ? 'Table Coverage' : 'Cobertura de Mesa'}
               </Text>
               <View style={s.segmentedRow}>
                 <TouchableOpacity
@@ -251,7 +269,7 @@ function CanvasViewSettingsModalBase({
                       tableCoverage === 'full' && s.segBtnTextActive,
                     ]}
                   >
-                    Mesa Completa (8×4)
+                    {isEn ? 'Full Table (8×4)' : 'Mesa Completa (8×4)'}
                   </Text>
                 </TouchableOpacity>
 
@@ -268,7 +286,7 @@ function CanvasViewSettingsModalBase({
                       tableCoverage === 'half' && s.segBtnTextActive,
                     ]}
                   >
-                    Media Mesa (4×4)
+                    {isEn ? 'Half Table (4×4)' : 'Media Mesa (4×4)'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -276,7 +294,9 @@ function CanvasViewSettingsModalBase({
               {/* Half table zone switcher */}
               {tableCoverage === 'half' && (
                 <View style={{ marginTop: 8 }}>
-                  <Text style={s.subLabel}>Zona de Media Mesa</Text>
+                  <Text style={s.subLabel}>
+                    {isEn ? 'Half Table Zone' : 'Zona de Media Mesa'}
+                  </Text>
                   <View style={s.segmentedRow}>
                     <TouchableOpacity
                       style={[
@@ -291,7 +311,7 @@ function CanvasViewSettingsModalBase({
                           halfTableZone === 'half_1' && s.segBtnTextActive,
                         ]}
                       >
-                        Mitad 1 (0-142 cm)
+                        {isEn ? 'Half 1 (0-142 cm)' : 'Mitad 1 (0-142 cm)'}
                       </Text>
                     </TouchableOpacity>
 
@@ -308,7 +328,7 @@ function CanvasViewSettingsModalBase({
                           halfTableZone === 'half_2' && s.segBtnTextActive,
                         ]}
                       >
-                        Mitad 2 (142-284 cm)
+                        {isEn ? 'Half 2 (142-284 cm)' : 'Mitad 2 (142-284 cm)'}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -316,7 +336,9 @@ function CanvasViewSettingsModalBase({
               )}
 
               {/* Canvas Zoom */}
-              <Text style={[s.subLabel, { marginTop: 12 }]}>Modo del Lienzo</Text>
+              <Text style={[s.subLabel, { marginTop: 12 }]}>
+                {isEn ? 'Canvas Mode' : 'Modo del Lienzo'}
+              </Text>
               <View style={s.segmentedRow}>
                 <TouchableOpacity
                   style={[s.segBtn, canvasZoom === 'fit' && s.segBtnActive]}
@@ -328,7 +350,7 @@ function CanvasViewSettingsModalBase({
                       canvasZoom === 'fit' && s.segBtnTextActive,
                     ]}
                   >
-                    Ajuste Automático
+                    {isEn ? 'Auto Fit' : 'Ajuste Automático'}
                   </Text>
                 </TouchableOpacity>
 
@@ -342,7 +364,7 @@ function CanvasViewSettingsModalBase({
                       canvasZoom === 'expanded' && s.segBtnTextActive,
                     ]}
                   >
-                    Lienzo Expandido (72%)
+                    {isEn ? 'Expanded Canvas (72%)' : 'Lienzo Expandido (72%)'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -362,10 +384,10 @@ function CanvasViewSettingsModalBase({
                   <IconSettings size={18} color={C.primary} strokeWidth={2} />
                   <View style={{ flex: 1 }}>
                     <Text style={s.customizerShortcutTitle}>
-                      Personalizar Paño y Skins de Mesa
+                      {isEn ? 'Customize Cloth & Table Skins' : 'Personalizar Paño y Skins de Mesa'}
                     </Text>
                     <Text style={s.customizerShortcutSub}>
-                      Color de paño (Simonis), rombos/círculos, madera
+                      {isEn ? 'Cloth color (Simonis), diamonds/dots, wood finish' : 'Color de paño (Simonis), rombos/círculos, madera'}
                     </Text>
                   </View>
                 </TouchableOpacity>
@@ -381,7 +403,7 @@ function CanvasViewSettingsModalBase({
               activeOpacity={0.8}
             >
               <IconCheck size={16} color="#0a100d" strokeWidth={2.5} />
-              <Text style={s.doneBtnText}>Listo</Text>
+              <Text style={s.doneBtnText}>{isEn ? 'Done' : 'Listo'}</Text>
             </TouchableOpacity>
           </View>
         </View>

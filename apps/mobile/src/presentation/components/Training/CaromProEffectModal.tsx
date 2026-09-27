@@ -23,6 +23,7 @@ import Svg, {
 import { BallId, SpinEffect } from '@bandaro/core';
 import { IconRefresh, IconX, IconCheck } from '@/src/presentation/components/icons';
 import { useColorScheme } from '@/components/useColorScheme';
+import { useI18n } from '@/components/useLanguage';
 import { getPalette } from '@/constants/theme';
 import {
     useTablePreferences,
@@ -55,6 +56,7 @@ export const CaromProEffectModal = memo(function CaromProEffectModal({
 }: CaromProEffectModalProps) {
     const { width: windowWidth, height: windowHeight } = useWindowDimensions();
     const isMobile = windowWidth < 768;
+    const { t, language } = useI18n();
     const colorScheme = useColorScheme();
     const palette = getPalette(colorScheme);
     const isDark = colorScheme === 'dark';
@@ -180,15 +182,15 @@ export const CaromProEffectModal = memo(function CaromProEffectModal({
                                     borderRadius: 4,
                                 }}>
                                     <Text style={{ fontSize: 9, fontWeight: '800', color: isYellow ? '#713f12' : '#0f172a' }}>
-                                        {isYellow ? 'BOLA AMARILLA' : 'BOLA BLANCA'}
+                                        {isYellow ? (language === 'en' ? 'YELLOW BALL' : 'BOLA AMARILLA') : (language === 'en' ? 'WHITE BALL' : 'BOLA BLANCA')}
                                     </Text>
                                 </View>
                             </View>
                             <Text style={[styles.headerTitle, isMobile && { fontSize: 13 }]}>
-                                SELECTOR DE EFECTO • {BALL_SKIN_PRESETS.find((s) => s.id === ballSkin)?.name.split(' (')[0] ?? 'PRO'}
+                                {t('training.effect.title')} • {BALL_SKIN_PRESETS.find((s) => s.id === ballSkin)?.name.split(' (')[0] ?? 'PRO'}
                             </Text>
                         </View>
-                        <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
+                        <TouchableOpacity style={styles.closeBtn} onPress={onClose} accessibilityLabel={t('common.close')}>
                             <IconX size={18} color="#94a3b8" />
                         </TouchableOpacity>
                     </View>
@@ -441,7 +443,7 @@ export const CaromProEffectModal = memo(function CaromProEffectModal({
                                         fontSize="6"
                                         fontWeight="bold"
                                         textAnchor="middle">
-                                        Der
+                                        {language === 'en' ? 'R' : 'Der'}
                                     </SvgText>
                                     <SvgText
                                         x={center - maxDragRadius * 0.86}
@@ -450,7 +452,7 @@ export const CaromProEffectModal = memo(function CaromProEffectModal({
                                         fontSize="6"
                                         fontWeight="bold"
                                         textAnchor="middle">
-                                        Izq
+                                        {language === 'en' ? 'L' : 'Izq'}
                                     </SvgText>
                                     <SvgText
                                         x={center + 4}
@@ -459,7 +461,7 @@ export const CaromProEffectModal = memo(function CaromProEffectModal({
                                         fontSize="6"
                                         fontWeight="bold"
                                         textAnchor="start">
-                                        Corr
+                                        {language === 'en' ? 'Top' : 'Corr'}
                                     </SvgText>
                                     <SvgText
                                         x={center + 4}
@@ -468,7 +470,7 @@ export const CaromProEffectModal = memo(function CaromProEffectModal({
                                         fontSize="6"
                                         fontWeight="bold"
                                         textAnchor="start">
-                                        Piq
+                                        {language === 'en' ? 'Draw' : 'Piq'}
                                     </SvgText>
 
                                     {/* Halo exterior y Casquillo del taco */}
@@ -501,11 +503,11 @@ export const CaromProEffectModal = memo(function CaromProEffectModal({
                             <View style={styles.legendRow}>
                                 <View style={styles.legendItem}>
                                     <View style={styles.legendDashSafe} />
-                                    <Text style={styles.legendText}>Zona segura (E4)</Text>
+                                    <Text style={styles.legendText}>{t('training.effect.safeZone')}</Text>
                                 </View>
                                 <View style={styles.legendItem}>
                                     <View style={styles.legendDashMiscue} />
-                                    <Text style={[styles.legendText, { color: '#f87171' }]}>Zona de pifia</Text>
+                                    <Text style={[styles.legendText, { color: '#f87171' }]}>{t('training.effect.miscueZone')}</Text>
                                 </View>
                             </View>
                         </View>
@@ -513,30 +515,30 @@ export const CaromProEffectModal = memo(function CaromProEffectModal({
                         {/* Ficha de Información Física y Efecto */}
                         <View style={styles.metricsCard}>
                             <View style={styles.metricCol}>
-                                <Text style={styles.metricLabel}>EFECTO</Text>
+                                <Text style={styles.metricLabel}>{t('training.system.effect').toUpperCase()}</Text>
                                 <Text style={[styles.metricValue, { color: '#00d2ff' }]}>
-                                    {effectLevel === 0 ? 'E0 Centro' : `E${effectLevel}`}
+                                    {effectLevel === 0 ? (language === 'en' ? 'E0 Center' : 'E0 Centro') : `E${effectLevel}`}
                                 </Text>
                             </View>
                             <View style={styles.metricDivider} />
                             <View style={styles.metricCol}>
-                                <Text style={styles.metricLabel}>DESVÍO X / Y</Text>
+                                <Text style={styles.metricLabel}>{t('training.effect.offset')}</Text>
                                 <Text style={styles.metricValue}>
                                     {offsetX_mm > 0 ? `+${offsetX_mm.toFixed(1)}` : offsetX_mm.toFixed(1)} / {offsetY_mm > 0 ? `+${offsetY_mm.toFixed(1)}` : offsetY_mm.toFixed(1)} mm
                                 </Text>
                             </View>
                             <View style={styles.metricDivider} />
                             <View style={styles.metricCol}>
-                                <Text style={styles.metricLabel}>INCIDENCIA</Text>
+                                <Text style={styles.metricLabel}>{t('training.effect.deflection')}</Text>
                                 <Text style={[styles.metricValue, { color: isMiscueZone ? '#ef4444' : '#f59e0b' }]}>
-                                    {isMiscueZone ? '⚠️ Pifia' : `+${effectLevel} Diam`}
+                                    {isMiscueZone ? `⚠️ ${t('training.effect.miscue')}` : `+${effectLevel} Diam`}
                                 </Text>
                             </View>
                         </View>
 
                         {/* Selector Rápido de Efecto Discreto */}
                         <View style={styles.presetSection}>
-                            <Text style={styles.sectionTitle}>NIVELES DE CASQUILLO (12 MM)</Text>
+                            <Text style={styles.sectionTitle}>{t('training.effect.tipLevels')}</Text>
                             <View style={styles.pillRow}>
                                 <TouchableOpacity
                                     style={[styles.pillBtn, effectLevel === 0 && styles.pillBtnActive]}
@@ -578,12 +580,12 @@ export const CaromProEffectModal = memo(function CaromProEffectModal({
 
                         {/* Selector de Horas de Reloj */}
                         <View style={styles.presetSection}>
-                            <Text style={styles.sectionTitle}>DIRECCIÓN DEL GOLPE (RELOJ)</Text>
+                            <Text style={styles.sectionTitle}>{t('training.effect.clockDirection')}</Text>
                             <View style={styles.pillRowWrap}>
                                 <TouchableOpacity
                                     style={styles.clockPill}
                                     onPress={() => setPreset(0, 0.75)}>
-                                    <Text style={styles.clockPillText}>12h Corrido</Text>
+                                    <Text style={styles.clockPillText}>{language === 'en' ? '12h Follow' : '12h Corrido'}</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={styles.clockPill}
@@ -593,7 +595,7 @@ export const CaromProEffectModal = memo(function CaromProEffectModal({
                                 <TouchableOpacity
                                     style={styles.clockPill}
                                     onPress={() => setPreset(0.75, 0)}>
-                                    <Text style={styles.clockPillText}>3h Lateral</Text>
+                                    <Text style={styles.clockPillText}>{language === 'en' ? '3h Right' : '3h Lateral'}</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={styles.clockPill}
@@ -603,7 +605,7 @@ export const CaromProEffectModal = memo(function CaromProEffectModal({
                                 <TouchableOpacity
                                     style={styles.clockPill}
                                     onPress={() => setPreset(0, -0.75)}>
-                                    <Text style={styles.clockPillText}>6h Pique</Text>
+                                    <Text style={styles.clockPillText}>{language === 'en' ? '6h Draw' : '6h Pique'}</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={styles.clockPill}
@@ -613,7 +615,7 @@ export const CaromProEffectModal = memo(function CaromProEffectModal({
                                 <TouchableOpacity
                                     style={styles.clockPill}
                                     onPress={() => setPreset(-0.75, 0)}>
-                                    <Text style={styles.clockPillText}>9h Lateral</Text>
+                                    <Text style={styles.clockPillText}>{language === 'en' ? '9h Left' : '9h Lateral'}</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={styles.clockPill}
@@ -630,12 +632,12 @@ export const CaromProEffectModal = memo(function CaromProEffectModal({
                             style={styles.resetBtn}
                             onPress={() => setPreset(0, 0)}>
                             <IconRefresh size={15} color="#94a3b8" />
-                            <Text style={styles.resetBtnText}>Centrar</Text>
+                            <Text style={styles.resetBtnText}>{t('common.center')}</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity style={styles.confirmBtn} onPress={onClose}>
                             <IconCheck size={16} color="#ffffff" strokeWidth={2.5} />
-                            <Text style={styles.confirmBtnText}>Listo</Text>
+                            <Text style={styles.confirmBtnText}>{t('common.done')}</Text>
                         </TouchableOpacity>
                     </View>
                 </View>

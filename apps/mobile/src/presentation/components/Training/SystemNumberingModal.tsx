@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { IconX, IconPlus, IconTrash, IconNumbers } from '@/src/presentation/components/icons';
 import { useColorScheme } from '@/components/useColorScheme';
+import { useI18n } from '@/components/useLanguage';
 import { getPalette } from '@/constants/theme';
 import {
     SystemNumberingControl,
@@ -42,6 +43,7 @@ export const SystemNumberingModal = memo(function SystemNumberingModal({
 }: SystemNumberingModalProps) {
     const { width } = useWindowDimensions();
     const isMobile = width < 768;
+    const { t, language } = useI18n();
     const colorScheme = useColorScheme();
     const palette = getPalette(colorScheme);
     const isDark = colorScheme === 'dark';
@@ -74,13 +76,13 @@ export const SystemNumberingModal = memo(function SystemNumberingModal({
                                 <IconNumbers size={18} color="#38bdf8" />
                             </View>
                             <View style={{ flex: 1 }}>
-                                <Text style={styles.headerSubtitle}>SISTEMAS Y DIAMANTES</Text>
+                                <Text style={styles.headerSubtitle}>{language === 'en' ? 'SYSTEMS & DIAMONDS' : 'SISTEMAS Y DIAMANTES'}</Text>
                                 <Text style={[styles.headerTitle, isMobile && { fontSize: 14 }]}>
-                                    Numeración de Bandas
+                                    {language === 'en' ? 'Cushion Numbering' : 'Numeración de Bandas'}
                                 </Text>
                             </View>
                         </View>
-                        <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
+                        <TouchableOpacity style={styles.closeBtn} onPress={onClose} accessibilityLabel={t('common.close')}>
                             <IconX size={18} color="#94a3b8" />
                         </TouchableOpacity>
                     </View>
@@ -98,7 +100,9 @@ export const SystemNumberingModal = memo(function SystemNumberingModal({
                                     styles.toggleBtnText,
                                     showNumbering && styles.toggleBtnTextActive,
                                 ]}>
-                                {showNumbering ? '● Visibles' : '○ Ocultos'}
+                                {showNumbering
+                                    ? (language === 'en' ? '● Visible' : '● Visibles')
+                                    : (language === 'en' ? '○ Hidden' : '○ Ocultos')}
                             </Text>
                         </TouchableOpacity>
 
@@ -107,7 +111,7 @@ export const SystemNumberingModal = memo(function SystemNumberingModal({
                                 style={styles.addBtn}
                                 onPress={handleQuickAdd}>
                                 <IconPlus size={13} color="#ffffff" strokeWidth={2.5} />
-                                <Text style={styles.addBtnText}>+ Número</Text>
+                                <Text style={styles.addBtnText}>{language === 'en' ? '+ Number' : '+ Número'}</Text>
                             </TouchableOpacity>
                         )}
 
@@ -116,7 +120,7 @@ export const SystemNumberingModal = memo(function SystemNumberingModal({
                                 style={styles.clearBtn}
                                 onPress={() => onAnchorsChange([])}>
                                 <IconTrash size={13} color="#ef4444" strokeWidth={2} />
-                                <Text style={styles.clearBtnText}>Limpiar</Text>
+                                <Text style={styles.clearBtnText}>{t('common.clear')}</Text>
                             </TouchableOpacity>
                         )}
                     </View>
@@ -124,7 +128,9 @@ export const SystemNumberingModal = memo(function SystemNumberingModal({
                     {showNumbering && isEditMode && (
                         <View style={styles.editHintBox}>
                             <Text style={styles.editHintText}>
-                                💡 Arrastra los números sobre la mesa para reposicionarlos.
+                                {language === 'en'
+                                    ? '💡 Drag numbers on the table to reposition them.'
+                                    : '💡 Arrastra los números sobre la mesa para reposicionarlos.'}
                             </Text>
                         </View>
                     )}

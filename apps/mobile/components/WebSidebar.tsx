@@ -91,8 +91,8 @@ export function WebSidebar({ collapsed, onToggleCollapsed }: WebSidebarProps) {
             {collapsed ? null : (
                 <View style={styles.footerCard}>
                     <Text style={styles.footerTag}>Web view</Text>
-                    <Text style={styles.footerTitle}>Training focus</Text>
-                    <Text style={styles.footerText}>Navegacion lateral fija para escritorio, respetando los colores base de la app.</Text>
+                    <Text style={styles.footerTitle}>{t('sidebar.webFocus')}</Text>
+                    <Text style={styles.footerText}>{t('sidebar.webDesc')}</Text>
                 </View>
             )}
         </View>

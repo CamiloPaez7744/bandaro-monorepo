@@ -65,7 +65,7 @@ export const ShotCatalogCard = memo(function ShotCatalogCard({
     palette,
     isPickerMode = false,
 }: ShotCatalogCardProps) {
-    const { language } = useI18n();
+    const { language, t } = useI18n();
     const localized = getLocalizedShot(shot, language === 'en' ? 'en' : 'es');
     const color = CATEGORY_COLORS[shot.category] ?? '#6B7280';
     const langCode = (language as string) === 'en' ? 'en' : (language as string) === 'ko' ? 'ko' : 'es';
@@ -117,7 +117,7 @@ export const ShotCatalogCard = memo(function ShotCatalogCard({
                     onPress={() => onPress(shot)}
                     style={styles.tablePressable}
                     accessibilityRole="button"
-                    accessibilityLabel={`Ver jugada ${shot.id}`}>
+                    accessibilityLabel={language === 'en' ? `View shot ${shot.id}` : `Ver jugada ${shot.id}`}>
                     <TrainingPlayTable
                         whiteBall={shot.white}
                         yellowBall={shot.yellow}
@@ -147,7 +147,7 @@ export const ShotCatalogCard = memo(function ShotCatalogCard({
                     }}
                     hitSlop={8}
                     accessibilityRole="button"
-                    accessibilityLabel="Simular trayectoria">
+                    accessibilityLabel={language === 'en' ? 'Simulate trajectory' : 'Simular trayectoria'}>
                     <IconPlayerPlay size={11} color="#FFFFFF" strokeWidth={2.5} />
                     <Text style={styles.cardSimulateBtnText}>
                         {isSimulating ? '...' : (language === 'en' ? 'Sim' : 'Simular')}
@@ -160,7 +160,7 @@ export const ShotCatalogCard = memo(function ShotCatalogCard({
                 <View style={styles.specItem}>
                     <IconTarget size={13} color={color} strokeWidth={2} />
                     <Text style={[styles.specLabel, { color: palette.muted }]}>
-                        {langCode === 'en' ? 'Thick' : langCode === 'ko' ? '두께' : 'Tome'}
+                        {t('catalog.card.thick')}
                     </Text>
                     <Text style={[styles.specValue, { color: palette.text }]}>{thicknessInfo.fraction}</Text>
                 </View>
@@ -168,17 +168,17 @@ export const ShotCatalogCard = memo(function ShotCatalogCard({
                 <View style={styles.specItem}>
                     <IconCircleDot size={13} color={color} strokeWidth={2} />
                     <Text style={[styles.specLabel, { color: palette.muted }]}>
-                        {langCode === 'en' ? 'Spin' : langCode === 'ko' ? '당점' : 'Efecto'}
+                        {t('catalog.card.spin')}
                     </Text>
                     <Text style={[styles.specValue, { color: palette.text }]}>
-                        {englishInfo.tips > 0 ? englishInfo.clockFormatted : 'Centro'}
+                        {englishInfo.tips > 0 ? englishInfo.clockFormatted : t('catalog.card.center')}
                     </Text>
                 </View>
                 <View style={[styles.specDivider, { backgroundColor: palette.border }]} />
                 <View style={styles.specItem}>
                     <IconRoute size={13} color={color} strokeWidth={2} />
                     <Text style={[styles.specLabel, { color: palette.muted }]}>
-                        {langCode === 'en' ? 'Rails' : langCode === 'ko' ? '레일' : 'Bandas'}
+                        {t('catalog.card.rails')}
                     </Text>
                     <Text style={[styles.specValue, { color: palette.text }]}>{shot.railSpeed}</Text>
                 </View>
@@ -203,12 +203,12 @@ export const ShotCatalogCard = memo(function ShotCatalogCard({
                         {isPickerMode ? (
                             <>
                                 <IconPlus size={16} color="#FFFFFF" strokeWidth={2.2} />
-                                <Text style={styles.trainBtnText}>Añadir a Sesión</Text>
+                                <Text style={styles.trainBtnText}>{t('catalog.card.addToSession')}</Text>
                             </>
                         ) : (
                             <>
                                 <IconTarget size={16} color="#FFFFFF" strokeWidth={2.2} />
-                                <Text style={styles.trainBtnText}>Entrenar Jugada</Text>
+                                <Text style={styles.trainBtnText}>{t('catalog.card.trainShot')}</Text>
                             </>
                         )}
                     </Pressable>
@@ -219,7 +219,7 @@ export const ShotCatalogCard = memo(function ShotCatalogCard({
                     onPress={() => onPress(shot)}
                     accessibilityRole="button">
                     <IconEye size={16} color={palette.text} strokeWidth={1.8} />
-                    <Text style={[styles.detailBtnText, { color: palette.text }]}>Detalle</Text>
+                    <Text style={[styles.detailBtnText, { color: palette.text }]}>{t('catalog.card.detail')}</Text>
                 </Pressable>
             </View>
         </View>
