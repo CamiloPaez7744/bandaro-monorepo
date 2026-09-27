@@ -52,6 +52,7 @@ interface InteractiveBilliardsTableProps {
     aimDirection?: Vec2;
     powerLevel?: number;
     tablePreferences?: TablePreferences;
+    categoryColor?: string;
     showCueStick?: boolean;
     showGhostBall?: boolean;
     onBallMove?: (ballId: BallId, position: Vec2) => void;
@@ -528,6 +529,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
         aimDirection = vec2(1, 0),
         powerLevel = 0,
         tablePreferences = DEFAULT_TABLE_PREFERENCES,
+        categoryColor,
         showCueStick = true,
         showGhostBall = true,
         onBallMove,
@@ -543,6 +545,8 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
         onPowerChange,
         onShoot,
     } = props;
+
+    const tableUid = useMemo(() => `ibt_${Math.random().toString(36).slice(2, 8)}`, []);
 
     const clothPalette = useMemo(
         () => resolveClothPalette(tablePreferences.clothColor),
@@ -602,9 +606,9 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
     draggingBallIdRef.current = draggingBallId;
 
     const ballColors: Record<BallId, { color: string; border: string; gradientId: string }> = {
-        white: { color: '#f8fafc', border: '#94a3b8', gradientId: 'ballWhite' },
-        yellow: { color: '#facc15', border: '#ca8a04', gradientId: 'ballYellow' },
-        red: { color: '#ef4444', border: '#991b1b', gradientId: 'ballRed' },
+        white: { color: '#f8fafc', border: '#94a3b8', gradientId: `${tableUid}_ballWhite` },
+        yellow: { color: '#facc15', border: '#ca8a04', gradientId: `${tableUid}_ballYellow` },
+        red: { color: '#ef4444', border: '#991b1b', gradientId: `${tableUid}_ballRed` },
     };
 
     const ballRotationsRef = useRef<Record<BallId, Quaternion>>({
@@ -911,7 +915,9 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                 })
                 .join(' ');
 
-            const color = path.ballId === 'white' ? '#f8fafc' : path.ballId === 'yellow' ? '#facc15' : '#ef4444';
+            const defaultColor = path.ballId === 'white' ? '#f8fafc' : path.ballId === 'yellow' ? '#facc15' : '#ef4444';
+            const color = isCueBall && categoryColor ? categoryColor : defaultColor;
+            const glowColor = isCueBall && categoryColor ? `${categoryColor}40` : 'rgba(255,255,255,0.18)';
             
             // Different stroke widths for cue ball vs target balls - trazos delgados con 80% opacidad
             const glowWidth = isCueBall ? 1.4 : 1.0;
@@ -922,7 +928,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                     <Polyline
                         points={points}
                         fill="none"
-                        stroke="rgba(255,255,255,0.18)"
+                        stroke={glowColor}
                         strokeWidth={glowWidth}
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -954,7 +960,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                 </G>
             );
         });
-    }, [trajectory, orientation, layout, balls, cueBallId, showGuides, isSimulating]);
+    }, [trajectory, orientation, layout, balls, cueBallId, showGuides, isSimulating, categoryColor]);
 
     return (
         <View
@@ -968,7 +974,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
             <Svg width="100%" height="100%" viewBox={`0 0 ${layout.viewBox.width} ${layout.viewBox.height}`} style={{ overflow: 'visible' }}>
                 <Defs>
                     {/* Gradiente del marco de madera noble */}
-                    <LinearGradient id="frameGradient" x1="0" y1="0" x2="1" y2="1">
+                    <LinearGradient id={`${tableUid}_frameGradient`} x1="0" y1="0" x2="1" y2="1">
                         <Stop offset="0%" stopColor={woodPalette.start} />
                         <Stop offset="30%" stopColor={woodPalette.mid} />
                         <Stop offset="70%" stopColor={woodPalette.bevel} />
@@ -976,20 +982,20 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                     </LinearGradient>
 
                     {/* Gradiente de las bandas de caucho */}
-                    <LinearGradient id="cushionGradient" x1="0" y1="0" x2="0" y2="1">
+                    <LinearGradient id={`${tableUid}_cushionGradient`} x1="0" y1="0" x2="0" y2="1">
                         <Stop offset="0%" stopColor={clothPalette.cushionTop} />
                         <Stop offset="100%" stopColor={clothPalette.cushionBottom} />
                     </LinearGradient>
 
                     {/* Gradiente base del paño Simonis */}
-                    <RadialGradient id="feltGradient" cx="50%" cy="50%" r="65%">
+                    <RadialGradient id={`${tableUid}_feltGradient`} cx="50%" cy="50%" r="65%">
                         <Stop offset="0%" stopColor={clothPalette.highlight} />
                         <Stop offset="65%" stopColor={clothPalette.base} />
                         <Stop offset="100%" stopColor={clothPalette.edge} />
                     </RadialGradient>
 
                     {/* Viñeta de iluminación cenital estilo 8 Ball Pool */}
-                    <RadialGradient id="arenaSpotlight" cx="50%" cy="50%" r="55%">
+                    <RadialGradient id={`${tableUid}_arenaSpotlight`} cx="50%" cy="50%" r="55%">
                         <Stop offset="0%" stopColor="#ffffff" stopOpacity={0.16} />
                         <Stop offset="40%" stopColor={clothPalette.highlight} stopOpacity={0.08} />
                         <Stop offset="75%" stopColor="#000000" stopOpacity={0.20} />
@@ -997,43 +1003,42 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                     </RadialGradient>
 
                     {/* Gradiente de cantoneras metálicas esquineras */}
-                    <LinearGradient id="cornerMetalGrad" x1="0" y1="0" x2="1" y2="1">
+                    <LinearGradient id={`${tableUid}_cornerMetalGrad`} x1="0" y1="0" x2="1" y2="1">
                         <Stop offset="0%" stopColor={metalPalette.highlight} />
                         <Stop offset="30%" stopColor={metalPalette.mid} />
                         <Stop offset="70%" stopColor={metalPalette.base} />
                         <Stop offset="100%" stopColor={metalPalette.dark} />
                     </LinearGradient>
 
-                    {/* Sombras de oclusión ambiental bajo la nariz de las bandas */}
                     {/* Sombras de oclusión ambiental bajo la nariz de las bandas con iluminación direccional */}
-                    <LinearGradient id="topCushionShadow" x1="0" y1="0" x2="0" y2="1">
+                    <LinearGradient id={`${tableUid}_topCushionShadow`} x1="0" y1="0" x2="0" y2="1">
                         <Stop offset="0%" stopColor="#000000" stopOpacity={0.62} />
                         <Stop offset="60%" stopColor="#000000" stopOpacity={0.24} />
                         <Stop offset="100%" stopColor="#000000" stopOpacity={0.0} />
                     </LinearGradient>
-                    <LinearGradient id="bottomCushionShadow" x1="0" y1="1" x2="0" y2="0">
+                    <LinearGradient id={`${tableUid}_bottomCushionShadow`} x1="0" y1="1" x2="0" y2="0">
                         <Stop offset="0%" stopColor="#000000" stopOpacity={0.35} />
                         <Stop offset="100%" stopColor="#000000" stopOpacity={0.0} />
                     </LinearGradient>
-                    <LinearGradient id="leftCushionShadow" x1="0" y1="0" x2="1" y2="0">
+                    <LinearGradient id={`${tableUid}_leftCushionShadow`} x1="0" y1="0" x2="1" y2="0">
                         <Stop offset="0%" stopColor="#000000" stopOpacity={0.62} />
                         <Stop offset="60%" stopColor="#000000" stopOpacity={0.24} />
                         <Stop offset="100%" stopColor="#000000" stopOpacity={0.0} />
                     </LinearGradient>
-                    <LinearGradient id="rightCushionShadow" x1="1" y1="0" x2="0" y2="0">
+                    <LinearGradient id={`${tableUid}_rightCushionShadow`} x1="1" y1="0" x2="0" y2="0">
                         <Stop offset="0%" stopColor="#000000" stopOpacity={0.35} />
                         <Stop offset="100%" stopColor="#000000" stopOpacity={0.0} />
                     </LinearGradient>
 
                     {/* Sombra de oclusión y contacto de las bolas sobre el paño */}
-                    <RadialGradient id="ballDropShadow" cx="50%" cy="50%" r="50%">
+                    <RadialGradient id={`${tableUid}_ballDropShadow`} cx="50%" cy="50%" r="50%">
                         <Stop offset="0%" stopColor="#000000" stopOpacity={0.72} />
                         <Stop offset="45%" stopColor="#000000" stopOpacity={0.38} />
                         <Stop offset="100%" stopColor="#000000" stopOpacity={0.0} />
                     </RadialGradient>
 
                     {/* Esferas 3D fotorrealistas de bolas de carambola estilo 8 Ball Pool */}
-                    <RadialGradient id="ballWhite" cx="34%" cy="28%" r="68%">
+                    <RadialGradient id={`${tableUid}_ballWhite`} cx="34%" cy="28%" r="68%">
                         <Stop offset="0%" stopColor="#ffffff" />
                         <Stop offset="28%" stopColor="#f8fafc" />
                         <Stop offset="58%" stopColor="#e2e8f0" />
@@ -1041,7 +1046,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                         <Stop offset="93%" stopColor="#64748b" />
                         <Stop offset="100%" stopColor="#334155" />
                     </RadialGradient>
-                    <RadialGradient id="ballYellow" cx="34%" cy="28%" r="68%">
+                    <RadialGradient id={`${tableUid}_ballYellow`} cx="34%" cy="28%" r="68%">
                         <Stop offset="0%" stopColor="#fffbeb" />
                         <Stop offset="26%" stopColor="#fef08a" />
                         <Stop offset="56%" stopColor="#facc15" />
@@ -1049,7 +1054,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                         <Stop offset="92%" stopColor="#854d0e" />
                         <Stop offset="100%" stopColor="#451a03" />
                     </RadialGradient>
-                    <RadialGradient id="ballRed" cx="34%" cy="28%" r="68%">
+                    <RadialGradient id={`${tableUid}_ballRed`} cx="34%" cy="28%" r="68%">
                         <Stop offset="0%" stopColor="#fee2e2" />
                         <Stop offset="26%" stopColor="#f87171" />
                         <Stop offset="56%" stopColor="#ef4444" />
@@ -1066,7 +1071,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                     width={layout.railW}
                     height={layout.railH}
                     rx={12}
-                    fill="url(#frameGradient)"
+                    fill={`url(#${tableUid}_frameGradient)`}
                     stroke={woodPalette.bevel}
                     strokeWidth={1.2}
                 />
@@ -1105,7 +1110,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                             {/* Esquina Superior Izquierda */}
                             <Path
                                 d={`M ${layout.railX} ${layout.railY + cornerSize} L ${layout.railX} ${layout.railY + cornerR} Q ${layout.railX} ${layout.railY} ${layout.railX + cornerR} ${layout.railY} L ${layout.railX + cornerSize} ${layout.railY} L ${layout.railX + cornerSize} ${layout.railY + railT} L ${layout.railX + railT + innerR} ${layout.railY + railT} Q ${layout.railX + railT} ${layout.railY + railT} ${layout.railX + railT} ${layout.railY + railT + innerR} L ${layout.railX + railT} ${layout.railY + cornerSize} Z`}
-                                fill="url(#cornerMetalGrad)"
+                                fill={`url(#${tableUid}_cornerMetalGrad)`}
                                 stroke={metalPalette.border}
                                 strokeWidth={0.7}
                             />
@@ -1113,7 +1118,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                             {/* Esquina Superior Derecha */}
                             <Path
                                 d={`M ${layout.railX + layout.railW - cornerSize} ${layout.railY} L ${layout.railX + layout.railW - cornerR} ${layout.railY} Q ${layout.railX + layout.railW} ${layout.railY} ${layout.railX + layout.railW} ${layout.railY + cornerR} L ${layout.railX + layout.railW} ${layout.railY + cornerSize} L ${layout.railX + layout.railW - railT} ${layout.railY + cornerSize} L ${layout.railX + layout.railW - railT} ${layout.railY + railT + innerR} Q ${layout.railX + layout.railW - railT} ${layout.railY + railT} ${layout.railX + layout.railW - railT - innerR} ${layout.railY + railT} L ${layout.railX + layout.railW - cornerSize} ${layout.railY + railT} Z`}
-                                fill="url(#cornerMetalGrad)"
+                                fill={`url(#${tableUid}_cornerMetalGrad)`}
                                 stroke={metalPalette.border}
                                 strokeWidth={0.7}
                             />
@@ -1121,7 +1126,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                             {/* Esquina Inferior Izquierda */}
                             <Path
                                 d={`M ${layout.railX} ${layout.railY + layout.railH - cornerSize} L ${layout.railX + railT} ${layout.railY + layout.railH - cornerSize} L ${layout.railX + railT} ${layout.railY + layout.railH - railT - innerR} Q ${layout.railX + railT} ${layout.railY + layout.railH - railT} ${layout.railX + railT + innerR} ${layout.railY + layout.railH - railT} L ${layout.railX + cornerSize} ${layout.railY + layout.railH - railT} L ${layout.railX + cornerSize} ${layout.railY + layout.railH} L ${layout.railX + cornerR} ${layout.railY + layout.railH} Q ${layout.railX} ${layout.railY + layout.railH} ${layout.railX} ${layout.railY + layout.railH - cornerR} Z`}
-                                fill="url(#cornerMetalGrad)"
+                                fill={`url(#${tableUid}_cornerMetalGrad)`}
                                 stroke={metalPalette.border}
                                 strokeWidth={0.7}
                             />
@@ -1129,7 +1134,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                             {/* Esquina Inferior Derecha */}
                             <Path
                                 d={`M ${layout.railX + layout.railW - cornerSize} ${layout.railY + layout.railH} L ${layout.railX + layout.railW - cornerSize} ${layout.railY + layout.railH - railT} L ${layout.railX + layout.railW - railT - innerR} ${layout.railY + layout.railH - railT} Q ${layout.railX + layout.railW - railT} ${layout.railY + layout.railH - railT} ${layout.railX + layout.railW - railT} ${layout.railY + layout.railH - railT - innerR} L ${layout.railX + layout.railW - railT} ${layout.railY + layout.railH - cornerSize} L ${layout.railX + layout.railW} ${layout.railY + layout.railH - cornerSize} L ${layout.railX + layout.railW} ${layout.railY + layout.railH - cornerR} Q ${layout.railX + layout.railW} ${layout.railY + layout.railH} ${layout.railX + layout.railW - cornerR} ${layout.railY + layout.railH} Z`}
-                                fill="url(#cornerMetalGrad)"
+                                fill={`url(#${tableUid}_cornerMetalGrad)`}
                                 stroke={metalPalette.border}
                                 strokeWidth={0.7}
                             />
@@ -1167,7 +1172,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                     width={layout.cushionW}
                     height={layout.cushionH}
                     rx={4}
-                    fill="url(#cushionGradient)"
+                    fill={`url(#${tableUid}_cushionGradient)`}
                     stroke="rgba(0,0,0,0.35)"
                     strokeWidth={0.8}
                 />
@@ -1179,7 +1184,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                     width={layout.playW}
                     height={layout.playH}
                     rx={2}
-                    fill="url(#feltGradient)"
+                    fill={`url(#${tableUid}_feltGradient)`}
                 />
 
                 {/* 5. Iluminación cenital de torneo estilo 8 Ball Pool */}
@@ -1190,16 +1195,16 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                         width={layout.playW}
                         height={layout.playH}
                         rx={2}
-                        fill="url(#arenaSpotlight)"
+                        fill={`url(#${tableUid}_arenaSpotlight)`}
                         opacity={0.65}
                     />
                 )}
 
                 {/* 6. Sombras 3D bajo la nariz del caucho con iluminación direccional */}
-                <Rect x={layout.playX} y={layout.playY} width={layout.playW} height={5.5} fill="url(#topCushionShadow)" />
-                <Rect x={layout.playX} y={layout.playY + layout.playH - 3.2} width={layout.playW} height={3.2} fill="url(#bottomCushionShadow)" />
-                <Rect x={layout.playX} y={layout.playY} width={5.5} height={layout.playH} fill="url(#leftCushionShadow)" />
-                <Rect x={layout.playX + layout.playW - 3.2} y={layout.playY} width={3.2} height={layout.playH} fill="url(#rightCushionShadow)" />
+                <Rect x={layout.playX} y={layout.playY} width={layout.playW} height={5.5} fill={`url(#${tableUid}_topCushionShadow)`} />
+                <Rect x={layout.playX} y={layout.playY + layout.playH - 3.2} width={layout.playW} height={3.2} fill={`url(#${tableUid}_bottomCushionShadow)`} />
+                <Rect x={layout.playX} y={layout.playY} width={5.5} height={layout.playH} fill={`url(#${tableUid}_leftCushionShadow)`} />
+                <Rect x={layout.playX + layout.playW - 3.2} y={layout.playY} width={3.2} height={layout.playH} fill={`url(#${tableUid}_rightCushionShadow)`} />
 
                 {/* Biselado de luz y sombra en la nariz de las bandas */}
                 <Line x1={layout.playX} y1={layout.playY} x2={layout.playX + layout.playW} y2={layout.playY} stroke="rgba(255,255,255,0.40)" strokeWidth={0.8} />
@@ -1470,7 +1475,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                                 y1={cueSvg.y}
                                 x2={rayEndSvg.x}
                                 y2={rayEndSvg.y}
-                                stroke="rgba(56, 189, 248, 0.35)"
+                                stroke={categoryColor ? `${categoryColor}40` : "rgba(56, 189, 248, 0.35)"}
                                 strokeWidth={2.4}
                                 strokeLinecap="round"
                             />
@@ -1480,7 +1485,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                                 y1={cueSvg.y}
                                 x2={rayEndSvg.x}
                                 y2={rayEndSvg.y}
-                                stroke="#ffffff"
+                                stroke={categoryColor || "#ffffff"}
                                 strokeWidth={0.9}
                                 strokeDasharray="3 3"
                                 strokeLinecap="round"
@@ -1494,7 +1499,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                                         cx={ghostSvg.x}
                                         cy={ghostSvg.y}
                                         r={3.075}
-                                        fill="rgba(56, 189, 248, 0.16)"
+                                        fill={categoryColor ? `${categoryColor}25` : "rgba(56, 189, 248, 0.16)"}
                                         stroke="#ffffff"
                                         strokeWidth={0.8}
                                     />
@@ -1503,11 +1508,11 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                                         cy={ghostSvg.y}
                                         r={3.075}
                                         fill="none"
-                                        stroke="#38bdf8"
+                                        stroke={categoryColor || "#38bdf8"}
                                         strokeWidth={0.5}
                                         strokeDasharray="2 2"
                                     />
-                                    <Circle cx={ghostSvg.x} cy={ghostSvg.y} r={0.8} fill="#38bdf8" />
+                                    <Circle cx={ghostSvg.x} cy={ghostSvg.y} r={0.8} fill={categoryColor || "#38bdf8"} />
 
                                     {/* Guía corta y nítida de la bola objetivo */}
                                     {guideData.targetBallGuide && (() => {
@@ -1593,6 +1598,9 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                     );
                 })()}
 
+                {/* 12. Trayectoria teórica calculada con color de categoría */}
+                {renderTrajectory}
+
                 {/* 13. Bolas de Carambola en 3D fotorrealistas con física de rodadura real (8 Ball Pool) */}
                 {balls.map((ball) => {
                     const mapped = mapPointToSvg(ball.pos, orientation, layout);
@@ -1612,7 +1620,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                                 cy={mapped.y + 0.6}
                                 rx={3.1}
                                 ry={2.9}
-                                fill="url(#ballDropShadow)"
+                                fill={`url(#${tableUid}_ballDropShadow)`}
                             />
 
                             {/* Cuerpo esférico 3D fotorrealista con gradiente multicapa */}

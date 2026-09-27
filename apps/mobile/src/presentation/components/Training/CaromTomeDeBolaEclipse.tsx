@@ -28,7 +28,7 @@ import {
 } from '@bandaro/core';
 import { useI18n } from '@/components/useLanguage';
 
-interface CaromTomeDeBolaEclipseProps {
+export interface CaromTomeDeBolaEclipseProps {
     balls: Ball[];
     cueBallId: BallId;
     aimDirection: Vec2;
@@ -37,6 +37,8 @@ interface CaromTomeDeBolaEclipseProps {
     onAimChange?: (newAim: Vec2) => void;
     disabled?: boolean;
     compact?: boolean;
+    categoryColor?: string;
+    isDark?: boolean;
 }
 
 interface TomeCalculation {
@@ -67,12 +69,32 @@ function calculateTomeDeBola(
     const objectBalls = balls.filter((b) => b.id !== cueBallId);
     if (objectBalls.length === 0) return null;
 
-    // 1. Check if trajectory already determined first collision
     let chosenTargetBall: Ball | null = null;
+    let impactCuePos: Vec2 = cueBall.pos;
+    let impactDir: Vec2 = dir;
+    let trajectoryHadCollision = false;
+
+    // 1. Check if trajectory simulation already determined the collision (handles cushions/bricoles)
     if (trajectory && trajectory.ballCollisions && trajectory.ballCollisions.length > 0) {
         const firstCol = trajectory.ballCollisions[0];
         const targetId = firstCol.ball1 === cueBallId ? firstCol.ball2 : firstCol.ball1;
-        chosenTargetBall = objectBalls.find((b) => b.id === targetId) ?? null;
+        const found = objectBalls.find((b) => b.id === targetId) ?? null;
+        if (found) {
+            chosenTargetBall = found;
+            const cuePath = trajectory.paths.find((p) => p.ballId === cueBallId);
+            if (cuePath && cuePath.points.length > 0) {
+                const idx = Math.min(firstCol.pointIndex, cuePath.points.length - 1);
+                impactCuePos = cuePath.points[idx].pos;
+                if (idx > 0) {
+                    const prevPos = cuePath.points[idx - 1].pos;
+                    const d = vec2Sub(impactCuePos, prevPos);
+                    if (vec2Length(d) > 0.001) {
+                        impactDir = vec2Normalize(d);
+                        trajectoryHadCollision = true;
+                    }
+                }
+            }
+        }
     }
 
     // 2. If trajectory didn't collide yet or no trajectory, raycast aim direction
@@ -92,6 +114,8 @@ function calculateTomeDeBola(
                 }
             }
         }
+        impactCuePos = cueBall.pos;
+        impactDir = dir;
     }
 
     if (!chosenTargetBall) {
@@ -100,11 +124,13 @@ function calculateTomeDeBola(
             const dClosest = vec2Length(vec2Sub(closest.pos, cueBall.pos));
             return dCur < dClosest ? cur : closest;
         }, objectBalls[0]);
+        impactCuePos = cueBall.pos;
+        impactDir = dir;
     }
 
-    const toTarget = vec2Sub(chosenTargetBall.pos, cueBall.pos);
+    const toTarget = vec2Sub(chosenTargetBall.pos, impactCuePos);
     const distToTarget = vec2Length(toTarget);
-    const proj = vec2Dot(toTarget, dir);
+    const proj = vec2Dot(toTarget, impactDir);
 
     let fraction = 0;
     let side: TomeCalculation['side'] = 'center';
@@ -112,9 +138,9 @@ function calculateTomeDeBola(
     let alpha = 0;
     let beta = 0;
 
-    if (proj > 0) {
+    if (trajectoryHadCollision || proj > 0) {
         const perp = Math.sqrt(Math.max(0, distToTarget * distToTarget - proj * proj));
-        const cross = toTarget.x * dir.y - toTarget.y * dir.x;
+        const cross = toTarget.x * impactDir.y - toTarget.y * impactDir.x;
 
         if (perp <= COLLISION_DIAMETER_CM) {
             directContact = true;
@@ -173,10 +199,15 @@ export const CaromTomeDeBolaEclipse = memo(function CaromTomeDeBolaEclipse({
     onAimChange,
     disabled = false,
     compact = false,
+    categoryColor,
+    isDark = true,
 }: CaromTomeDeBolaEclipseProps) {
     const { language } = useI18n();
     const { width: windowWidth } = useWindowDimensions();
     const [showPresets, setShowPresets] = useState(false);
+
+    // Unique ID per instance prevents SVG gradient collisions on Web
+    const uid = useMemo(() => `tome_${Math.random().toString(36).slice(2, 8)}`, []);
 
     const tome = useMemo(
         () => calculateTomeDeBola(balls, cueBallId, aimDirection, trajectory, language),
@@ -207,10 +238,10 @@ export const CaromTomeDeBolaEclipse = memo(function CaromTomeDeBolaEclipse({
     const tipX = cueBallX + spin.x * (sphereRadius * 0.7);
     const tipY = center - spin.y * (sphereRadius * 0.7);
 
-    const getBallGradient = (id: BallId) => {
-        if (id === 'red') return 'eclipseGradRed';
-        if (id === 'yellow') return 'eclipseGradYellow';
-        return 'eclipseGradWhite';
+    const getBallGradientId = (id: BallId) => {
+        if (id === 'red') return `${uid}_gradRed`;
+        if (id === 'yellow') return `${uid}_gradYellow`;
+        return `${uid}_gradWhite`;
     };
 
     const snapToFraction = useCallback(
@@ -234,10 +265,18 @@ export const CaromTomeDeBolaEclipse = memo(function CaromTomeDeBolaEclipse({
         [cueBall, targetBall, onAimChange, disabled, tome?.side]
     );
 
+    const activeColor = categoryColor || '#38bdf8';
+    const activeGlow = categoryColor ? `${categoryColor}40` : 'rgba(56, 189, 248, 0.35)';
+
     return (
         <View style={styles.outerContainer}>
             <TouchableOpacity
-                style={[styles.cardContainer, compact && styles.cardContainerCompact]}
+                style={[
+                    styles.cardContainer,
+                    compact && styles.cardContainerCompact,
+                    categoryColor ? { borderColor: `${categoryColor}55`, shadowColor: categoryColor } : null,
+                    !isDark ? { backgroundColor: '#ffffff', borderColor: categoryColor ? `${categoryColor}60` : 'rgba(0, 0, 0, 0.12)' } : null,
+                ]}
                 onPress={() => setShowPresets((prev) => !prev)}
                 disabled={disabled}
                 activeOpacity={0.8}
@@ -248,19 +287,19 @@ export const CaromTomeDeBolaEclipse = memo(function CaromTomeDeBolaEclipse({
                 <View style={[styles.eclipseWrap, compact && { width: 48, height: 38 }]}>
                     <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
                         <Defs>
-                            <RadialGradient id="eclipseGradWhite" cx="35%" cy="30%" r="70%">
+                            <RadialGradient id={`${uid}_gradWhite`} cx="35%" cy="30%" r="70%">
                                 <Stop offset="0%" stopColor="#ffffff" />
                                 <Stop offset="40%" stopColor="#f8fafc" />
                                 <Stop offset="75%" stopColor="#cbd5e1" />
                                 <Stop offset="100%" stopColor="#64748b" />
                             </RadialGradient>
-                            <RadialGradient id="eclipseGradYellow" cx="35%" cy="30%" r="70%">
+                            <RadialGradient id={`${uid}_gradYellow`} cx="35%" cy="30%" r="70%">
                                 <Stop offset="0%" stopColor="#fffbeb" />
                                 <Stop offset="30%" stopColor="#fef08a" />
                                 <Stop offset="70%" stopColor="#eab308" />
                                 <Stop offset="100%" stopColor="#854d0e" />
                             </RadialGradient>
-                            <RadialGradient id="eclipseGradRed" cx="35%" cy="30%" r="70%">
+                            <RadialGradient id={`${uid}_gradRed`} cx="35%" cy="30%" r="70%">
                                 <Stop offset="0%" stopColor="#fca5a5" />
                                 <Stop offset="30%" stopColor="#ef4444" />
                                 <Stop offset="70%" stopColor="#b91c1c" />
@@ -275,44 +314,63 @@ export const CaromTomeDeBolaEclipse = memo(function CaromTomeDeBolaEclipse({
                                     cx={center}
                                     cy={center}
                                     r={sphereRadius}
-                                    fill={`url(#${getBallGradient(targetBall.id)})`}
+                                    fill={`url(#${getBallGradientId(targetBall.id)})`}
                                     stroke="rgba(255, 255, 255, 0.35)"
                                     strokeWidth={1}
+                                />
+                                {/* Brillo especular 3D */}
+                                <Circle
+                                    cx={center - sphereRadius * 0.28}
+                                    cy={center - sphereRadius * 0.28}
+                                    r={sphereRadius * 0.22}
+                                    fill="#ffffff"
+                                    opacity={0.65}
                                 />
                                 <Line
                                     x1={center}
                                     y1={center - sphereRadius + 2}
                                     x2={center}
                                     y2={center + sphereRadius - 2}
-                                    stroke="rgba(0, 0, 0, 0.45)"
-                                    strokeWidth={0.8}
+                                    stroke={activeColor}
+                                    strokeWidth={0.9}
                                     strokeDasharray="2 2"
+                                    opacity={0.65}
                                 />
                             </G>
                         )}
 
-                        {/* 2. BOLA ATACADORA */}
+                        {/* 2. BOLA ATACADORA (Armonizada con el color de categoría) */}
                         {cueBall && (
-                            <G opacity={0.88}>
+                            <G opacity={0.92}>
                                 <Circle
                                     cx={cueBallX}
                                     cy={center}
                                     r={sphereRadius}
-                                    fill={`url(#${getBallGradient(cueBall.id)})`}
-                                    stroke="#38bdf8"
-                                    strokeWidth={1.2}
+                                    fill={`url(#${getBallGradientId(cueBall.id)})`}
+                                    stroke={activeColor}
+                                    strokeWidth={1.4}
                                 />
+                                {/* Brillo especular 3D de la bola tiradora */}
+                                <Circle
+                                    cx={cueBallX - sphereRadius * 0.28}
+                                    cy={center - sphereRadius * 0.28}
+                                    r={sphereRadius * 0.22}
+                                    fill="#ffffff"
+                                    opacity={0.65}
+                                />
+                                {/* Resplandor exterior del punto de contacto */}
                                 <Circle
                                     cx={tipX}
                                     cy={tipY}
-                                    r={tipRadius * 1.5}
-                                    fill="rgba(0, 210, 255, 0.4)"
+                                    r={tipRadius * 1.6}
+                                    fill={activeGlow}
                                 />
+                                {/* Casquillo / impacto con color de categoría */}
                                 <Circle
                                     cx={tipX}
                                     cy={tipY}
                                     r={tipRadius}
-                                    fill="#00d2ff"
+                                    fill={activeColor}
                                     stroke="#ffffff"
                                     strokeWidth={0.8}
                                 />
@@ -323,27 +381,43 @@ export const CaromTomeDeBolaEclipse = memo(function CaromTomeDeBolaEclipse({
 
                 {/* Lecturas y Métricas de Desvío */}
                 <View style={[styles.metricsCol, compact && styles.metricsColCompact]}>
+                    <View style={styles.headerLabelRow}>
+                        <Text style={[styles.headerLabelTitle, compact && { fontSize: 7.5 }, { color: activeColor }]}>
+                            {language === 'en' ? 'FULLNESS' : 'TOME'}
+                        </Text>
+                        <View style={[styles.headerLiveDot, { backgroundColor: activeColor }]} />
+                    </View>
+
                     <View style={styles.badgeRow}>
-                        <Text style={[styles.fractionTitle, compact && { fontSize: 8.5 }]}>
+                        <Text
+                            style={[
+                                styles.fractionTitle,
+                                compact && { fontSize: 8.5 },
+                                !isDark ? { color: '#0f172a' } : null,
+                            ]}
+                            numberOfLines={1}
+                        >
                             {tome?.fractionLabel ?? (language === 'en' ? 'Contact' : 'Tome')}
                         </Text>
-                        <Text style={[styles.percentageText, compact && { fontSize: 8 }]}>
+                        <Text style={[styles.percentageText, compact && { fontSize: 8.5 }, { color: activeColor }]}>
                             {tome?.directContact ? `${tome.percentage}%` : '--'}
                         </Text>
                     </View>
 
                     <View style={styles.angleRow}>
-                        <Text style={[styles.angleItem, compact && { fontSize: 8 }]}>
-                            α:<Text style={styles.angleVal}>{tome?.directContact ? `${tome.cueDeflectionAlphaDeg}°` : '--'}</Text>
+                        <Text style={[styles.angleItem, compact && { fontSize: 8 }, !isDark ? { color: '#64748b' } : null]}>
+                            α:<Text style={[styles.angleVal, !isDark ? { color: '#0f172a' } : null, { color: activeColor }]}>{tome?.directContact ? `${tome.cueDeflectionAlphaDeg}°` : '--'}</Text>
                         </Text>
-                        <Text style={styles.angleSep}>•</Text>
-                        <Text style={[styles.angleItem, compact && { fontSize: 8 }]}>
-                            β:<Text style={styles.angleVal}>{tome?.directContact ? `${tome.targetExitBetaDeg}°` : '--'}</Text>
+                        <Text style={[styles.angleSep, !isDark ? { color: '#94a3b8' } : null]}>•</Text>
+                        <Text style={[styles.angleItem, compact && { fontSize: 8 }, !isDark ? { color: '#64748b' } : null]}>
+                            β:<Text style={[styles.angleVal, !isDark ? { color: '#0f172a' } : null]}>{tome?.directContact ? `${tome.targetExitBetaDeg}°` : '--'}</Text>
                         </Text>
                         {tome?.side !== 'center' && tome?.side !== 'miss' && (
-                            <Text style={[styles.sideBadge, compact && { fontSize: 7 }]}>
-                                {tome?.side === 'right' ? (language === 'en' ? 'R' : 'Der') : (language === 'en' ? 'L' : 'Izq')}
-                            </Text>
+                            <View style={[styles.sideBadgePill, { backgroundColor: `${activeColor}22`, borderColor: `${activeColor}55` }]}>
+                                <Text style={[styles.sideBadgeText, compact && { fontSize: 7 }, { color: activeColor }]}>
+                                    {tome?.side === 'right' ? (language === 'en' ? 'R' : 'Der') : (language === 'en' ? 'L' : 'Izq')}
+                                </Text>
+                            </View>
                         )}
                     </View>
                 </View>
@@ -351,41 +425,45 @@ export const CaromTomeDeBolaEclipse = memo(function CaromTomeDeBolaEclipse({
 
             {/* Selector Rápido Popover de Tomes (Mobile safe) */}
             {showPresets && (
-                <View style={[styles.presetsPopover, { maxWidth: Math.min(280, windowWidth - 20) }]}>
-                    <Text style={styles.presetsTitle}>
+                <View style={[
+                    styles.presetsPopover,
+                    { maxWidth: Math.min(280, windowWidth - 20) },
+                    categoryColor ? { borderColor: `${categoryColor}77` } : null,
+                    !isDark ? { backgroundColor: '#ffffff', borderColor: categoryColor ? `${categoryColor}80` : '#cbd5e1' } : null,
+                ]}>
+                    <Text style={[styles.presetsTitle, { color: activeColor }]}>
                         {language === 'en' ? 'QUICK FULLNESS PRESETS' : 'ENCUADRE RÁPIDO DE TOME'}
                     </Text>
                     <View style={styles.presetsRow}>
-                        <TouchableOpacity
-                            style={styles.presetPill}
-                            onPress={() => snapToFraction(0.125)}>
-                            <Text style={styles.presetPillText}>1/8</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.presetPill}
-                            onPress={() => snapToFraction(0.25)}>
-                            <Text style={styles.presetPillText}>1/4</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.presetPill}
-                            onPress={() => snapToFraction(0.375)}>
-                            <Text style={styles.presetPillText}>3/8</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.presetPill}
-                            onPress={() => snapToFraction(0.50)}>
-                            <Text style={styles.presetPillText}>1/2</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.presetPill}
-                            onPress={() => snapToFraction(0.75)}>
-                            <Text style={styles.presetPillText}>3/4</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.presetPill}
-                            onPress={() => snapToFraction(1.0)}>
-                            <Text style={styles.presetPillText}>{language === 'en' ? 'Full' : 'Llena'}</Text>
-                        </TouchableOpacity>
+                        {[
+                            { frac: 0.125, label: '1/8' },
+                            { frac: 0.25, label: '1/4' },
+                            { frac: 0.375, label: '3/8' },
+                            { frac: 0.5, label: '1/2' },
+                            { frac: 0.75, label: '3/4' },
+                            { frac: 1.0, label: language === 'en' ? 'Full' : 'Llena' },
+                        ].map((preset) => {
+                            const isSelected = tome && Math.abs(tome.fraction - preset.frac) < 0.06;
+                            return (
+                                <TouchableOpacity
+                                    key={preset.label}
+                                    style={[
+                                        styles.presetPill,
+                                        !isDark ? { backgroundColor: 'rgba(0,0,0,0.05)', borderColor: 'rgba(0,0,0,0.1)' } : null,
+                                        isSelected ? { backgroundColor: `${activeColor}25`, borderColor: activeColor } : null,
+                                    ]}
+                                    onPress={() => snapToFraction(preset.frac)}>
+                                    <Text
+                                        style={[
+                                            styles.presetPillText,
+                                            !isDark ? { color: '#0f172a' } : null,
+                                            isSelected ? { color: activeColor, fontWeight: '900' } : null,
+                                        ]}>
+                                        {preset.label}
+                                    </Text>
+                                </TouchableOpacity>
+                            );
+                        })}
                     </View>
                 </View>
             )}
@@ -438,6 +516,22 @@ const styles = StyleSheet.create({
         minWidth: 62,
         gap: 0.5,
     },
+    headerLabelRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    headerLabelTitle: {
+        fontSize: 8.5,
+        fontWeight: '800',
+        letterSpacing: 0.6,
+        textTransform: 'uppercase',
+    },
+    headerLiveDot: {
+        width: 4.5,
+        height: 4.5,
+        borderRadius: 2.25,
+    },
     badgeRow: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -474,12 +568,17 @@ const styles = StyleSheet.create({
         fontSize: 7,
         color: '#475569',
     },
-    sideBadge: {
+    sideBadgePill: {
+        paddingHorizontal: 4,
+        paddingVertical: 0.5,
+        borderRadius: 4,
+        borderWidth: 0.5,
+        marginLeft: 2,
+    },
+    sideBadgeText: {
         fontSize: 7.5,
-        fontWeight: '800',
-        color: '#fbbf24',
+        fontWeight: '900',
         textTransform: 'uppercase',
-        marginLeft: 1,
     },
     presetsPopover: {
         position: 'absolute',

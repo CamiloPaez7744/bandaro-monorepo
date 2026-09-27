@@ -38,6 +38,10 @@ export interface BallThicknessDiagramProps {
     compact?: boolean;
     /** Whether to show technical title and badges */
     showLabels?: boolean;
+    /** Category accent color */
+    categoryColor?: string;
+    /** Dark or light theme */
+    isDark?: boolean;
     /** Additional container style */
     style?: ViewStyle;
 }
@@ -157,6 +161,8 @@ export const BallThicknessDiagram = memo(function BallThicknessDiagram({
     lang = 'es',
     compact = false,
     showLabels = true,
+    categoryColor,
+    isDark = true,
     style,
 }: BallThicknessDiagramProps) {
     const rawId = useId();
@@ -225,26 +231,46 @@ export const BallThicknessDiagram = memo(function BallThicknessDiagram({
     const tipY = centerY + resolvedEnglish.offsetY;
     const tipMarkerRadius = Math.max(3.2, radius * 0.15);
 
+    const activeColor = categoryColor || '#38BDF8';
+    const activeGlow = categoryColor ? `${categoryColor}40` : 'rgba(56, 189, 248, 0.35)';
+    const activeBg = categoryColor ? `${categoryColor}1A` : 'rgba(56, 189, 248, 0.18)';
+    const activeBorder = categoryColor ? `${categoryColor}55` : 'rgba(56, 189, 248, 0.45)';
+
     return (
-        <View style={[styles.card, compact && styles.cardCompact, style]}>
+        <View
+            style={[
+                styles.card,
+                compact && styles.cardCompact,
+                !isDark ? { backgroundColor: '#ffffff', borderColor: categoryColor ? `${categoryColor}35` : 'rgba(0, 0, 0, 0.1)' } : null,
+                categoryColor ? { borderColor: `${categoryColor}40` } : null,
+                style,
+            ]}
+        >
             {/* Header Titles & Badges */}
             {showLabels && (
                 <View style={styles.header}>
                     <View style={styles.headerTitleCol}>
-                        <Text style={styles.labelTitle}>
+                        <Text style={[styles.labelTitle, !isDark ? { color: '#64748B' } : null]}>
                             {lang === 'en' ? 'THICKNESS & ENGLISH' : lang === 'ko' ? '두께 및 당점' : 'TOME Y EFECTO'}
                         </Text>
                     </View>
 
                     <View style={styles.badgesRow}>
                         {/* Tome Fraction Badge */}
-                        <View style={styles.fractionPill}>
-                            <Text style={styles.fractionText}>{info.fraction}</Text>
+                        <View style={[styles.fractionPill, { backgroundColor: activeBg, borderColor: activeBorder }]}>
+                            <Text style={[styles.fractionText, { color: activeColor }]}>{info.fraction}</Text>
                         </View>
 
                         {/* English Spin Badge */}
-                        <View style={styles.tipsPill}>
-                            <Text style={styles.tipsText}>
+                        <View
+                            style={[
+                                styles.tipsPill,
+                                !isDark
+                                    ? { backgroundColor: 'rgba(0,0,0,0.05)', borderColor: 'rgba(0,0,0,0.1)' }
+                                    : null,
+                            ]}
+                        >
+                            <Text style={[styles.tipsText, !isDark ? { color: '#0F172A' } : null]}>
                                 {resolvedEnglish.tips > 0.15
                                     ? `${resolvedEnglish.clockFormatted} • ${resolvedEnglish.tips}T`
                                     : (lang === 'en' ? 'Center' : lang === 'ko' ? '중심' : 'Centro')}
@@ -368,7 +394,7 @@ export const BallThicknessDiagram = memo(function BallThicknessDiagram({
                                             y1={centerY - radius}
                                             x2={item.lineX}
                                             y2={centerY + radius}
-                                            stroke="rgba(56, 189, 248, 0.45)"
+                                            stroke={activeGlow}
                                             strokeWidth={4.5}
                                         />
                                     )}
@@ -379,12 +405,12 @@ export const BallThicknessDiagram = memo(function BallThicknessDiagram({
                                         y2={centerY + radius}
                                         stroke={
                                             item.isActive
-                                                ? '#0284C7'
+                                                ? activeColor
                                                 : item.isCenter
-                                                ? 'rgba(15, 23, 42, 0.75)'
+                                                ? (isDark ? 'rgba(15, 23, 42, 0.75)' : 'rgba(0, 0, 0, 0.75)')
                                                 : item.isMajor
-                                                ? 'rgba(15, 23, 42, 0.45)'
-                                                : 'rgba(15, 23, 42, 0.22)'
+                                                ? (isDark ? 'rgba(15, 23, 42, 0.45)' : 'rgba(0, 0, 0, 0.45)')
+                                                : (isDark ? 'rgba(15, 23, 42, 0.22)' : 'rgba(0, 0, 0, 0.22)')
                                         }
                                         strokeWidth={item.isActive ? 2.2 : item.isCenter ? 1.6 : item.isMajor ? 1.1 : 0.75}
                                         strokeDasharray={item.isActive || item.isCenter ? undefined : '2.5 2'}
@@ -412,12 +438,12 @@ export const BallThicknessDiagram = memo(function BallThicknessDiagram({
                                         width={17}
                                         height={10}
                                         rx={3}
-                                        fill={item.isActive ? '#0284C7' : 'rgba(15, 23, 42, 0.78)'}
+                                        fill={item.isActive ? activeColor : (isDark ? 'rgba(15, 23, 42, 0.78)' : '#E2E8F0')}
                                     />
                                     <SvgText
                                         x={item.lineX}
                                         y={centerY - radius - 4}
-                                        fill={item.isActive ? '#FFFFFF' : '#E2E8F0'}
+                                        fill={item.isActive ? '#FFFFFF' : (isDark ? '#E2E8F0' : '#334155')}
                                         fontSize={6.5}
                                         fontWeight={item.isActive ? '800' : '600'}
                                         textAnchor="middle"
@@ -436,7 +462,7 @@ export const BallThicknessDiagram = memo(function BallThicknessDiagram({
                                 y1={centerY - radius * 0.85}
                                 x2={contactX}
                                 y2={centerY + radius * 0.85}
-                                stroke="#38BDF8"
+                                stroke={activeColor}
                                 strokeWidth={1.4}
                                 strokeDasharray="2 2"
                             />
@@ -444,7 +470,7 @@ export const BallThicknessDiagram = memo(function BallThicknessDiagram({
                                 cx={contactX}
                                 cy={centerY}
                                 r={contactRadius * 0.65}
-                                fill="#38BDF8"
+                                fill={activeColor}
                                 stroke="#FFFFFF"
                                 strokeWidth={0.8}
                             />
@@ -507,7 +533,7 @@ export const BallThicknessDiagram = memo(function BallThicknessDiagram({
                                 y1={centerY}
                                 x2={tipX}
                                 y2={tipY}
-                                stroke="rgba(2, 132, 199, 0.6)"
+                                stroke={activeColor}
                                 strokeWidth={1}
                                 strokeDasharray="1.5 1.5"
                             />
@@ -520,18 +546,18 @@ export const BallThicknessDiagram = memo(function BallThicknessDiagram({
                                 cx={tipX}
                                 cy={tipY}
                                 r={tipMarkerRadius * 1.5}
-                                fill="rgba(2, 132, 199, 0.25)"
+                                fill={activeGlow}
                             />
-                            {/* Precision cyan outer ring */}
+                            {/* Precision outer ring */}
                             <Circle
                                 cx={tipX}
                                 cy={tipY}
                                 r={tipMarkerRadius * 1.15}
                                 fill="none"
-                                stroke="#38BDF8"
+                                stroke={activeColor}
                                 strokeWidth={0.9}
                             />
-                            {/* Master chalk blue core */}
+                            {/* Master chalk core */}
                             <Circle
                                 cx={tipX}
                                 cy={tipY}
@@ -564,11 +590,11 @@ export const BallThicknessDiagram = memo(function BallThicknessDiagram({
 
             {/* Bottom Footer Description (Tome Cut Direction + Spin Type) */}
             {showLabels && (
-                <View style={styles.footer}>
-                    <Text style={styles.footerCutText}>
+                <View style={[styles.footer, !isDark ? { borderTopColor: 'rgba(0, 0, 0, 0.08)' } : null]}>
+                    <Text style={[styles.footerCutText, !isDark ? { color: '#0F172A' } : null, { color: activeColor }]}>
                         {info.cutDirection} ({info.fraction})
                     </Text>
-                    <Text style={styles.footerSpinText}>
+                    <Text style={[styles.footerSpinText, !isDark ? { color: '#64748B' } : null]}>
                         {resolvedEnglish.spinDescription}
                     </Text>
                 </View>

@@ -43,6 +43,7 @@ export interface CatalogShot {
     isDefense: boolean;
     isAvoidKiss: boolean;
     youtubeUrl: string | null;
+    isFavorite: boolean;
 }
 
 const BB_WIDTH = 500;
@@ -343,6 +344,7 @@ export function adaptCatalogShot(raw: any): CatalogShot {
         isDefense: raw.is_defense,
         isAvoidKiss: raw.is_avoid_kiss,
         youtubeUrl: raw.youtube_url,
+        isFavorite: Boolean(raw.is_favorite),
     };
 }
 

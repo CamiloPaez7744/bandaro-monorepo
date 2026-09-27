@@ -275,3 +275,22 @@ export const shotCatalog = pgTable(
         index('idx_shot_catalog_player').on(t.playerLastName),
     ]
 );
+
+// ---------------------------------------------------------------------------
+// 6. User Favorite Shots (Catalog Bookmarks)
+// ---------------------------------------------------------------------------
+export const userFavoriteShots = pgTable(
+    'user_favorite_shots',
+    {
+        id: uuid('id').primaryKey().defaultRandom(),
+        userId: varchar('user_id', { length: 100 }).notNull().default('guest'),
+        shotId: integer('shot_id').notNull(),
+        createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    },
+    (t) => [
+        uniqueIndex('user_favorite_shots_user_shot_idx').on(t.userId, t.shotId),
+        index('user_favorite_shots_user_idx').on(t.userId),
+        index('user_favorite_shots_shot_idx').on(t.shotId),
+    ]
+);
+

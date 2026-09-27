@@ -47,6 +47,7 @@ import {
     BallId,
     Vec2,
     vec2,
+    vec2Normalize,
     vec2Sub,
     SpinEffect,
     SnapshotBall,
@@ -56,6 +57,9 @@ import {
     getDefaultBreakAim,
 } from '@bandaro/core';
 import { ApiSnapshotRepository } from '@/src/infrastructure/repositories/ApiSnapshotRepository';
+import { fetchShotDetail } from '@/src/infrastructure/catalog/catalogApi';
+import { adaptCatalogShot, type CatalogShot, getLocalizedCategoryName } from '@/src/infrastructure/catalog/shotAdapter';
+import { CATEGORY_COLORS } from '@/src/presentation/components/Catalog/ShotCatalogCard';
 
 type Orientation = 'horizontal' | 'vertical';
 
@@ -81,7 +85,16 @@ export function TrainingSimulationScreen() {
     const params = useLocalSearchParams<{
         systemId?: string;
         snapshotId?: string;
+        shotId?: string;
         customName?: string;
+        category?: string;
+        categoryName?: string;
+        categoryColor?: string;
+        aimX?: string;
+        aimY?: string;
+        spinX?: string;
+        spinY?: string;
+        powerLevel?: string;
         whiteX?: string;
         whiteY?: string;
         yellowX?: string;
@@ -94,8 +107,29 @@ export function TrainingSimulationScreen() {
     const isMobile = width < 768;
 
     const { t, language } = useI18n();
-    const palette = getPalette(useColorScheme());
-    const styles = getStyles(palette, isMobile);
+    const colorScheme = useColorScheme();
+    const palette = getPalette(colorScheme);
+    const isDark = colorScheme === 'dark';
+    const styles = getStyles(palette, isMobile, isDark);
+
+    const [fetchedShot, setFetchedShot] = useState<CatalogShot | null>(null);
+
+    const rawCategoryColor = params.categoryColor
+        ? decodeURIComponent(params.categoryColor)
+        : null;
+    const normalizedParamColor = rawCategoryColor
+        ? (rawCategoryColor.startsWith('#') ? rawCategoryColor : `#${rawCategoryColor}`)
+        : null;
+
+    const activeCategoryColor =
+        normalizedParamColor ||
+        (params.category ? CATEGORY_COLORS[params.category] : null) ||
+        (fetchedShot ? CATEGORY_COLORS[fetchedShot.category] : null);
+
+    const categoryName =
+        params.categoryName ||
+        (params.category ? getLocalizedCategoryName(params.category, language === 'en' ? 'en' : 'es') : null) ||
+        (fetchedShot ? getLocalizedCategoryName(fetchedShot.category, language === 'en' ? 'en' : 'es') : null);
 
     const system = useMemo(
         () => (params.systemId ? getTrainingSystemById(params.systemId) : null),
@@ -123,10 +157,16 @@ export function TrainingSimulationScreen() {
 
     const initialPositions = useMemo(() => {
         if (params.whiteX && params.whiteY) {
+            const wX = Number(params.whiteX);
+            const wY = Number(params.whiteY);
+            const yX = Number(params.yellowX);
+            const yY = Number(params.yellowY);
+            const rX = Number(params.redX);
+            const rY = Number(params.redY);
             return {
-                white: vec2(Number(params.whiteX) || 71, Number(params.whiteY) || 52.75),
-                yellow: vec2(Number(params.yellowX) || 71, Number(params.yellowY) || 71),
-                red: vec2(Number(params.redX) || 213, Number(params.redY) || 71),
+                white: vec2(!isNaN(wX) ? wX : 71, !isNaN(wY) ? wY : 52.75),
+                yellow: vec2(!isNaN(yX) ? yX : 71, !isNaN(yY) ? yY : 71),
+                red: vec2(!isNaN(rX) ? rX : 213, !isNaN(rY) ? rY : 71),
             };
         }
 
@@ -210,7 +250,7 @@ export function TrainingSimulationScreen() {
 
     const customCoordsAimSetRef = useRef(false);
     useEffect(() => {
-        if (params.whiteX && params.whiteY && !customCoordsAimSetRef.current) {
+        if (params.whiteX && params.whiteY && !customCoordsAimSetRef.current && !params.shotId) {
             customCoordsAimSetRef.current = true;
             const wx = Number(params.whiteX) || 71;
             // Si la bola blanca está situada en el extremo derecho (x > 142), apuntar horizontalmente hacia la izquierda
@@ -220,12 +260,12 @@ export function TrainingSimulationScreen() {
                 setAimDirection(vec2(1, 0));
             }
         }
-    }, [params.whiteX, params.whiteY, setAimDirection]);
+    }, [params.whiteX, params.whiteY, params.shotId, setAimDirection]);
 
     const [tableOrientation, setTableOrientation] = useState<Orientation>(
         width >= 900 ? 'horizontal' : 'vertical'
     );
-    const [isEditMode, setIsEditMode] = useState(!params.systemId);
+    const [isEditMode, setIsEditMode] = useState(!params.systemId && !params.shotId);
     const [showGuides, setShowGuides] = useState(true);
     const [showRuler, setShowRuler] = useState(false);
     const [numberingAnchors, setNumberingAnchors] = useState<NumberAnchor[]>([]);
@@ -240,7 +280,7 @@ export function TrainingSimulationScreen() {
     const systemLoadedRef = useRef<string | null>(null);
 
     useEffect(() => {
-        if (!system || system.positions.length === 0 || params.snapshotId) {
+        if (!system || system.positions.length === 0 || params.snapshotId || params.shotId) {
             return;
         }
 
@@ -265,7 +305,121 @@ export function TrainingSimulationScreen() {
         setAimDirection(presetAim);
         setIsEditMode(true);
         setShowGuides(true);
-    }, [initialPositions, resetBalls, setAimDirection, setCueBall, setPowerLevel, setSpin, system]);
+    }, [initialPositions, resetBalls, setAimDirection, setCueBall, setPowerLevel, setSpin, system, params.shotId]);
+
+    // Sincronización e inicialización inmediata de la jugada del catálogo en el simulador
+    const lastLoadedShotKeyRef = useRef<string | null>(null);
+    useEffect(() => {
+        if (params.whiteX && params.whiteY) {
+            const shotKey = `${params.shotId || 'c'}_${params.whiteX}_${params.whiteY}_${params.yellowX}_${params.yellowY}_${params.redX}_${params.redY}_${params.aimX || ''}_${params.aimY || ''}`;
+            if (lastLoadedShotKeyRef.current === shotKey) return;
+            lastLoadedShotKeyRef.current = shotKey;
+
+            const wX = Number(params.whiteX);
+            const wY = Number(params.whiteY);
+            const yX = Number(params.yellowX);
+            const yY = Number(params.yellowY);
+            const rX = Number(params.redX);
+            const rY = Number(params.redY);
+
+            const pos = {
+                white: vec2(!isNaN(wX) ? wX : 71, !isNaN(wY) ? wY : 52.75),
+                yellow: vec2(!isNaN(yX) ? yX : 71, !isNaN(yY) ? yY : 71),
+                red: vec2(!isNaN(rX) ? rX : 213, !isNaN(rY) ? rY : 71),
+            };
+
+            resetBalls(pos);
+            setCueBall('white');
+
+            if (params.aimX && params.aimY) {
+                const ax = Number(params.aimX);
+                const ay = Number(params.aimY);
+                if (!isNaN(ax) && !isNaN(ay) && (ax !== 0 || ay !== 0)) {
+                    setAimDirection(vec2Normalize(vec2(ax, ay)));
+                }
+            } else {
+                const aimVec = vec2Normalize(vec2Sub(pos.yellow, pos.white));
+                setAimDirection(aimVec);
+            }
+
+            if (params.spinX !== undefined && params.spinY !== undefined) {
+                const sx = Number(params.spinX) || 0;
+                const sy = Number(params.spinY) || 0;
+                const mag = Math.min(1, Math.hypot(sx, sy));
+                setSpin({ x: sx, y: sy, magnitude: mag });
+            }
+
+            if (params.powerLevel) {
+                const pl = Math.min(5, Math.max(1, Number(params.powerLevel) || 3));
+                setPowerLevel(pl);
+            }
+
+            setIsEditMode(false);
+            setShowGuides(true);
+        } else if (params.shotId && lastLoadedShotKeyRef.current !== params.shotId) {
+            lastLoadedShotKeyRef.current = params.shotId;
+            fetchShotDetail(Number(params.shotId))
+                .then((raw) => {
+                    const shot = adaptCatalogShot(raw);
+                    setFetchedShot(shot);
+                    const pos = {
+                        white: vec2(shot.white.x, shot.white.y),
+                        yellow: vec2(shot.yellow.x, shot.yellow.y),
+                        red: vec2(shot.red.x, shot.red.y),
+                    };
+                    resetBalls(pos);
+                    setCueBall('white');
+
+                    if (shot.cueBallTrajectory && shot.cueBallTrajectory.length >= 2) {
+                        const p0 = shot.cueBallTrajectory[0];
+                        const p1 = shot.cueBallTrajectory[1];
+                        setAimDirection(vec2Normalize(vec2Sub(vec2(p1.x, p1.y), vec2(p0.x, p0.y))));
+                    } else {
+                        setAimDirection(vec2Normalize(vec2Sub(vec2(shot.yellow.x, shot.yellow.y), vec2(shot.white.x, shot.white.y))));
+                    }
+
+                    let spinX = 0;
+                    let spinY = 0;
+                    if (shot.effectY < 0) {
+                        const tips = Math.min(3.5, Math.abs(shot.effectY * 5.0));
+                        const rawHour = shot.effectX * 5.0;
+                        const hour = rawHour <= 0.05 ? 12 : rawHour;
+                        const theta = (3 - hour) * (Math.PI / 6);
+                        const mag = Math.min(1.0, tips / 3.5);
+                        spinX = Math.cos(theta) * mag;
+                        spinY = Math.sin(theta) * mag;
+                    } else if (shot.effectX !== 0 || shot.effectY !== 0) {
+                        spinX = Math.max(-1, Math.min(1, shot.effectX));
+                        spinY = Math.max(-1, Math.min(1, shot.effectY));
+                    }
+                    setSpin({ x: spinX, y: spinY, magnitude: Math.min(1, Math.hypot(spinX, spinY)) });
+                    setPowerLevel(Math.min(5, Math.max(1, shot.powerLevel || shot.railSpeed || 3)));
+                    setIsEditMode(false);
+                    setShowGuides(true);
+                })
+                .catch((err) => {
+                    console.warn('[Simulator] Could not load catalog shot details:', err);
+                });
+        }
+    }, [
+        params.shotId,
+        params.whiteX,
+        params.whiteY,
+        params.yellowX,
+        params.yellowY,
+        params.redX,
+        params.redY,
+        params.aimX,
+        params.aimY,
+        params.spinX,
+        params.spinY,
+        params.powerLevel,
+        resetBalls,
+        setAimDirection,
+        setCueBall,
+        setPowerLevel,
+        setSpin,
+    ]);
 
     const handleBallMove = useCallback(
         (ballId: BallId, position: Vec2) => {
@@ -282,7 +436,7 @@ export function TrainingSimulationScreen() {
     );
 
     const handleReset = useCallback(() => {
-        if (!system && (!snapshotBalls || snapshotBalls.length === 0) && !params.whiteX) {
+        if (!system && (!snapshotBalls || snapshotBalls.length === 0) && !params.whiteX && !params.shotId) {
             const breakPos = getBreakPosition(tablePreferences.breakFormat, {
                 pbaFormation: tablePreferences.pbaFormation,
                 umbSide: tablePreferences.umbSide,
@@ -298,6 +452,7 @@ export function TrainingSimulationScreen() {
         system,
         snapshotBalls,
         params.whiteX,
+        params.shotId,
         tablePreferences.breakFormat,
         tablePreferences.pbaFormation,
         tablePreferences.umbSide,
@@ -375,12 +530,21 @@ export function TrainingSimulationScreen() {
                             onPress={() => router.back()}
                             accessibilityRole="button"
                             accessibilityLabel={t('common.back')}>
-                            <IconArrowLeft size={isMobile ? 16 : 18} color="#f8fafc" strokeWidth={2.2} />
+                            <IconArrowLeft size={isMobile ? 16 : 18} color={isDark ? '#f8fafc' : palette.text} strokeWidth={2.2} />
                         </TouchableOpacity>
 
                         <View style={styles.titleColumn}>
                             <View style={styles.systemTagRow}>
-                                <Text style={styles.systemTag}>{t('training.sim.tag')}</Text>
+                                {categoryName && activeCategoryColor ? (
+                                    <View style={[styles.categoryBadge, { backgroundColor: activeCategoryColor + '22', borderColor: activeCategoryColor + '66' }]}>
+                                        <View style={[styles.categoryDot, { backgroundColor: activeCategoryColor }]} />
+                                        <Text style={[styles.categoryBadgeText, { color: activeCategoryColor }]}>
+                                            {categoryName}
+                                        </Text>
+                                    </View>
+                                ) : (
+                                    <Text style={styles.systemTag}>{t('training.sim.tag')}</Text>
+                                )}
                                 <View style={styles.systemDot} />
                                 <Text style={styles.modeTag}>{isEditMode ? t('training.sim.edit') : t('training.sim.shot')}</Text>
                             </View>
@@ -503,6 +667,7 @@ export function TrainingSimulationScreen() {
                                 collisionPulses={state.collisionPulses}
                                 aimDirection={state.aimDirection}
                                 powerLevel={state.powerPercentage}
+                                categoryColor={activeCategoryColor ?? undefined}
                                 tablePreferences={tablePreferences}
                                 showCueStick={true}
                                 showGhostBall={true}
@@ -546,6 +711,8 @@ export function TrainingSimulationScreen() {
                                     onPress={() => setShowEffectModal(true)}
                                     disabled={state.isSimulating}
                                     compact={true}
+                                    categoryColor={activeCategoryColor ?? undefined}
+                                    isDark={isDark}
                                 />
                             </View>
 
@@ -559,6 +726,8 @@ export function TrainingSimulationScreen() {
                                     onAimChange={handleAimChange}
                                     disabled={state.isSimulating}
                                     compact={true}
+                                    categoryColor={activeCategoryColor ?? undefined}
+                                    isDark={isDark}
                                 />
                             </View>
                         </View>
@@ -750,6 +919,8 @@ export function TrainingSimulationScreen() {
                             cueBallId={state.cueBallId}
                             onPress={() => setShowEffectModal(true)}
                             disabled={state.isSimulating}
+                            categoryColor={activeCategoryColor ?? undefined}
+                            isDark={isDark}
                         />
 
                         <CaromTomeDeBolaEclipse
@@ -760,6 +931,8 @@ export function TrainingSimulationScreen() {
                             trajectory={state.trajectory}
                             onAimChange={handleAimChange}
                             disabled={state.isSimulating}
+                            categoryColor={activeCategoryColor ?? undefined}
+                            isDark={isDark}
                         />
 
                         <CaromAimFineTuner
@@ -849,11 +1022,11 @@ export function TrainingSimulationScreen() {
     );
 }
 
-const getStyles = (palette: ReturnType<typeof getPalette>, isMobile: boolean) =>
+const getStyles = (palette: ReturnType<typeof getPalette>, isMobile: boolean, isDark = true) =>
     StyleSheet.create({
         container: {
             flex: 1,
-            backgroundColor: '#070b0e',
+            backgroundColor: isDark ? '#070b0e' : palette.background,
             paddingHorizontal: isMobile ? 6 : 12,
             gap: isMobile ? 4 : 6,
         },
@@ -886,10 +1059,10 @@ const getStyles = (palette: ReturnType<typeof getPalette>, isMobile: boolean) =>
             justifyContent: 'space-between',
             alignItems: 'center',
             gap: isMobile ? 6 : 12,
-            backgroundColor: 'rgba(15, 23, 42, 0.75)',
+            backgroundColor: isDark ? 'rgba(15, 23, 42, 0.75)' : palette.card,
             borderRadius: isMobile ? 14 : 18,
             borderWidth: 1,
-            borderColor: 'rgba(255, 255, 255, 0.08)',
+            borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : palette.border,
             paddingHorizontal: isMobile ? 8 : 12,
             paddingVertical: isMobile ? 4 : 6,
             userSelect: 'none',
@@ -904,9 +1077,9 @@ const getStyles = (palette: ReturnType<typeof getPalette>, isMobile: boolean) =>
             width: isMobile ? 28 : 34,
             height: isMobile ? 28 : 34,
             borderRadius: isMobile ? 14 : 17,
-            backgroundColor: 'rgba(255, 255, 255, 0.08)',
+            backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)',
             borderWidth: 1,
-            borderColor: 'rgba(255, 255, 255, 0.12)',
+            borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)',
             alignItems: 'center',
             justifyContent: 'center',
         },
@@ -925,6 +1098,25 @@ const getStyles = (palette: ReturnType<typeof getPalette>, isMobile: boolean) =>
             color: '#00d2ff',
             letterSpacing: 0.8,
         },
+        categoryBadge: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 4,
+            paddingHorizontal: 6,
+            paddingVertical: 1.5,
+            borderRadius: 8,
+            borderWidth: 1,
+        },
+        categoryDot: {
+            width: 5,
+            height: 5,
+            borderRadius: 2.5,
+        },
+        categoryBadgeText: {
+            fontSize: isMobile ? 8 : 9,
+            fontWeight: '800',
+            letterSpacing: 0.3,
+        },
         systemDot: {
             width: 3,
             height: 3,
@@ -938,7 +1130,7 @@ const getStyles = (palette: ReturnType<typeof getPalette>, isMobile: boolean) =>
             letterSpacing: 0.6,
         },
         title: {
-            color: '#f8fafc',
+            color: isDark ? '#f8fafc' : palette.text,
             fontSize: isMobile ? 12 : 14,
             fontWeight: '900',
             letterSpacing: 0.2,
@@ -977,9 +1169,9 @@ const getStyles = (palette: ReturnType<typeof getPalette>, isMobile: boolean) =>
             width: isMobile ? 28 : 32,
             height: isMobile ? 28 : 32,
             borderRadius: isMobile ? 14 : 16,
-            backgroundColor: 'rgba(255, 255, 255, 0.06)',
+            backgroundColor: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.05)',
             borderWidth: 1,
-            borderColor: 'rgba(255, 255, 255, 0.1)',
+            borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)',
             alignItems: 'center',
             justifyContent: 'center',
         },
@@ -1024,10 +1216,10 @@ const getStyles = (palette: ReturnType<typeof getPalette>, isMobile: boolean) =>
 
         /* MOBILE 2-TIER BOTTOM HUD */
         bottomHudMobileContainer: {
-            backgroundColor: 'rgba(15, 23, 42, 0.85)',
+            backgroundColor: isDark ? 'rgba(15, 23, 42, 0.85)' : palette.card,
             borderRadius: 18,
             borderWidth: 1,
-            borderColor: 'rgba(255, 255, 255, 0.08)',
+            borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : palette.border,
             padding: 6,
             gap: 5,
             userSelect: 'none',
@@ -1045,14 +1237,14 @@ const getStyles = (palette: ReturnType<typeof getPalette>, isMobile: boolean) =>
             gap: 6,
             paddingTop: 4,
             borderTopWidth: 1,
-            borderTopColor: 'rgba(255, 255, 255, 0.06)',
+            borderTopColor: isDark ? 'rgba(255, 255, 255, 0.06)' : palette.border,
         },
         cueBallSelectorPillMobile: {
             flexDirection: 'row',
-            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+            backgroundColor: isDark ? 'rgba(15, 23, 42, 0.95)' : palette.surfaceLow,
             borderRadius: 14,
             borderWidth: 1,
-            borderColor: 'rgba(255, 255, 255, 0.12)',
+            borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : palette.border,
             padding: 2,
             gap: 2,
         },
@@ -1080,20 +1272,20 @@ const getStyles = (palette: ReturnType<typeof getPalette>, isMobile: boolean) =>
             alignItems: 'center',
             justifyContent: 'space-between',
             gap: 8,
-            backgroundColor: 'rgba(15, 23, 42, 0.75)',
+            backgroundColor: isDark ? 'rgba(15, 23, 42, 0.75)' : palette.card,
             borderRadius: 22,
             borderWidth: 1,
-            borderColor: 'rgba(255, 255, 255, 0.08)',
+            borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : palette.border,
             paddingHorizontal: 8,
             paddingVertical: 4,
             userSelect: 'none',
         },
         cueBallSelectorPill: {
             flexDirection: 'row',
-            backgroundColor: 'rgba(15, 23, 42, 0.85)',
+            backgroundColor: isDark ? 'rgba(15, 23, 42, 0.85)' : palette.surfaceLow,
             borderRadius: 18,
             borderWidth: 1,
-            borderColor: 'rgba(255, 255, 255, 0.12)',
+            borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : palette.border,
             padding: 2,
             gap: 2,
         },
@@ -1106,7 +1298,7 @@ const getStyles = (palette: ReturnType<typeof getPalette>, isMobile: boolean) =>
             borderRadius: 14,
         },
         ballOptionBtnActive: {
-            backgroundColor: 'rgba(255, 255, 255, 0.12)',
+            backgroundColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)',
         },
         whiteBallIcon: {
             width: 11,
@@ -1137,10 +1329,10 @@ const getStyles = (palette: ReturnType<typeof getPalette>, isMobile: boolean) =>
         ballOptionText: {
             fontSize: 9,
             fontWeight: '700',
-            color: '#64748b',
+            color: isDark ? '#64748b' : palette.muted,
         },
         ballOptionTextActive: {
-            color: '#f8fafc',
+            color: isDark ? '#f8fafc' : palette.text,
             fontWeight: '800',
         },
         utilityActionsRow: {
@@ -1168,9 +1360,9 @@ const getStyles = (palette: ReturnType<typeof getPalette>, isMobile: boolean) =>
             flexDirection: 'row',
             alignItems: 'center',
             gap: 4,
-            backgroundColor: 'rgba(255, 255, 255, 0.05)',
+            backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)',
             borderWidth: 1,
-            borderColor: 'rgba(255, 255, 255, 0.1)',
+            borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : palette.border,
             borderRadius: 14,
             paddingHorizontal: 7,
             paddingVertical: 4,
@@ -1182,7 +1374,7 @@ const getStyles = (palette: ReturnType<typeof getPalette>, isMobile: boolean) =>
         guidePillText: {
             fontSize: 9,
             fontWeight: '700',
-            color: '#64748b',
+            color: isDark ? '#64748b' : palette.muted,
         },
         guidePillTextActive: {
             color: '#00d2ff',
@@ -1228,7 +1420,7 @@ const getStyles = (palette: ReturnType<typeof getPalette>, isMobile: boolean) =>
         ballStudioBadgeText: {
             fontSize: 9.5,
             fontWeight: '800',
-            color: '#f8fafc',
+            color: isDark ? '#f8fafc' : palette.text,
             letterSpacing: 0.2,
         },
         ballModuleContainerDesktop: {
@@ -1259,13 +1451,13 @@ const getStyles = (palette: ReturnType<typeof getPalette>, isMobile: boolean) =>
         ballStudioTriggerBadge: {
             fontSize: 10,
             fontWeight: '800',
-            color: '#f8fafc',
+            color: isDark ? '#f8fafc' : palette.text,
             letterSpacing: 0.3,
         },
         ballStudioSkinBadge: {
             fontSize: 8.5,
             fontWeight: '600',
-            color: '#94a3b8',
+            color: isDark ? '#94a3b8' : palette.muted,
             maxWidth: 120,
         },
     });

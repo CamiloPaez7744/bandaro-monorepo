@@ -98,6 +98,19 @@ export async function runSchemaUpdates() {
         CREATE INDEX IF NOT EXISTS billiard_systems_cat_idx ON billiard_systems(category);
     `);
 
+    // 7. User Favorite Shots
+    await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS user_favorite_shots (
+            id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id varchar(100) NOT NULL DEFAULT 'guest',
+            shot_id integer NOT NULL,
+            created_at timestamptz DEFAULT now() NOT NULL
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS user_favorite_shots_user_shot_idx ON user_favorite_shots(user_id, shot_id);
+        CREATE INDEX IF NOT EXISTS user_favorite_shots_user_idx ON user_favorite_shots(user_id);
+        CREATE INDEX IF NOT EXISTS user_favorite_shots_shot_idx ON user_favorite_shots(shot_id);
+    `);
+
     console.log('[db] Schema tables and indexes created successfully!');
 }
 

@@ -16,6 +16,7 @@ import {
     IconSparkles,
     IconTarget,
     IconAdjustments,
+    IconBookmark,
 } from '@tabler/icons-react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -80,9 +81,12 @@ export function ShotCatalogScreen({
         error,
         selectedCategory,
         setSelectedCategory,
+        onlyFavorites,
+        setOnlyFavorites,
         searchQuery,
         setSearchQuery,
         loadMore,
+        toggleFavorite,
     } = useShotCatalog();
 
     const handlePressDetail = useCallback(
@@ -180,18 +184,46 @@ export function ShotCatalogScreen({
                     <TouchableOpacity
                         style={[
                             styles.categoryChip,
-                            !selectedCategory
+                            !selectedCategory && !onlyFavorites
                                 ? [styles.categoryChipActive, { backgroundColor: palette.primary, borderColor: palette.primary }]
                                 : [styles.categoryChipInactive, { backgroundColor: palette.card, borderColor: palette.border }],
                         ]}
                         activeOpacity={0.8}
-                        onPress={() => setSelectedCategory(undefined)}>
+                        onPress={() => {
+                            setSelectedCategory(undefined);
+                            setOnlyFavorites(false);
+                        }}>
                         <Text
                             style={[
                                 styles.categoryChipText,
-                                !selectedCategory ? styles.categoryChipTextActive : { color: palette.muted },
+                                !selectedCategory && !onlyFavorites ? styles.categoryChipTextActive : { color: palette.muted },
                             ]}>
                             {t('catalog.allCategories', { total })}
+                        </Text>
+                    </TouchableOpacity>
+
+                    {/* Guardadas / Favoritas pill */}
+                    <TouchableOpacity
+                        style={[
+                            styles.categoryChip,
+                            { flexDirection: 'row', alignItems: 'center', gap: 6 },
+                            onlyFavorites
+                                ? [styles.categoryChipActive, { backgroundColor: '#F59E0B', borderColor: '#F59E0B' }]
+                                : [styles.categoryChipInactive, { backgroundColor: palette.card, borderColor: palette.border }],
+                        ]}
+                        activeOpacity={0.8}
+                        onPress={() => setOnlyFavorites((prev) => !prev)}>
+                        <IconBookmark
+                            size={14}
+                            color={onlyFavorites ? '#FFFFFF' : '#F59E0B'}
+                            fill={onlyFavorites ? '#FFFFFF' : 'transparent'}
+                        />
+                        <Text
+                            style={[
+                                styles.categoryChipText,
+                                onlyFavorites ? styles.categoryChipTextActive : { color: palette.text },
+                            ]}>
+                            {language === 'en' ? 'Favorites' : 'Guardadas'}
                         </Text>
                     </TouchableOpacity>
 
@@ -273,6 +305,7 @@ export function ShotCatalogScreen({
                                         shot={shot}
                                         onPress={handlePressDetail}
                                         onTrain={handleTrainShot}
+                                        onToggleFavorite={toggleFavorite}
                                         palette={palette}
                                         isPickerMode={isPickerMode}
                                     />

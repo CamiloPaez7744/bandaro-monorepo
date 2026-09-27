@@ -11,6 +11,8 @@ export interface RailSpeedGaugeProps {
     compact?: boolean;
     /** Show labels */
     showLabels?: boolean;
+    /** Dark or light theme */
+    isDark?: boolean;
     /** Additional style */
     style?: ViewStyle;
 }
@@ -55,6 +57,7 @@ export const RailSpeedGauge = memo(function RailSpeedGauge({
     lang = 'es',
     compact = false,
     showLabels = true,
+    isDark = true,
     style,
 }: RailSpeedGaugeProps) {
     const clampedSpeed = Math.max(0, Math.min(5, Math.round(speed * 2) / 2));
@@ -66,10 +69,17 @@ export const RailSpeedGauge = memo(function RailSpeedGauge({
     const speedLabel = SPEED_LABELS[lang][wholeSpeed] ?? `${clampedSpeed} ${unitText}`;
 
     return (
-        <View style={[styles.card, compact && styles.cardCompact, style]}>
+        <View
+            style={[
+                styles.card,
+                compact && styles.cardCompact,
+                !isDark ? { backgroundColor: '#ffffff', borderColor: 'rgba(0, 0, 0, 0.1)' } : null,
+                style,
+            ]}
+        >
             {showLabels && (
                 <View style={styles.header}>
-                    <Text style={styles.labelTitle}>{titleText}</Text>
+                    <Text style={[styles.labelTitle, !isDark ? { color: '#64748B' } : null]}>{titleText}</Text>
                     <View style={[styles.speedPill, { borderColor: `${activeColor}60`, backgroundColor: `${activeColor}1A` }]}>
                         <Text style={[styles.speedPillText, { color: activeColor }]}>
                             {clampedSpeed} {unitText}
@@ -86,7 +96,13 @@ export const RailSpeedGauge = memo(function RailSpeedGauge({
                     const segColor = SEGMENT_COLORS[level - 1];
 
                     return (
-                        <View key={level} style={styles.segmentTrack}>
+                        <View
+                            key={level}
+                            style={[
+                                styles.segmentTrack,
+                                !isDark ? { backgroundColor: 'rgba(0, 0, 0, 0.06)', borderColor: 'rgba(0, 0, 0, 0.08)' } : null,
+                            ]}
+                        >
                             {isFilled && (
                                 <View
                                     style={[
@@ -134,8 +150,8 @@ export const RailSpeedGauge = memo(function RailSpeedGauge({
             </View>
 
             {showLabels && (
-                <View style={styles.footer}>
-                    <Text style={styles.footerText}>{speedLabel}</Text>
+                <View style={[styles.footer, !isDark ? { borderTopColor: 'rgba(0, 0, 0, 0.08)' } : null]}>
+                    <Text style={[styles.footerText, !isDark ? { color: '#0F172A' } : null]}>{speedLabel}</Text>
                 </View>
             )}
         </View>

@@ -18,6 +18,7 @@ export interface BallTacticsVisualizerProps {
     isDefense?: boolean;
     lang?: CatalogLanguage;
     compact?: boolean;
+    isDark?: boolean;
     style?: ViewStyle;
 }
 
@@ -64,6 +65,7 @@ export const BallTacticsVisualizer = memo(function BallTacticsVisualizer({
     isDefense = false,
     lang = 'es',
     compact = false,
+    isDark = true,
     style,
 }: BallTacticsVisualizerProps) {
     const { width } = useWindowDimensions();
@@ -71,16 +73,24 @@ export const BallTacticsVisualizer = memo(function BallTacticsVisualizer({
     const labels = UI_TITLES[lang] ?? UI_TITLES.es;
 
     return (
-        <View style={[styles.container, compact && styles.containerCompact, style]}>
+        <View
+            style={[
+                styles.container,
+                compact && styles.containerCompact,
+                !isDark ? { backgroundColor: '#ffffff', borderColor: categoryColor ? `${categoryColor}35` : 'rgba(0, 0, 0, 0.1)' } : null,
+                categoryColor ? { borderColor: `${categoryColor}40` } : null,
+                style,
+            ]}
+        >
             {/* Studio Header with Tactical Title and Trait Badges */}
             <View style={styles.header}>
                 <View style={styles.headerTitleCol}>
                     <View style={styles.badgeRow}>
                         <View style={[styles.accentDot, { backgroundColor: categoryColor }]} />
-                        <Text style={styles.titleText}>{labels.title}</Text>
+                        <Text style={[styles.titleText, !isDark ? { color: '#0F172A' } : null]}>{labels.title}</Text>
                     </View>
                     {!compact && (
-                        <Text style={styles.subtitleText}>{labels.subtitle}</Text>
+                        <Text style={[styles.subtitleText, !isDark ? { color: '#64748B' } : null]}>{labels.subtitle}</Text>
                     )}
                 </View>
 
@@ -116,6 +126,8 @@ export const BallTacticsVisualizer = memo(function BallTacticsVisualizer({
                     lang={lang}
                     compact={compact}
                     showLabels={true}
+                    categoryColor={categoryColor}
+                    isDark={isDark}
                 />
             </View>
 
@@ -126,6 +138,7 @@ export const BallTacticsVisualizer = memo(function BallTacticsVisualizer({
                     lang={lang}
                     compact={compact}
                     showLabels={true}
+                    isDark={isDark}
                 />
             </View>
         </View>

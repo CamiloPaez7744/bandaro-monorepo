@@ -466,7 +466,10 @@ export function TrainingCatalogScreen() {
           setShowSelectorModal(false);
           router.push('/catalog');
         }}
-        onOpenSimulator={() => router.push('/training/simulate')}
+        onOpenSimulator={() => {
+          setShowSelectorModal(false);
+          router.push('/training/simulate');
+        }}
         onCapturePhoto={() => setShowCameraModal(true)}
       />
 

@@ -1,17 +1,18 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import {
     Platform, Pressable, ScrollView, Text, View,
-    useWindowDimensions, Modal, StyleSheet, type ViewStyle,
+    useWindowDimensions, Modal, StyleSheet, type ViewStyle, type TextStyle,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { IconX, IconPlayerPlay, IconBookmark, IconTarget } from '@tabler/icons-react-native';
 
 import { useColorScheme } from '@/components/useColorScheme';
+import { useAuth } from '@/components/useAuth';
 import { getPalette } from '@/constants/theme';
 import { useSidebarWidth } from '@/components/LayoutContext';
 import { useI18n } from '@/components/useLanguage';
 import { TrainingPlayTable } from '@/src/presentation/components/Training/TrainingPlayTable';
-import { fetchShotDetail, type CatalogShotRaw } from '@/src/infrastructure/catalog/catalogApi';
+import { fetchShotDetail, toggleFavoriteShot, type CatalogShotRaw } from '@/src/infrastructure/catalog/catalogApi';
 import {
     adaptCatalogShot,
     getLocalizedShot,
@@ -43,6 +44,8 @@ const UI_LABELS: Record<CatalogLanguage, {
     loading: string;
     notFound: string;
     close: string;
+    save: string;
+    saved: string;
     thickness: string;
     speed: string;
     effectX: string;
@@ -63,6 +66,8 @@ const UI_LABELS: Record<CatalogLanguage, {
         loading: 'Cargando tiro...',
         notFound: 'Tiro no encontrado',
         close: 'Cerrar',
+        save: 'Guardar',
+        saved: 'Guardada',
         thickness: 'Grosor',
         speed: 'Velocidad',
         effectX: 'Efecto X',
@@ -75,14 +80,16 @@ const UI_LABELS: Record<CatalogLanguage, {
         tips: 'Consejos de Ejecución',
         youtube: 'Ver en YouTube',
         train: 'Entrenar',
-        simulate: 'Simular Trayectoria',
-        simulating: 'Simulando...',
+        simulate: 'Ver en simulador',
+        simulating: 'Cargando simulador...',
         originalNotice: 'Traducción adaptada al billar carambola',
     },
     en: {
         loading: 'Loading shot...',
         notFound: 'Shot not found',
         close: 'Close',
+        save: 'Save',
+        saved: 'Saved',
         thickness: 'Thickness',
         speed: 'Speed',
         effectX: 'Spin X',
@@ -95,14 +102,16 @@ const UI_LABELS: Record<CatalogLanguage, {
         tips: 'Execution Tips',
         youtube: 'Watch on YouTube',
         train: 'Practice',
-        simulate: 'Simulate Trajectory',
-        simulating: 'Simulating...',
+        simulate: 'View in Simulator',
+        simulating: 'Loading simulator...',
         originalNotice: 'English carom billiard technical translation',
     },
     ko: {
         loading: '로딩 중...',
         notFound: '샷을 찾을 수 없습니다',
         close: '닫기',
+        save: '저장',
+        saved: '저장됨',
         thickness: '두께',
         speed: '당점속도',
         effectX: '회전 X',
@@ -115,8 +124,8 @@ const UI_LABELS: Record<CatalogLanguage, {
         tips: '공략 팁',
         youtube: 'YouTube에서 보기',
         train: '연습하기',
-        simulate: '경로 시뮬레이션',
-        simulating: '시뮬레이션 중...',
+        simulate: '시뮬레이터에서 보기',
+        simulating: '시뮬레이터 로딩 중...',
         originalNotice: 'Billiard Bible 원문 텍스트 (한국어)',
     },
 };
@@ -132,14 +141,19 @@ export function ShotDetailScreen({ shotId: propShotId, onClose, onSimulate }: Sh
     const router = useRouter();
     const colorScheme = useColorScheme();
     const palette = getPalette(colorScheme);
+    const isDark = colorScheme === 'dark';
     const { width: windowWidth } = useWindowDimensions();
     const sidebarWidth = useSidebarWidth();
     const { language } = useI18n();
+    const { user } = useAuth();
+    const userId = user?.id || 'guest';
 
     const shotId = propShotId ?? (params.shotId ? parseInt(params.shotId, 10) : undefined);
     const [shot, setShot] = useState<CatalogShot | null>(null);
     const [loading, setLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
     const [isSimulating, setIsSimulating] = useState(false);
+    const [modalVisible, setModalVisible] = useState(true);
     const [selectedLang, setSelectedLang] = useState<CatalogLanguage>(language === 'en' ? 'en' : 'es');
 
     useEffect(() => {
@@ -158,35 +172,105 @@ export function ShotDetailScreen({ shotId: propShotId, onClose, onSimulate }: Sh
         }, 50);
     }, [onSimulate, shot]);
 
-    const handleSimulateFromButton = useCallback(() => {
-        // Smoothly scroll to the top so user can see the table and trajectory animation
-        scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-
-        // Trigger or restart trajectory simulation
-        handleTriggerSimulation();
-    }, [handleTriggerSimulation]);
-
-    useEffect(() => {
-        if (!shotId) return;
-        setLoading(true);
-        fetchShotDetail(shotId)
-            .then((raw) => setShot(adaptCatalogShot(raw)))
-            .catch(() => setShot(null))
-            .finally(() => setLoading(false));
-    }, [shotId]);
-
-    const handleClose = () => {
+    const handleClose = useCallback(() => {
+        setModalVisible(false);
         if (onClose) {
             onClose();
         } else {
             router.back();
         }
-    };
+    }, [onClose, router]);
 
     const color = shot ? (CATEGORY_COLORS[shot.category] ?? '#6B7280') : '#6B7280';
     const isWide = windowWidth - sidebarWidth >= 600;
     const labels = UI_LABELS[selectedLang] ?? UI_LABELS.es;
     const localized = shot ? getLocalizedShot(shot, selectedLang) : null;
+
+    const handleSimulateFromButton = useCallback(() => {
+        if (!shot) return;
+
+        setModalVisible(false);
+
+        // Calculate aim vector from cue ball trajectory if available
+        let aimX = '1';
+        let aimY = '0';
+        if (shot.cueBallTrajectory && shot.cueBallTrajectory.length >= 2) {
+            const p0 = shot.cueBallTrajectory[0];
+            const p1 = shot.cueBallTrajectory[1];
+            aimX = String(p1.x - p0.x);
+            aimY = String(p1.y - p0.y);
+        } else {
+            aimX = String(shot.yellow.x - shot.white.x);
+            aimY = String(shot.yellow.y - shot.white.y);
+        }
+
+        // Calculate spin
+        let sX = 0;
+        let sY = 0;
+        if (shot.effectY < 0) {
+            const tips = Math.min(3.5, Math.abs(shot.effectY * 5.0));
+            const rawHour = shot.effectX * 5.0;
+            const hour = rawHour <= 0.05 ? 12 : rawHour;
+            const theta = (3 - hour) * (Math.PI / 6);
+            const mag = Math.min(1.0, tips / 3.5);
+            sX = Math.cos(theta) * mag;
+            sY = Math.sin(theta) * mag;
+        } else if (shot.effectX !== 0 || shot.effectY !== 0) {
+            sX = Math.max(-1, Math.min(1, shot.effectX));
+            sY = Math.max(-1, Math.min(1, shot.effectY));
+        }
+
+        if (onClose) {
+            onClose();
+        }
+
+        router.replace({
+            pathname: '/training/simulate',
+            params: {
+                shotId: String(shot.id),
+                whiteX: String(shot.white.x),
+                whiteY: String(shot.white.y),
+                yellowX: String(shot.yellow.x),
+                yellowY: String(shot.yellow.y),
+                redX: String(shot.red.x),
+                redY: String(shot.red.y),
+                aimX,
+                aimY,
+                spinX: String(sX),
+                spinY: String(sY),
+                powerLevel: String(shot.powerLevel || shot.railSpeed || 3),
+                category: shot.category,
+                categoryName: shot.categoryName,
+                categoryColor: color ? encodeURIComponent(color) : '',
+                customName: localized?.name || `Jugada #${shot.id}`,
+            },
+        });
+    }, [onClose, router, shot, localized, color]);
+
+    const handleToggleFavorite = useCallback(async () => {
+        if (!shot || isSaving) return;
+        setIsSaving(true);
+        const nextState = !shot.isFavorite;
+        setShot((prev) => (prev ? { ...prev, isFavorite: nextState } : null));
+
+        try {
+            const res = await toggleFavoriteShot(shot.id, userId);
+            setShot((prev) => (prev ? { ...prev, isFavorite: res.isFavorite } : null));
+        } catch {
+            setShot((prev) => (prev ? { ...prev, isFavorite: !nextState } : null));
+        } finally {
+            setIsSaving(false);
+        }
+    }, [shot, isSaving, userId]);
+
+    useEffect(() => {
+        if (!shotId) return;
+        setLoading(true);
+        fetchShotDetail(shotId, userId)
+            .then((raw) => setShot(adaptCatalogShot(raw)))
+            .catch(() => setShot(null))
+            .finally(() => setLoading(false));
+    }, [shotId, userId]);
 
     if (loading) {
         return (
@@ -213,14 +297,37 @@ export function ShotDetailScreen({ shotId: propShotId, onClose, onSimulate }: Sh
             style={{ flex: 1, backgroundColor: palette.background } as any}
             contentContainerStyle={{ padding: isWide ? 28 : 16, maxWidth: 1060, alignSelf: 'center', width: '100%' }}
         >
-            {/* Header: Close button & Actions */}
+            {/* Header: Save button on Left, Close button on Right */}
             <View style={styles.headerRow}>
+                <Pressable
+                    onPress={handleToggleFavorite}
+                    hitSlop={8}
+                    style={[
+                        styles.favoriteBtn,
+                        shot.isFavorite
+                            ? { backgroundColor: '#F59E0B22', borderColor: '#F59E0B66' }
+                            : { backgroundColor: 'rgba(128,128,128,0.1)', borderColor: 'transparent' },
+                    ]}
+                >
+                    <IconBookmark
+                        size={17}
+                        color={shot.isFavorite ? '#F59E0B' : palette.muted}
+                        fill={shot.isFavorite ? '#F59E0B' : 'transparent'}
+                    />
+                    <Text
+                        style={[
+                            styles.favoriteBtnText,
+                            { color: shot.isFavorite ? '#F59E0B' : palette.muted },
+                        ]}
+                    >
+                        {shot.isFavorite ? labels.saved : labels.save}
+                    </Text>
+                </Pressable>
+
+                <View style={{ flex: 1 }} />
+
                 <Pressable onPress={handleClose} hitSlop={8} style={styles.closeBtn}>
                     <IconX size={20} color={palette.muted} />
-                </Pressable>
-                <View style={{ flex: 1 }} />
-                <Pressable hitSlop={8} style={styles.closeBtn}>
-                    <IconBookmark size={18} color={palette.muted} />
                 </Pressable>
             </View>
 
@@ -340,6 +447,7 @@ export function ShotDetailScreen({ shotId: propShotId, onClose, onSimulate }: Sh
                             isDefense={shot.isDefense}
                             lang={selectedLang}
                             compact={true}
+                            isDark={isDark}
                         />
                     </View>
                 )}
@@ -358,6 +466,7 @@ export function ShotDetailScreen({ shotId: propShotId, onClose, onSimulate }: Sh
                     isDefense={shot.isDefense}
                     lang={selectedLang}
                     compact={false}
+                    isDark={isDark}
                 />
             )}
 
@@ -404,8 +513,11 @@ export function ShotDetailScreen({ shotId: propShotId, onClose, onSimulate }: Sh
                 <Pressable
                     style={[styles.simulateBtn, { flex: 1, backgroundColor: '#0d5e2f' }]}
                     onPress={() => {
-                        handleClose();
-                        router.push({ pathname: '/training/session', params: { shotId: String(shot.id) } });
+                        setModalVisible(false);
+                        if (onClose) {
+                            onClose();
+                        }
+                        router.replace({ pathname: '/training/session', params: { shotId: String(shot.id) } });
                     }}
                 >
                     <IconTarget size={18} color="#fff" />
@@ -428,13 +540,14 @@ export function ShotDetailScreen({ shotId: propShotId, onClose, onSimulate }: Sh
 
     // On web, render as a modal overlay
     if (Platform.OS === 'web' && !propShotId) {
+        if (!modalVisible) return null;
         return (
-            <Modal transparent animationType="fade" visible onRequestClose={handleClose}>
-                <View style={styles.webOverlay}>
-                    <View style={styles.webModal}>
+            <Modal transparent animationType="fade" visible={modalVisible} onRequestClose={handleClose}>
+                <Pressable style={styles.webOverlay} onPress={handleClose}>
+                    <Pressable style={styles.webModal} onPress={(e) => e.stopPropagation()}>
                         {content}
-                    </View>
-                </View>
+                    </Pressable>
+                </Pressable>
             </Modal>
         );
     }
@@ -463,6 +576,19 @@ const styles = StyleSheet.create({
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' } as ViewStyle,
     headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 } as ViewStyle,
     closeBtn: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(128,128,128,0.1)' } as ViewStyle,
+    favoriteBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 12,
+        height: 36,
+        borderRadius: 18,
+        borderWidth: 1,
+    } as ViewStyle,
+    favoriteBtnText: {
+        fontSize: 13,
+        fontWeight: '600',
+    } as TextStyle,
     badgeAndLangRow: {
         flexDirection: 'row',
         alignItems: 'center',

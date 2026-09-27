@@ -7,9 +7,9 @@ export const shotsRouter: Router = Router();
 
 shotsRouter.get('/catalog', async (req: Request, res: Response) => {
     try {
-        const { category, player, search, limit = '50', offset = '0' } = req.query;
+        const { category, player, search, onlyFavorites, userId = 'guest', limit = '50', offset = '0' } = req.query;
+        const activeUserId = String(userId || 'guest');
 
-        let query = sql`SELECT * FROM shot_catalog WHERE 1=1`;
         const conditions: any[] = [];
 
         if (category) {
@@ -18,6 +18,10 @@ shotsRouter.get('/catalog', async (req: Request, res: Response) => {
 
         if (player) {
             conditions.push(sql`(player_first_name ILIKE ${'%' + player + '%'} OR player_last_name ILIKE ${'%' + player + '%'})`);
+        }
+
+        if (onlyFavorites === 'true' || onlyFavorites === '1') {
+            conditions.push(sql`EXISTS (SELECT 1 FROM user_favorite_shots ufs WHERE ufs.shot_id = shot_catalog.external_id AND ufs.user_id = ${activeUserId})`);
         }
 
         if (search) {
@@ -37,13 +41,15 @@ shotsRouter.get('/catalog', async (req: Request, res: Response) => {
             )`);
         }
 
+        const selectFields = sql`shot_catalog.*, EXISTS (SELECT 1 FROM user_favorite_shots ufs WHERE ufs.shot_id = shot_catalog.external_id AND ufs.user_id = ${activeUserId}) AS is_favorite`;
         const orderClause = sql`ORDER BY (CASE WHEN has_analysis = true THEN 0 ELSE 1 END) ASC, external_id ASC`;
 
+        let query;
         if (conditions.length > 0) {
             const whereClause = conditions.reduce((acc, cond) => sql`${acc} AND ${cond}`);
-            query = sql`SELECT * FROM shot_catalog WHERE ${whereClause} ${orderClause} LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}`;
+            query = sql`SELECT ${selectFields} FROM shot_catalog WHERE ${whereClause} ${orderClause} LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}`;
         } else {
-            query = sql`SELECT * FROM shot_catalog ${orderClause} LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}`;
+            query = sql`SELECT ${selectFields} FROM shot_catalog ${orderClause} LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}`;
         }
 
         const result = await db.execute(query);
@@ -77,11 +83,59 @@ shotsRouter.get('/catalog/categories', async (_req: Request, res: Response) => {
     }
 });
 
+shotsRouter.get('/favorites', async (req: Request, res: Response) => {
+    try {
+        const { userId = 'guest' } = req.query;
+        const activeUserId = String(userId || 'guest');
+        const result = await db.execute(
+            sql`SELECT shot_id FROM user_favorite_shots WHERE user_id = ${activeUserId} ORDER BY created_at DESC`
+        );
+        const favoriteShotIds = result.rows.map((r: any) => Number(r.shot_id));
+        res.json({ favoriteShotIds });
+    } catch (error) {
+        console.error('Error fetching favorites:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+shotsRouter.post('/favorites/toggle', async (req: Request, res: Response) => {
+    try {
+        const { shotId, userId = 'guest' } = req.body;
+        if (!shotId) {
+            res.status(400).json({ error: 'shotId is required' });
+            return;
+        }
+        const activeUserId = String(userId || 'guest');
+        const idNum = parseInt(String(shotId), 10);
+
+        const existing = await db.execute(
+            sql`SELECT id FROM user_favorite_shots WHERE user_id = ${activeUserId} AND shot_id = ${idNum}`
+        );
+
+        if (existing.rows.length > 0) {
+            await db.execute(
+                sql`DELETE FROM user_favorite_shots WHERE user_id = ${activeUserId} AND shot_id = ${idNum}`
+            );
+            res.json({ success: true, isFavorite: false, shotId: idNum });
+        } else {
+            await db.execute(
+                sql`INSERT INTO user_favorite_shots (user_id, shot_id) VALUES (${activeUserId}, ${idNum})`
+            );
+            res.json({ success: true, isFavorite: true, shotId: idNum });
+        }
+    } catch (error) {
+        console.error('Error toggling favorite:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 shotsRouter.get('/catalog/:id', async (req: Request, res: Response) => {
     try {
         const id = String(req.params.id);
+        const { userId = 'guest' } = req.query;
+        const activeUserId = String(userId || 'guest');
         const result = await db.execute(
-            sql`SELECT * FROM shot_catalog WHERE external_id = ${parseInt(id, 10)}`
+            sql`SELECT shot_catalog.*, EXISTS (SELECT 1 FROM user_favorite_shots ufs WHERE ufs.shot_id = shot_catalog.external_id AND ufs.user_id = ${activeUserId}) AS is_favorite FROM shot_catalog WHERE external_id = ${parseInt(id, 10)}`
         );
 
         if (result.rows.length === 0) {
@@ -95,3 +149,4 @@ shotsRouter.get('/catalog/:id', async (req: Request, res: Response) => {
         res.status(500).json({ error: 'Internal server error' });
     }
 });
+

@@ -31,6 +31,7 @@ export interface CatalogShotRaw {
     is_defense: boolean;
     is_avoid_kiss: boolean;
     youtube_url: string;
+    is_favorite?: boolean;
 }
 
 export interface CatalogResponse {
@@ -51,6 +52,8 @@ export async function fetchCatalog(params?: {
     category?: string;
     player?: string;
     search?: string;
+    onlyFavorites?: boolean;
+    userId?: string;
     limit?: number;
     offset?: number;
 }): Promise<CatalogResponse> {
@@ -58,6 +61,8 @@ export async function fetchCatalog(params?: {
     if (params?.category) query.set('category', params.category);
     if (params?.player) query.set('player', params.player);
     if (params?.search) query.set('search', params.search);
+    if (params?.onlyFavorites) query.set('onlyFavorites', 'true');
+    if (params?.userId) query.set('userId', params.userId);
     if (params?.limit) query.set('limit', String(params.limit));
     if (params?.offset) query.set('offset', String(params.offset));
 
@@ -67,8 +72,8 @@ export async function fetchCatalog(params?: {
     return res.json();
 }
 
-export async function fetchShotDetail(externalId: number): Promise<CatalogShotRaw> {
-    const res = await fetch(`${BASE}/catalog/${externalId}`);
+export async function fetchShotDetail(externalId: number, userId = 'guest'): Promise<CatalogShotRaw> {
+    const res = await fetch(`${BASE}/catalog/${externalId}?userId=${encodeURIComponent(userId)}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
 }
@@ -78,3 +83,24 @@ export async function fetchCategories(): Promise<CategoryCount[]> {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
 }
+
+export async function toggleFavoriteShot(
+    shotId: number,
+    userId = 'guest'
+): Promise<{ success: boolean; isFavorite: boolean; shotId: number }> {
+    const res = await fetch(`${BASE}/favorites/toggle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shotId, userId }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+}
+
+export async function fetchFavoriteShotIds(userId = 'guest'): Promise<number[]> {
+    const res = await fetch(`${BASE}/favorites?userId=${encodeURIComponent(userId)}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    return data.favoriteShotIds ?? [];
+}
+

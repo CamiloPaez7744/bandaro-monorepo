@@ -10,6 +10,8 @@ interface CaromSpinBallWidgetProps {
     onPress: () => void;
     disabled?: boolean;
     compact?: boolean;
+    categoryColor?: string;
+    isDark?: boolean;
 }
 
 /**
@@ -46,6 +48,8 @@ export const CaromSpinBallWidget = memo(function CaromSpinBallWidget({
     onPress,
     disabled = false,
     compact = false,
+    categoryColor,
+    isDark = true,
 }: CaromSpinBallWidgetProps) {
     const { t, language } = useI18n();
     const size = compact ? 38 : 50;
@@ -60,10 +64,17 @@ export const CaromSpinBallWidget = memo(function CaromSpinBallWidget({
     const isYellow = cueBallId === 'yellow';
     const gradientId = useMemo(() => `widgetBallGrad-${Math.random().toString(36).slice(2, 7)}`, []);
     const shortLabel = useMemo(() => getSpinShortLabel(spin, compact, language), [spin, compact, language]);
+    const activeColor = categoryColor || '#00d2ff';
+    const activeGlow = categoryColor ? `${categoryColor}55` : 'rgba(0, 210, 255, 0.45)';
 
     return (
         <TouchableOpacity
-            style={[styles.container, compact && styles.containerCompact]}
+            style={[
+                styles.container,
+                compact && styles.containerCompact,
+                categoryColor ? { borderColor: `${categoryColor}60`, shadowColor: categoryColor } : null,
+                !isDark ? { backgroundColor: '#ffffff', borderColor: categoryColor ? `${categoryColor}60` : 'rgba(0, 0, 0, 0.12)' } : null,
+            ]}
             onPress={onPress}
             disabled={disabled}
             activeOpacity={0.75}
@@ -102,13 +113,13 @@ export const CaromSpinBallWidget = memo(function CaromSpinBallWidget({
                         strokeWidth={1}
                     />
 
-                    {/* Retícula fina en cruz azul neón */}
+                    {/* Retícula fina en cruz con color de categoría */}
                     <Line
                         x1={center - radius + 2}
                         y1={center}
                         x2={center + radius - 2}
                         y2={center}
-                        stroke="rgba(0, 210, 255, 0.45)"
+                        stroke={activeGlow}
                         strokeWidth={0.8}
                     />
                     <Line
@@ -116,24 +127,24 @@ export const CaromSpinBallWidget = memo(function CaromSpinBallWidget({
                         y1={center - radius + 2}
                         x2={center}
                         y2={center + radius - 2}
-                        stroke="rgba(0, 210, 255, 0.45)"
+                        stroke={activeGlow}
                         strokeWidth={0.8}
                     />
 
-                    {/* Resplandor neón exterior del casquillo */}
+                    {/* Resplandor exterior del casquillo */}
                     <Circle
                         cx={tipX}
                         cy={tipY}
                         r={compact ? 4 : 5.5}
-                        fill="rgba(0, 210, 255, 0.35)"
+                        fill={categoryColor ? `${categoryColor}40` : "rgba(0, 210, 255, 0.35)"}
                     />
 
-                    {/* Casquillo / Punto de impacto en azul neón brillante */}
+                    {/* Casquillo / Punto de impacto */}
                     <Circle
                         cx={tipX}
                         cy={tipY}
                         r={compact ? 2.5 : 3.5}
-                        fill="#00d2ff"
+                        fill={activeColor}
                         stroke="#ffffff"
                         strokeWidth={1}
                     />
@@ -142,12 +153,12 @@ export const CaromSpinBallWidget = memo(function CaromSpinBallWidget({
 
             <View style={[styles.textContainer, compact && styles.textContainerCompact]}>
                 <View style={styles.labelRow}>
-                    <Text style={[styles.labelTitle, compact && { fontSize: 7.5 }]}>
+                    <Text style={[styles.labelTitle, compact && { fontSize: 7.5 }, { color: activeColor }]}>
                         {language === 'en' ? 'SPIN' : 'EFECTO'}
                     </Text>
-                    <View style={styles.liveDot} />
+                    <View style={[styles.liveDot, { backgroundColor: activeColor }]} />
                 </View>
-                <Text style={[styles.labelValue, compact && { fontSize: 9.5 }]} numberOfLines={1}>
+                <Text style={[styles.labelValue, compact && { fontSize: 9.5 }, !isDark ? { color: '#0f172a' } : null]} numberOfLines={1}>
                     {shortLabel}
                 </Text>
             </View>

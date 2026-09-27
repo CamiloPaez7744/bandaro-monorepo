@@ -1,6 +1,16 @@
 import { memo, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { IconBolt, IconGauge, IconRoute, IconTarget, IconPlus, IconEye, IconPlayerPlay, IconCircleDot } from '@tabler/icons-react-native';
+import {
+    IconBolt,
+    IconGauge,
+    IconRoute,
+    IconTarget,
+    IconPlus,
+    IconEye,
+    IconPlayerPlay,
+    IconCircleDot,
+    IconBookmark,
+} from '@tabler/icons-react-native';
 
 import { TrainingPlayTable } from '@/src/presentation/components/Training/TrainingPlayTable';
 import { getPalette, theme } from '@/constants/theme';
@@ -54,6 +64,7 @@ export type ShotCatalogCardProps = {
     shot: CatalogShot;
     onPress: (shot: CatalogShot) => void;
     onTrain?: (shot: CatalogShot) => void;
+    onToggleFavorite?: (shotId: number) => void;
     palette: ReturnType<typeof getPalette>;
     isPickerMode?: boolean;
 };
@@ -62,6 +73,7 @@ export const ShotCatalogCard = memo(function ShotCatalogCard({
     shot,
     onPress,
     onTrain,
+    onToggleFavorite,
     palette,
     isPickerMode = false,
 }: ShotCatalogCardProps) {
@@ -92,10 +104,32 @@ export const ShotCatalogCard = memo(function ShotCatalogCard({
                       onMouseLeave: () => setIsHovered(false),
                   }
                 : {})}>
-            {/* Top Bar: Shot ID & Category Badge */}
+            {/* Top Bar: Shot ID, Favorite button & Category Badge */}
             <View style={styles.topBar}>
-                <View style={[styles.idBadge, { backgroundColor: palette.surfaceLow, borderColor: palette.border }]}>
-                    <Text style={[styles.idText, { color: palette.muted }]}>#{shot.id}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <View style={[styles.idBadge, { backgroundColor: palette.surfaceLow, borderColor: palette.border }]}>
+                        <Text style={[styles.idText, { color: palette.muted }]}>#{shot.id}</Text>
+                    </View>
+                    {onToggleFavorite ? (
+                        <Pressable
+                            hitSlop={8}
+                            onPress={(e) => {
+                                e.stopPropagation();
+                                onToggleFavorite(shot.id);
+                            }}
+                            style={[
+                                styles.cardFavBtn,
+                                shot.isFavorite
+                                    ? { backgroundColor: '#F59E0B20', borderColor: '#F59E0B60' }
+                                    : { backgroundColor: palette.surfaceLow, borderColor: palette.border },
+                            ]}>
+                            <IconBookmark
+                                size={12}
+                                color={shot.isFavorite ? '#F59E0B' : palette.muted}
+                                fill={shot.isFavorite ? '#F59E0B' : 'transparent'}
+                            />
+                        </Pressable>
+                    ) : null}
                 </View>
 
                 <View style={styles.topRightBadges}>
@@ -246,6 +280,14 @@ const styles = StyleSheet.create({
         paddingVertical: 3,
         borderRadius: 6,
         borderWidth: 1,
+    },
+    cardFavBtn: {
+        paddingHorizontal: 6,
+        paddingVertical: 3,
+        borderRadius: 6,
+        borderWidth: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     idText: {
         fontSize: 11,
