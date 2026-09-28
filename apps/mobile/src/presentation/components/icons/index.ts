@@ -60,6 +60,10 @@ import IconChevronsLeft from '@tabler/icons-react-native/IconChevronsLeft';
 import IconChevronsRight from '@tabler/icons-react-native/IconChevronsRight';
 import IconInfoCircle from '@tabler/icons-react-native/IconInfoCircle';
 import IconCircleDot from '@tabler/icons-react-native/IconCircleDot';
+import IconBallBowling from '@tabler/icons-react-native/IconBallBowling';
+import IconChartBar from '@tabler/icons-react-native/IconChartBar';
+import IconClipboardList from '@tabler/icons-react-native/IconClipboardList';
+import IconMenu2 from '@tabler/icons-react-native/IconMenu2';
 
 export {
     IconCircleDot,
@@ -124,6 +128,10 @@ export {
     IconChevronsLeft,
     IconChevronsRight,
     IconInfoCircle,
+    IconBallBowling,
+    IconChartBar,
+    IconClipboardList,
+    IconMenu2,
 };
 
 

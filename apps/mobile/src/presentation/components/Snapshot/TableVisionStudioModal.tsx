@@ -2613,7 +2613,7 @@ const getStyles = (C: ReturnType<typeof getC>, isDark: boolean) =>
       padding: 12,
     },
     backdrop: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
     },
     modalContainer: {
       width: '100%',

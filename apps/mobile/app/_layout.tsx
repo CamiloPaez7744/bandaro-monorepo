@@ -73,6 +73,7 @@ function RootLayoutNav() {
           <View style={styles.webContent}>
             <Stack>
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="training/simulate" options={{ headerShown: false }} />
               <Stack.Screen name="auth/login" options={{ title: t('stack.login') }} />
               <Stack.Screen name="auth/register" options={{ title: t('stack.register') }} />
               <Stack.Screen name="training/index" options={{ title: t('stack.training') }} />
@@ -86,6 +87,7 @@ function RootLayoutNav() {
       ) : (
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="training/simulate" options={{ headerShown: false }} />
           <Stack.Screen name="auth/login" options={{ title: t('stack.login') }} />
           <Stack.Screen name="auth/register" options={{ title: t('stack.register') }} />
           <Stack.Screen name="training/index" options={{ title: t('stack.training') }} />

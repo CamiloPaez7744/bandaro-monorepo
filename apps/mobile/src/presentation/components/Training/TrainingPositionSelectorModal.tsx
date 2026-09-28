@@ -114,7 +114,7 @@ export function TrainingPositionSelectorModal({
                     <IconBook size={isDesktop ? 24 : 20} color={palette.primary} strokeWidth={2} />
                   </View>
                   <View style={[styles.cardTagBadge, { backgroundColor: `${palette.primary}15`, borderColor: `${palette.primary}40` }]}>
-                    <Text style={[styles.cardTagText, { color: palette.primary }]}>BILLIARD-BIBLE</Text>
+                    <Text style={[styles.cardTagText, { color: palette.primary }]}>{t('training.selector.catalogTag')}</Text>
                   </View>
                 </View>
 
@@ -145,7 +145,7 @@ export function TrainingPositionSelectorModal({
                     <IconDeviceGamepad2 size={isDesktop ? 24 : 20} color={palette.secondary} strokeWidth={2} />
                   </View>
                   <View style={[styles.cardTagBadge, { backgroundColor: `${palette.secondary}15`, borderColor: `${palette.secondary}40` }]}>
-                    <Text style={[styles.cardTagText, { color: palette.secondary }]}>{t('common.active')}</Text>
+                    <Text style={[styles.cardTagText, { color: palette.secondary }]}>{t('training.selector.simTag')}</Text>
                   </View>
                 </View>
 

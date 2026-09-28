@@ -13,7 +13,6 @@ import {
 import {
     IconSearch,
     IconX,
-    IconSparkles,
     IconTarget,
     IconAdjustments,
     IconBookmark,
@@ -119,17 +118,6 @@ export function ShotCatalogScreen({
             <View style={[styles.header, { paddingHorizontal, paddingTop, borderColor: palette.border }]}>
                 <View style={styles.headerTitleRow}>
                     <View style={styles.headerTitles}>
-                        <View style={styles.badgeRow}>
-                            <View style={[styles.pillBadge, { backgroundColor: `${palette.primary}18`, borderColor: `${palette.primary}33` }]}>
-                                <IconSparkles size={13} color={palette.primary} />
-                                <Text style={[styles.pillBadgeText, { color: palette.primary }]}>
-                                    {isPickerMode ? t('catalog.pickerBadge') : t('catalog.heroBadge')}
-                                </Text>
-                            </View>
-                            <Text style={[styles.totalCountText, { color: palette.muted }]}>
-                                {t('catalog.shotsCount', { count: total.toLocaleString() })}
-                            </Text>
-                        </View>
                         <Text style={[styles.title, { color: palette.text }]}>
                             {isPickerMode ? t('catalog.pickerTitle') : t('catalog.title')}
                         </Text>
@@ -344,29 +332,6 @@ const styles = StyleSheet.create({
     headerTitles: {
         flex: 1,
         gap: 4,
-    },
-    badgeRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-    },
-    pillBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 5,
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-        borderRadius: theme.radius.full,
-        borderWidth: 1,
-    },
-    pillBadgeText: {
-        fontSize: 10,
-        fontWeight: '700',
-        letterSpacing: 0.5,
-    },
-    totalCountText: {
-        fontSize: 12,
-        fontWeight: '600',
     },
     title: {
         fontSize: 22,

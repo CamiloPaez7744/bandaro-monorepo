@@ -1,54 +1,43 @@
 import { Tabs } from 'expo-router';
 import { IconHome, IconBook, IconClock, IconBarbell, IconUser } from '@tabler/icons-react-native';
 import { Platform, useWindowDimensions } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { getPalette } from '@/constants/theme';
-import { useColorScheme } from '@/components/useColorScheme';
+import { AnimatedTabBar } from '@/src/presentation/components/AnimatedTabBar';
 import { useI18n } from '@/components/useLanguage';
 
-function HomeTabIcon({ color, size }: Readonly<{ color: string; size: number }>) {
+function HomeTabIcon({ color, size }: Readonly<{ color: any; size: number }>) {
   return <IconHome size={size} color={color} strokeWidth={2} />;
 }
 
-function CatalogTabIcon({ color, size }: Readonly<{ color: string; size: number }>) {
+function CatalogTabIcon({ color, size }: Readonly<{ color: any; size: number }>) {
   return <IconBook size={size} color={color} strokeWidth={2} />;
 }
 
-function HistoryTabIcon({ color, size }: Readonly<{ color: string; size: number }>) {
+function HistoryTabIcon({ color, size }: Readonly<{ color: any; size: number }>) {
   return <IconClock size={size} color={color} strokeWidth={2} />;
 }
 
-function TrainingTabIcon({ color, size }: Readonly<{ color: string; size: number }>) {
+function TrainingTabIcon({ color, size }: Readonly<{ color: any; size: number }>) {
   return <IconBarbell size={size} color={color} strokeWidth={2} />;
 }
 
-function ProfileTabIcon({ color, size }: Readonly<{ color: string; size: number }>) {
+function ProfileTabIcon({ color, size }: Readonly<{ color: any; size: number }>) {
   return <IconUser size={size} color={color} strokeWidth={2} />;
 }
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
   const { t } = useI18n();
-  const palette = getPalette(colorScheme);
-  const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const useWebSidebar = Platform.OS === 'web' && width >= 1024;
+  const hideBottomBar = Platform.OS === 'web' && width >= 1024;
 
   return (
     <Tabs
+      tabBar={hideBottomBar ? () => null : (props) => <AnimatedTabBar {...props} />}
       screenOptions={{
-        tabBarActiveTintColor: palette.primary,
-        tabBarInactiveTintColor: palette.muted,
-        tabBarStyle: {
-          backgroundColor: palette.background,
-          borderTopColor: palette.border,
-          height: 60 + insets.bottom,
-          paddingBottom: insets.bottom,
-          display: useWebSidebar ? 'none' : 'flex',
-        },
         headerShown: false,
-      }}>
+        tabBarStyle: hideBottomBar ? { display: 'none' } : undefined,
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
@@ -84,7 +73,6 @@ export default function TabLayout() {
           tabBarIcon: ProfileTabIcon,
         }}
       />
-      <Tabs.Screen name="two" options={{ href: null }} />
     </Tabs>
   );
 }

@@ -425,7 +425,7 @@ const getStyles = (C: ReturnType<typeof getC>, isDark: boolean) =>
       padding: 16,
     },
     backdrop: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
     },
     modalBox: {
       width: '100%',

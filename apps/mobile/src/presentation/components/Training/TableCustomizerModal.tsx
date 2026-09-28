@@ -1179,7 +1179,7 @@ const getStyles = (palette: ReturnType<typeof getPalette>, isDark: boolean) =>
       alignItems: 'center',
     },
     arenaPreviewBorder: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       borderWidth: 4,
       borderRadius: 6,
     },

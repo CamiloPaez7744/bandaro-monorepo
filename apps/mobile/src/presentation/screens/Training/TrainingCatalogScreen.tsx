@@ -127,10 +127,6 @@ export function TrainingCatalogScreen() {
         <View style={styles.heroCard}>
           <View style={styles.heroGlowCircle} />
           <View style={styles.heroTopRow}>
-            <View style={styles.heroTagBadge}>
-              <IconSparkles size={13} color={palette.primary} strokeWidth={2.5} />
-              <Text style={styles.heroTagText}>{t('training.route.heroTag')}</Text>
-            </View>
             <View style={styles.heroStatsRow}>
               <View style={styles.heroStatChip}>
                 <IconFlame size={14} color="#f59e0b" strokeWidth={2.5} />
@@ -598,24 +594,6 @@ const getStyles = (palette: ReturnType<typeof getPalette>, isWideScreen: boolean
       justifyContent: 'space-between',
       flexWrap: 'wrap',
       gap: 10,
-    },
-    heroTagBadge: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      borderRadius: 999,
-      paddingHorizontal: 12,
-      paddingVertical: 5,
-      backgroundColor: `${palette.primary}18`,
-      borderWidth: 1,
-      borderColor: `${palette.primary}35`,
-    },
-    heroTagText: {
-      color: palette.primary,
-      fontSize: 10.5,
-      fontWeight: '800',
-      letterSpacing: 0.6,
-      textTransform: 'uppercase',
     },
     heroStatsRow: {
       flexDirection: 'row',
