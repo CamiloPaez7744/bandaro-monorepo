@@ -15,6 +15,7 @@ interface CaromPowerMeterProps {
     onPowerChange: (power: number) => void;
     onShoot: (finalPower: number) => void;
     disabled?: boolean;
+    compact?: boolean;
 }
 
 /**
@@ -29,10 +30,11 @@ export const CaromPowerMeter = React.memo(function CaromPowerMeter({
     onPowerChange,
     onShoot,
     disabled = false,
+    compact = false,
 }: CaromPowerMeterProps) {
     const { language } = useI18n();
     const [isDragging, setIsDragging] = useState(false);
-    const containerHeightRef = useRef<number>(260);
+    const containerHeightRef = useRef<number>(compact ? 130 : 250);
     const powerLevelRef = useRef(powerLevel);
     powerLevelRef.current = powerLevel;
 
@@ -94,21 +96,22 @@ export const CaromPowerMeter = React.memo(function CaromPowerMeter({
     const fillColor = getFillColor(powerLevel);
 
     return (
-        <View style={styles.outerContainer}>
+        <View style={[styles.outerContainer, compact && styles.outerContainerCompact]}>
             {/* Header / Badge superior de fuerza */}
-            <View style={[styles.speedBadge, { borderColor: `${fillColor}55` }]}>
+            <View style={[styles.speedBadge, compact && styles.speedBadgeCompact, { borderColor: `${fillColor}55` }]}>
                 {powerLevel >= 80 ? (
-                    <IconFlame size={12} color={fillColor} />
+                    <IconFlame size={compact ? 10 : 12} color={fillColor} />
                 ) : (
-                    <IconBolt size={12} color={fillColor} />
+                    <IconBolt size={compact ? 10 : 12} color={fillColor} />
                 )}
-                <Text style={[styles.speedText, { color: fillColor }]}>{powerLevel}%</Text>
+                <Text style={[styles.speedText, compact && { fontSize: 8.5 }, { color: fillColor }]}>{powerLevel}%</Text>
             </View>
 
             {/* Ranura del medidor vertical */}
             <View
                 style={[
                     styles.meterTrack,
+                    compact && styles.meterTrackCompact,
                     isDragging && { borderColor: fillColor, shadowColor: fillColor },
                 ]}
                 onLayout={(e) => {
@@ -131,7 +134,7 @@ export const CaromPowerMeter = React.memo(function CaromPowerMeter({
                 <View style={styles.ticksContainer} pointerEvents="none">
                     {[20, 40, 60, 80].map((mark, idx) => (
                         <View key={mark} style={[styles.tickLine, { top: `${mark}%` }]}>
-                            <Text style={styles.tickLabel}>{idx + 1}</Text>
+                            <Text style={[styles.tickLabel, compact && { fontSize: 7, marginRight: 0 }]}>{idx + 1}</Text>
                         </View>
                     ))}
                 </View>
@@ -140,21 +143,22 @@ export const CaromPowerMeter = React.memo(function CaromPowerMeter({
                 <View
                     style={[
                         styles.cueHandle,
+                        compact && styles.cueHandleCompact,
                         {
-                            top: `${Math.min(92, Math.max(2, powerLevel))}%`,
+                            top: `${Math.min(90, Math.max(2, powerLevel))}%`,
                             borderColor: fillColor,
                         },
                     ]}
                     pointerEvents="none">
-                    <View style={[styles.cueTipPuff, { backgroundColor: fillColor }]} />
-                    <View style={styles.cueHandleGrip} />
+                    <View style={[styles.cueTipPuff, compact && { width: 8, height: 3 }, { backgroundColor: fillColor }]} />
+                    <View style={[styles.cueHandleGrip, compact && { width: 10, height: 1.5 }]} />
                 </View>
             </View>
 
             {/* Indicador inferior de velocidad de banda */}
-            <View style={styles.footerInfo}>
-                <Text style={styles.footerLabel}>{language === 'en' ? 'SPD' : 'VEL'}</Text>
-                <Text style={[styles.footerValue, { color: fillColor }]}>{railSpeed}</Text>
+            <View style={[styles.footerInfo, compact && { gap: 0 }]}>
+                <Text style={[styles.footerLabel, compact && { fontSize: 7 }]}>{language === 'en' ? 'SPD' : 'VEL'}</Text>
+                <Text style={[styles.footerValue, compact && { fontSize: 10 }, { color: fillColor }]}>{railSpeed}</Text>
             </View>
         </View>
     );
@@ -167,6 +171,10 @@ const styles = StyleSheet.create({
         gap: 6,
         userSelect: 'none',
     },
+    outerContainerCompact: {
+        width: 32,
+        gap: 3,
+    },
     speedBadge: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -176,6 +184,11 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         paddingHorizontal: 6,
         paddingVertical: 2,
+    },
+    speedBadgeCompact: {
+        paddingHorizontal: 4,
+        paddingVertical: 1,
+        borderRadius: 6,
     },
     speedText: {
         fontSize: 10,
@@ -197,6 +210,12 @@ const styles = StyleSheet.create({
         shadowRadius: 10,
         elevation: 6,
     },
+    meterTrackCompact: {
+        width: 22,
+        height: 130,
+        borderRadius: 11,
+        borderWidth: 1,
+    },
     meterFill: {
         width: '100%',
         position: 'absolute',
@@ -208,7 +227,7 @@ const styles = StyleSheet.create({
         shadowRadius: 8,
     },
     ticksContainer: {
-        ...StyleSheet.absoluteFillObject,
+        ...StyleSheet.absoluteFill,
     },
     tickLine: {
         position: 'absolute',
@@ -242,6 +261,13 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.5,
         shadowRadius: 3,
         elevation: 4,
+    },
+    cueHandleCompact: {
+        left: 2,
+        right: 2,
+        height: 13,
+        borderRadius: 6.5,
+        borderWidth: 1,
     },
     cueTipPuff: {
         width: 10,

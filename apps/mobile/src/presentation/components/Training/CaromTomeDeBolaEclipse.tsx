@@ -41,7 +41,7 @@ export interface CaromTomeDeBolaEclipseProps {
     isDark?: boolean;
 }
 
-interface TomeCalculation {
+export interface TomeCalculation {
     targetBall: Ball;
     fraction: number; // 0..1
     fractionLabel: string;
@@ -52,10 +52,10 @@ interface TomeCalculation {
     directContact: boolean;
 }
 
-const BALL_RADIUS_CM = 3.075;
-const COLLISION_DIAMETER_CM = BALL_RADIUS_CM * 2; // 6.15 cm
+export const BALL_RADIUS_CM = 3.075;
+export const COLLISION_DIAMETER_CM = BALL_RADIUS_CM * 2; // 6.15 cm
 
-function calculateTomeDeBola(
+export function calculateTomeDeBola(
     balls: Ball[],
     cueBallId: BallId,
     aimDirection: Vec2,

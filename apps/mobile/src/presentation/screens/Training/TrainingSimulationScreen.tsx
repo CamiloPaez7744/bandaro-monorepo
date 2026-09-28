@@ -1,6 +1,6 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, useWindowDimensions, Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -17,6 +17,7 @@ import {
     IconArrowLeft,
     IconEye,
     IconSettings,
+    IconMenu2,
 } from '@/src/presentation/components/icons';
 
 import { useColorScheme } from '@/components/useColorScheme';
@@ -27,12 +28,12 @@ import { NumberAnchor, Formula } from '@/src/presentation/components/Training/Sy
 import { SystemNumberingModal } from '@/src/presentation/components/Training/SystemNumberingModal';
 import { TableCustomizerModal } from '@/src/presentation/components/Training/TableCustomizerModal';
 import { CaromBallStudioModal } from '@/src/presentation/components/Training/CaromBallStudioModal';
+import { SimulatorSettingsModal } from '@/src/presentation/components/Training/SimulatorSettingsModal';
 import { CaromRefereeBanner } from '@/src/presentation/components/Training/CaromRefereeBanner';
 import { CaromPowerMeter } from '@/src/presentation/components/Training/CaromPowerMeter';
 import { CaromAimFineTuner } from '@/src/presentation/components/Training/CaromAimFineTuner';
-import { CaromSpinBallWidget } from '@/src/presentation/components/Training/CaromSpinBallWidget';
-import { CaromProEffectModal } from '@/src/presentation/components/Training/CaromProEffectModal';
-import { CaromTomeDeBolaEclipse } from '@/src/presentation/components/Training/CaromTomeDeBolaEclipse';
+import { CaromCombinedBallWidget } from '@/src/presentation/components/Training/CaromCombinedBallWidget';
+import { CaromBallControlModal } from '@/src/presentation/components/Training/CaromBallControlModal';
 import {
     DEFAULT_TABLE_PREFERENCES,
     BALL_SKIN_PRESETS,
@@ -103,8 +104,9 @@ export function TrainingSimulationScreen() {
         redY?: string;
     }>();
     const insets = useSafeAreaInsets();
-    const { width } = useWindowDimensions();
-    const isMobile = width < 768;
+    const { width, height } = useWindowDimensions();
+    const isLandscape = width > height;
+    const isMobile = (width < 768 && !isLandscape) || height < 500;
 
     const { t, language } = useI18n();
     const colorScheme = useColorScheme();
@@ -140,9 +142,10 @@ export function TrainingSimulationScreen() {
 
     const { preferences: tablePreferences, updatePreferences: handlePreferencesChange } = useTablePreferences();
     const [showCustomizer, setShowCustomizer] = useState(false);
-    const [showEffectModal, setShowEffectModal] = useState(false);
+    const [showBallControlModal, setShowBallControlModal] = useState(false);
     const [showNumberingModal, setShowNumberingModal] = useState(false);
     const [showBallStudioModal, setShowBallStudioModal] = useState(false);
+    const [showToolsMenu, setShowToolsMenu] = useState(false);
 
     useEffect(() => {
         if (params.snapshotId) {
@@ -263,7 +266,7 @@ export function TrainingSimulationScreen() {
     }, [params.whiteX, params.whiteY, params.shotId, setAimDirection]);
 
     const [tableOrientation, setTableOrientation] = useState<Orientation>(
-        width >= 900 ? 'horizontal' : 'vertical'
+        width > height || width >= 900 ? 'horizontal' : 'vertical'
     );
     const [isEditMode, setIsEditMode] = useState(!params.systemId && !params.shotId);
     const [showGuides, setShowGuides] = useState(true);
@@ -273,9 +276,90 @@ export function TrainingSimulationScreen() {
     const [showNumbering, setShowNumbering] = useState(false);
 
     useEffect(() => {
-        const next: Orientation = width >= 900 ? 'horizontal' : 'vertical';
+        const next: Orientation = width > height || width >= 900 ? 'horizontal' : 'vertical';
         setTableOrientation((prev) => (prev !== next ? next : prev));
-    }, [width]);
+    }, [width, height]);
+
+    const isWeb = Platform.OS === 'web';
+
+    // Dimensiones óptimas de la mesa para mantener la proporción exacta (aspectRatio)
+    // y evitar que en Web/Desktop se expanda al 100% del ancho del monitor.
+    const tableDimensions = useMemo(() => {
+        const isHorizontal = isLandscape || tableOrientation === 'horizontal';
+        // Proporción exacta del layout de la mesa (getLayout):
+        // Horizontal: 307.54 / 165.54 ≈ 1.8578
+        // Vertical: 165.54 / 307.54 ≈ 0.5383
+        const aspect = isHorizontal ? 307.54 / 165.54 : 165.54 / 307.54;
+
+        if (isHorizontal) {
+            const dockLeftW = 44 + 8;
+            const dockRightW = 56 + 8;
+            const paddingH = (insets.left || 0) + (insets.right || 0) + 16;
+            const paddingV = (insets.top || 0) + (insets.bottom || 0) + 12;
+
+            const availW = Math.max(200, width - dockLeftW - dockRightW - paddingH);
+            const availH = Math.max(150, height - paddingV);
+
+            // Ajuste por contención (Contain)
+            let calcH = availH;
+            let calcW = calcH * aspect;
+
+            if (calcW > availW) {
+                calcW = availW;
+                calcH = calcW / aspect;
+            }
+
+            // En Web / Desktop: Centrar con holgura estética sin devorar el ancho completo de la pantalla
+            if (isWeb) {
+                const webMaxW = Math.min(1360, width * 0.80);
+                if (calcW > webMaxW) {
+                    calcW = webMaxW;
+                    calcH = calcW / aspect;
+                }
+                const webMaxH = (height - insets.top - insets.bottom) * 0.88;
+                if (calcH > webMaxH) {
+                    calcH = webMaxH;
+                    calcW = calcH * aspect;
+                }
+            }
+
+            return {
+                width: Math.round(calcW),
+                height: Math.round(calcH),
+                aspectRatio: aspect,
+            };
+        } else {
+            // Modo Vertical (Smartphones)
+            const dockRightW = isMobile ? 48 : 56;
+            const paddingH = (insets.left || 0) + (insets.right || 0) + 12;
+            const paddingV = (insets.top || 0) + (insets.bottom || 0) + 16;
+
+            const availW = Math.max(180, width - dockRightW - paddingH);
+            const availH = Math.max(200, height - paddingV);
+
+            let calcW = availW;
+            let calcH = calcW / aspect;
+
+            if (calcH > availH) {
+                calcH = availH;
+                calcW = calcH * aspect;
+            }
+
+            if (isWeb) {
+                const webMaxH = height * 0.88;
+                if (calcH > webMaxH) {
+                    calcH = webMaxH;
+                    calcW = calcH * aspect;
+                }
+            }
+
+            return {
+                width: Math.round(calcW),
+                height: Math.round(calcH),
+                aspectRatio: aspect,
+            };
+        }
+    }, [isLandscape, tableOrientation, width, height, insets, isMobile, isWeb]);
 
     const systemLoadedRef = useRef<string | null>(null);
 
@@ -497,6 +581,24 @@ export function TrainingSimulationScreen() {
         setAimDirection,
     ]);
 
+    const handleStartPractice = useCallback(() => {
+        const whiteB = state.balls.find((b) => b.id === 'white');
+        const yellowB = state.balls.find((b) => b.id === 'yellow');
+        const redB = state.balls.find((b) => b.id === 'red');
+        router.push({
+            pathname: '/training/session',
+            params: {
+                customName: system?.name ? `${t('common.practice')}: ${system.name}` : (language === 'en' ? 'Simulator Position' : 'Posición de Simulador'),
+                whiteX: String(Math.round(whiteB ? whiteB.pos.x : 50)),
+                whiteY: String(Math.round(whiteB ? whiteB.pos.y : 71)),
+                yellowX: String(Math.round(yellowB ? yellowB.pos.x : 142)),
+                yellowY: String(Math.round(yellowB ? yellowB.pos.y : 71)),
+                redX: String(Math.round(redB ? redB.pos.x : 220)),
+                redY: String(Math.round(redB ? redB.pos.y : 71)),
+            },
+        });
+    }, [state.balls, router, system?.name, t, language]);
+
     if (params.systemId && !system) {
         return (
             <View style={[styles.notFound, { paddingTop: insets.top + theme.spacing.lg }]}>
@@ -512,481 +614,366 @@ export function TrainingSimulationScreen() {
 
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
+            <Stack.Screen options={{ headerShown: false }} />
             <View
                 style={[
                     styles.container,
                     {
-                        paddingTop: insets.top + (isMobile ? 4 : 6),
-                        paddingBottom: insets.bottom + (isMobile ? 4 : 6),
+                        paddingTop: insets.top + (isLandscape ? 2 : (isMobile ? 2 : 6)),
+                        paddingBottom: insets.bottom + (isLandscape ? 2 : (isMobile ? 2 : 6)),
+                        paddingLeft: insets.left + (isLandscape ? 4 : 0),
+                        paddingRight: insets.right + (isLandscape ? 4 : 0),
                     },
                 ]}>
                 
-                {/* BARRA SUPERIOR HUD DE JUEGO AAA */}
-                <View style={styles.topHudBar}>
-                    {/* Sección Izquierda: Salir y Título con Badge */}
-                    <View style={styles.headerLeft}>
-                        <TouchableOpacity
-                            style={styles.circleIconBtn}
-                            onPress={() => router.back()}
-                            accessibilityRole="button"
-                            accessibilityLabel={t('common.back')}>
-                            <IconArrowLeft size={isMobile ? 16 : 18} color={isDark ? '#f8fafc' : palette.text} strokeWidth={2.2} />
-                        </TouchableOpacity>
+                {isLandscape ? (
+                    /* LAYOUT PANORÁMICO (LANDSCAPE): DOCK IZQ + ESCENARIO CENTRAL + DOCK DER */
+                    <View style={styles.panoramicRootLayout}>
+                        {/* DOCK IZQUIERDO: Menú y herramientas agrupadas */}
+                        <View style={styles.leftToolsDock}>
+                            <TouchableOpacity
+                                style={styles.circleIconBtn}
+                                onPress={() => router.back()}
+                                accessibilityRole="button"
+                                accessibilityLabel={t('common.back')}>
+                                <IconArrowLeft size={16} color={isDark ? '#f8fafc' : palette.text} strokeWidth={2.2} />
+                            </TouchableOpacity>
 
-                        <View style={styles.titleColumn}>
-                            <View style={styles.systemTagRow}>
-                                {categoryName && activeCategoryColor ? (
-                                    <View style={[styles.categoryBadge, { backgroundColor: activeCategoryColor + '22', borderColor: activeCategoryColor + '66' }]}>
-                                        <View style={[styles.categoryDot, { backgroundColor: activeCategoryColor }]} />
-                                        <Text style={[styles.categoryBadgeText, { color: activeCategoryColor }]}>
-                                            {categoryName}
-                                        </Text>
-                                    </View>
-                                ) : (
-                                    <Text style={styles.systemTag}>{t('training.sim.tag')}</Text>
-                                )}
-                                <View style={styles.systemDot} />
-                                <Text style={styles.modeTag}>{isEditMode ? t('training.sim.edit') : t('training.sim.shot')}</Text>
-                            </View>
-                            <Text style={styles.title} numberOfLines={1}>
-                                {titleText}
-                            </Text>
-                        </View>
-                    </View>
+                            {/* Botón Menú de Configuraciones Agrupadas */}
+                            <TouchableOpacity
+                                style={styles.menuHighlightBtn}
+                                onPress={() => setShowToolsMenu(true)}
+                                accessibilityLabel={language === 'en' ? 'Simulator Menu' : 'Menú de Configuración'}>
+                                <IconMenu2 size={18} color="#00d2ff" strokeWidth={2.2} />
+                            </TouchableOpacity>
 
-                    {/* Sección Derecha: Botonería de herramientas con estética gaming */}
-                    <View style={styles.headerToolsRow}>
-                        {/* Botón Entrenar Destacado */}
-                        <TouchableOpacity
-                            style={styles.trainHighlightBtn}
-                            onPress={() => {
-                                const whiteB = state.balls.find((b) => b.id === 'white');
-                                const yellowB = state.balls.find((b) => b.id === 'yellow');
-                                const redB = state.balls.find((b) => b.id === 'red');
-                                router.push({
-                                    pathname: '/training/session',
-                                    params: {
-                                        customName: system?.name ? `${t('common.practice')}: ${system.name}` : (language === 'en' ? 'Simulator Position' : 'Posición de Simulador'),
-                                        whiteX: String(Math.round(whiteB ? whiteB.pos.x : 50)),
-                                        whiteY: String(Math.round(whiteB ? whiteB.pos.y : 71)),
-                                        yellowX: String(Math.round(yellowB ? yellowB.pos.x : 142)),
-                                        yellowY: String(Math.round(yellowB ? yellowB.pos.y : 71)),
-                                        redX: String(Math.round(redB ? redB.pos.x : 220)),
-                                        redY: String(Math.round(redB ? redB.pos.y : 71)),
-                                    },
-                                });
-                            }}
-                            disabled={state.isSimulating}>
-                            <IconTarget size={14} color="#fff" strokeWidth={2.5} />
-                            {!isMobile && <Text style={styles.trainBtnText}>{t('common.practice')}</Text>}
-                        </TouchableOpacity>
+                            <View style={styles.dockSeparator} />
 
-                        {/* Alternar Modo Edición / Puntería */}
-                        <TouchableOpacity
-                            style={[
-                                styles.toolIconOnlyBtn,
-                                isEditMode && styles.toolPillBtnActiveAmber,
-                            ]}
-                            onPress={() => setIsEditMode((prev) => !prev)}
-                            disabled={state.isSimulating}
-                            accessibilityLabel={t('training.sim.editMode')}>
-                            {isEditMode ? (
-                                <IconPencil size={isMobile ? 14 : 15} color="#fbbf24" strokeWidth={2.2} />
-                            ) : (
-                                <IconTarget size={isMobile ? 14 : 15} color="#94a3b8" strokeWidth={2} />
-                            )}
-                        </TouchableOpacity>
-
-                        {/* Personalizar Mesa */}
-                        <TouchableOpacity
-                            style={styles.toolIconOnlyBtn}
-                            onPress={() => setShowCustomizer(true)}
-                            disabled={state.isSimulating}
-                            accessibilityLabel={t('training.sim.customizeTable')}>
-                            <IconPalette size={isMobile ? 14 : 16} color="#94a3b8" strokeWidth={2} />
-                        </TouchableOpacity>
-
-                        {/* Alternar Regla de Bandas */}
-                        <TouchableOpacity
-                            style={[
-                                styles.toolIconOnlyBtn,
-                                showRuler && styles.toolPillBtnActiveCyan,
-                            ]}
-                            onPress={() => setShowRuler((prev) => !prev)}
-                            disabled={state.isSimulating}
-                            accessibilityLabel={t('training.sim.cushionRuler')}>
-                            <IconRuler2 size={isMobile ? 14 : 16} color={showRuler ? '#00d2ff' : '#94a3b8'} strokeWidth={2} />
-                        </TouchableOpacity>
-
-                        {/* Sistemas y Numeración */}
-                        <TouchableOpacity
-                            style={[
-                                styles.toolIconOnlyBtn,
-                                showNumbering && styles.toolPillBtnActiveCyan,
-                            ]}
-                            onPress={() => setShowNumberingModal(true)}
-                            disabled={state.isSimulating}
-                            accessibilityLabel={t('training.sim.systems')}>
-                            <IconNumbers size={isMobile ? 14 : 16} color={showNumbering ? '#00d2ff' : '#94a3b8'} strokeWidth={2} />
-                        </TouchableOpacity>
-
-                        {/* Reiniciar Posición */}
-                        <TouchableOpacity
-                            style={styles.toolIconOnlyBtn}
-                            onPress={handleReset}
-                            disabled={state.isSimulating}
-                            accessibilityLabel={t('training.sim.resetTable')}>
-                            <IconRefresh size={isMobile ? 14 : 16} color="#94a3b8" strokeWidth={2} />
-                        </TouchableOpacity>
-                    </View>
-                </View>
-
-                {/* ESCENARIO PRINCIPAL: LA MESA SE MANTIENE 100% FIJA Y ESTABLE */}
-                <View style={styles.arenaContainer}>
-                    {/* Banner de Árbitro: FLOATING OVERLAY (Nunca desplaza la mesa al aparecer o cerrarse) */}
-                    <View style={styles.floatingRefereeBannerWrap} pointerEvents="box-none">
-                        <CaromRefereeBanner
-                            validation={state.validation}
-                            isSimulating={state.isSimulating}
-                            cushionCountLive={state.liveCushionCount}
-                            ballHitsLive={state.liveBallHits}
-                            onDismiss={dismissValidation}
-                        />
-                    </View>
-
-                    {/* Escenario de Mesa y Taco de Potencia Dockeado */}
-                    <View style={[styles.tableAndPowerRow, isMobile && { gap: 6 }]}>
-                        <View style={styles.fixedTableWrap}>
-                            <InteractiveBilliardsTable
-                                orientation={tableOrientation}
-                                style={styles.tableStage}
-                                balls={state.balls}
-                                cueBallId={state.cueBallId}
-                                trajectory={state.trajectory}
-                                dynamicTrails={state.dynamicTrails ?? undefined}
-                                collisionPulses={state.collisionPulses}
-                                aimDirection={state.aimDirection}
-                                powerLevel={state.powerPercentage}
-                                categoryColor={activeCategoryColor ?? undefined}
-                                tablePreferences={tablePreferences}
-                                showCueStick={true}
-                                showGhostBall={true}
-                                onBallMove={handleBallMove}
-                                onAimChange={handleAimChange}
-                                onPowerChange={setPowerPercentage}
-                                onShoot={(power) => executeShot(power)}
-                                isSimulating={state.isSimulating}
-                                isEditMode={isEditMode}
-                                showGuides={showGuides}
-                                showRuler={showRuler}
-                                numberingAnchors={numberingAnchors}
-                                numberingFormula={numberingFormula}
-                                showNumbering={showNumbering}
-                                onNumberingAnchorsChange={setNumberingAnchors}
-                            />
-                        </View>
-
-                        {/* Medidor vertical de taco estilo 8 Ball Pool */}
-                        <View style={[styles.powerMeterDock, isMobile && { width: 38 }]}>
-                            <CaromPowerMeter
-                                powerLevel={state.powerPercentage}
-                                onPowerChange={setPowerPercentage}
-                                onShoot={(power) => executeShot(power)}
+                            {/* Práctica Directa */}
+                            <TouchableOpacity
+                                style={styles.circleIconBtnGreen}
+                                onPress={handleStartPractice}
                                 disabled={state.isSimulating}
-                            />
-                        </View>
-                    </View>
-                </View>
+                                accessibilityLabel={t('common.practice')}>
+                                <IconTarget size={15} color="#ffffff" strokeWidth={2.5} />
+                            </TouchableOpacity>
 
-                {/* BARRA INFERIOR HUD DE CONTROL TÁCTICO */}
-                {isMobile ? (
-                    /* Mobile 2-Tier Tactical HUD (Fits all mobile screens without any overflow) */
-                    <View style={styles.bottomHudMobileContainer}>
-                        {/* Tier 1: Instrumentos Tácticos (Efecto y Tome Eclipse) */}
-                        <View style={styles.bottomHudMobileTier1}>
-                            <View style={{ flex: 1 }}>
-                                <CaromSpinBallWidget
-                                    spin={state.spin}
-                                    cueBallId={state.cueBallId}
-                                    onPress={() => setShowEffectModal(true)}
-                                    disabled={state.isSimulating}
-                                    compact={true}
-                                    categoryColor={activeCategoryColor ?? undefined}
-                                    isDark={isDark}
+                            {/* Alternar Edición / Apuntado */}
+                            <TouchableOpacity
+                                style={[styles.circleIconBtn, isEditMode && styles.circleIconBtnActiveAmber]}
+                                onPress={() => setIsEditMode((prev) => !prev)}
+                                disabled={state.isSimulating}
+                                accessibilityLabel={t('training.sim.editMode')}>
+                                <IconPencil size={14} color={isEditMode ? '#fbbf24' : '#94a3b8'} strokeWidth={2.2} />
+                            </TouchableOpacity>
+
+                            {/* Alternar Guías Visuales */}
+                            <TouchableOpacity
+                                style={[styles.circleIconBtn, showGuides && styles.circleIconBtnActiveCyan]}
+                                onPress={() => setShowGuides((prev) => !prev)}
+                                disabled={state.isSimulating}
+                                accessibilityLabel={t('training.sim.guides')}>
+                                <IconEye size={14} color={showGuides ? '#00d2ff' : '#94a3b8'} strokeWidth={2.2} />
+                            </TouchableOpacity>
+
+                            {/* Reiniciar Posición */}
+                            <TouchableOpacity
+                                style={styles.circleIconBtn}
+                                onPress={handleReset}
+                                disabled={state.isSimulating}
+                                accessibilityLabel={t('training.sim.resetTable')}>
+                                <IconRefresh size={14} color="#94a3b8" strokeWidth={2} />
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* ESCENARIO CENTRAL: MESA CON MÁXIMO PROTAGONISMO */}
+                        <View style={styles.panoramicCenterStage}>
+                            {/* Banner de Árbitro: FLOATING OVERLAY */}
+                            <View style={styles.floatingRefereeBannerWrap} pointerEvents="box-none">
+                                <CaromRefereeBanner
+                                    validation={state.validation}
+                                    isSimulating={state.isSimulating}
+                                    cushionCountLive={state.liveCushionCount}
+                                    ballHitsLive={state.liveBallHits}
+                                    onDismiss={dismissValidation}
                                 />
                             </View>
 
-                            <View style={{ flex: 1.15 }}>
-                                <CaromTomeDeBolaEclipse
+                            <View style={styles.fixedTableWrap}>
+                                <InteractiveBilliardsTable
+                                    orientation="horizontal"
+                                    style={[styles.tableStage, { width: tableDimensions.width, height: tableDimensions.height }]}
                                     balls={state.balls}
                                     cueBallId={state.cueBallId}
-                                    aimDirection={state.aimDirection}
-                                    spin={state.spin}
                                     trajectory={state.trajectory}
-                                    onAimChange={handleAimChange}
-                                    disabled={state.isSimulating}
-                                    compact={true}
+                                    dynamicTrails={state.dynamicTrails ?? undefined}
+                                    collisionPulses={state.collisionPulses}
+                                    aimDirection={state.aimDirection}
+                                    powerLevel={state.powerPercentage}
                                     categoryColor={activeCategoryColor ?? undefined}
-                                    isDark={isDark}
+                                    tablePreferences={tablePreferences}
+                                    showCueStick={true}
+                                    showGhostBall={true}
+                                    onBallMove={handleBallMove}
+                                    onAimChange={handleAimChange}
+                                    onPowerChange={setPowerPercentage}
+                                    onShoot={(power) => executeShot(power)}
+                                    isSimulating={state.isSimulating}
+                                    isEditMode={isEditMode}
+                                    showGuides={showGuides}
+                                    showRuler={showRuler}
+                                    numberingAnchors={numberingAnchors}
+                                    numberingFormula={numberingFormula}
+                                    showNumbering={showNumbering}
+                                    onNumberingAnchorsChange={setNumberingAnchors}
                                 />
                             </View>
                         </View>
 
-                        {/* Tier 2: Controles de Juego, Micro-Puntería y Disparador */}
-                        <View style={styles.bottomHudMobileTier2}>
-                            {/* Módulo de Bolas: Selector Rápido + Acceso a Estudio Oficial (Skins & Break) */}
-                            <View style={styles.ballModuleContainerMobile}>
-                                <View style={styles.cueBallSelectorPillMobile}>
-                                    <TouchableOpacity
-                                        style={[
-                                            styles.ballOptionBtnMobile,
-                                            state.cueBallId === 'white' && styles.ballOptionBtnActive,
-                                        ]}
-                                        onPress={() => handleCueBallChange('white')}
-                                        disabled={state.isSimulating}>
-                                        <View style={styles.whiteBallIcon}>
-                                            {tablePreferences.showBallDots !== false && (
-                                                <View
-                                                    style={[
-                                                        styles.ballMiniDot,
-                                                        { backgroundColor: tablePreferences.ballSkin === 'cosmo_helix_pba' ? '#00e5ff' : '#dc2626' },
-                                                    ]}
-                                                />
-                                            )}
-                                        </View>
-                                        <Text style={[styles.ballOptionText, state.cueBallId === 'white' && styles.ballOptionTextActive]}>
-                                            {t('common.white')}
-                                        </Text>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity
-                                        style={[
-                                            styles.ballOptionBtnMobile,
-                                            state.cueBallId === 'yellow' && styles.ballOptionBtnActive,
-                                        ]}
-                                        onPress={() => handleCueBallChange('yellow')}
-                                        disabled={state.isSimulating}>
-                                        <View style={styles.yellowBallIcon}>
-                                            {tablePreferences.showBallDots !== false && (
-                                                <View
-                                                    style={[
-                                                        styles.ballMiniDot,
-                                                        { backgroundColor: tablePreferences.ballSkin === 'cosmo_helix_pba' ? '#1e3a8a' : '#dc2626' },
-                                                    ]}
-                                                />
-                                            )}
-                                        </View>
-                                        <Text style={[styles.ballOptionText, state.cueBallId === 'yellow' && styles.ballOptionTextActive]}>
-                                            {t('common.yellow')}
-                                        </Text>
-                                    </TouchableOpacity>
-                                </View>
-
-                                <TouchableOpacity
-                                    style={[
-                                        styles.ballStudioTriggerMobile,
-                                        tablePreferences.breakFormat === 'umb' ? styles.ballStudioUmbMobile : styles.ballStudioPbaMobile,
-                                    ]}
-                                    onPress={() => setShowBallStudioModal(true)}
-                                    disabled={state.isSimulating}
-                                    accessibilityLabel={language === 'en' ? 'Ball Studio and Official Break' : 'Módulo de Bolas y Salida Oficial'}>
-                                    <Text style={styles.ballStudioBadgeFlag}>
-                                        {tablePreferences.breakFormat === 'umb' ? '🌍' : '🇰🇷'}
-                                    </Text>
-                                    <Text style={styles.ballStudioBadgeText}>
-                                        {tablePreferences.breakFormat === 'umb' ? 'UMB' : `PBA ${tablePreferences.pbaFormation ?? '159'}`}
-                                    </Text>
-                                    <IconSettings size={12} color="#38bdf8" strokeWidth={2.2} />
-                                </TouchableOpacity>
-                            </View>
-
-                            {/* Micro-ajuste fino de puntería */}
-                            <CaromAimFineTuner
-                                aimDirection={state.aimDirection}
-                                onAimChange={handleAimChange}
+                        {/* DOCK DERECHO: CONTROLES DE TIRO (BOLA -> POTENCIA -> PLAY) */}
+                        <View style={styles.rightShotControlsDock}>
+                            {/* 1. La Bola (Control combinado de Efecto y Tome al pulsar) */}
+                            <CaromCombinedBallWidget
+                                cueBallId={state.cueBallId}
+                                spin={state.spin}
+                                onPress={() => setShowBallControlModal(true)}
+                                tablePreferences={tablePreferences}
+                                categoryColor={activeCategoryColor ?? undefined}
                                 disabled={state.isSimulating}
                                 compact={true}
+                                isDark={isDark}
                             />
 
-                            {/* Trazas & Alternador de Guías */}
-                            <View style={styles.utilityActionsRow}>
-                                {state.dynamicTrails && (
-                                    <TouchableOpacity
-                                        style={styles.clearTrailsBtn}
-                                        onPress={clearTrails}
-                                        accessibilityLabel={t('training.sim.clearTrails')}>
-                                        <IconTrash size={12} color="#ef4444" strokeWidth={2} />
-                                    </TouchableOpacity>
-                                )}
-
-                                <TouchableOpacity
-                                    style={[styles.guidePill, showGuides && styles.guidePillActive]}
-                                    onPress={() => setShowGuides((prev) => !prev)}>
-                                    <IconEye size={12} color={showGuides ? '#00d2ff' : '#64748b'} strokeWidth={2.2} />
-                                </TouchableOpacity>
+                            {/* 2. Selector de Potencia */}
+                            <View style={styles.powerMeterCenterWrap}>
+                                <CaromPowerMeter
+                                    powerLevel={state.powerPercentage}
+                                    onPowerChange={setPowerPercentage}
+                                    onShoot={(power) => executeShot(power)}
+                                    disabled={state.isSimulating}
+                                    compact={true}
+                                />
                             </View>
 
-                            {/* Botón Disparo Primario */}
+                            {/* 3. Botón de Play / Disparo */}
                             <TouchableOpacity
                                 style={[
-                                    styles.fireButtonMobile,
+                                    styles.fireButtonPanoramic,
                                     state.isSimulating && styles.fireButtonDisabled,
                                 ]}
                                 onPress={() => executeShot()}
                                 disabled={state.isSimulating}
                                 accessibilityLabel={t('training.sim.shoot')}>
                                 {state.isSimulating ? (
-                                    <IconLoader2 size={16} color="#ffffff" strokeWidth={2.5} />
+                                    <IconLoader2 size={18} color="#ffffff" strokeWidth={2.5} />
                                 ) : (
-                                    <IconPlayerPlay size={16} color="#ffffff" strokeWidth={2.5} />
+                                    <IconPlayerPlay size={18} color="#ffffff" strokeWidth={2.5} />
                                 )}
                             </TouchableOpacity>
                         </View>
                     </View>
                 ) : (
-                    /* Desktop panoramic single-row HUD */
-                    <View style={styles.bottomHudBar}>
-                        {/* Módulo de Bolas: Selector Rápido + Acceso a Estudio Oficial (Skins & Break) */}
-                        <View style={styles.ballModuleContainerDesktop}>
-                            <View style={styles.cueBallSelectorPill}>
+                    /* PORTRAIT LAYOUT */
+                    <>
+                        {/* BARRA SUPERIOR HUD DE JUEGO */}
+                        <View style={styles.topHudBar}>
+                            {/* Sección Izquierda: Salir, Menú de Configuraciones y Título */}
+                            <View style={styles.headerLeft}>
                                 <TouchableOpacity
-                                    style={[
-                                        styles.ballOptionBtn,
-                                        state.cueBallId === 'white' && styles.ballOptionBtnActive,
-                                    ]}
-                                    onPress={() => handleCueBallChange('white')}
-                                    disabled={state.isSimulating}>
-                                    <View style={styles.whiteBallIcon}>
-                                        {tablePreferences.showBallDots !== false && (
-                                            <View
-                                                style={[
-                                                    styles.ballMiniDot,
-                                                    { backgroundColor: tablePreferences.ballSkin === 'cosmo_helix_pba' ? '#00e5ff' : '#dc2626' },
-                                                ]}
-                                            />
-                                        )}
-                                    </View>
-                                    <Text style={[styles.ballOptionText, state.cueBallId === 'white' && styles.ballOptionTextActive]}>
-                                        {t('common.white')}
-                                    </Text>
+                                    style={styles.circleIconBtn}
+                                    onPress={() => router.back()}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={t('common.back')}>
+                                    <IconArrowLeft size={isMobile ? 16 : 18} color={isDark ? '#f8fafc' : palette.text} strokeWidth={2.2} />
                                 </TouchableOpacity>
 
                                 <TouchableOpacity
-                                    style={[
-                                        styles.ballOptionBtn,
-                                        state.cueBallId === 'yellow' && styles.ballOptionBtnActive,
-                                    ]}
-                                    onPress={() => handleCueBallChange('yellow')}
-                                    disabled={state.isSimulating}>
-                                    <View style={styles.yellowBallIcon}>
-                                        {tablePreferences.showBallDots !== false && (
-                                            <View
-                                                style={[
-                                                    styles.ballMiniDot,
-                                                    { backgroundColor: tablePreferences.ballSkin === 'cosmo_helix_pba' ? '#1e3a8a' : '#dc2626' },
-                                                ]}
-                                            />
-                                        )}
-                                    </View>
-                                    <Text style={[styles.ballOptionText, state.cueBallId === 'yellow' && styles.ballOptionTextActive]}>
-                                        {t('common.yellow')}
-                                    </Text>
+                                    style={styles.menuHighlightBtn}
+                                    onPress={() => setShowToolsMenu(true)}
+                                    accessibilityLabel={language === 'en' ? 'Simulator Menu' : 'Menú de Configuración'}>
+                                    <IconMenu2 size={16} color="#00d2ff" strokeWidth={2.2} />
                                 </TouchableOpacity>
-                            </View>
 
-                            <TouchableOpacity
-                                style={[
-                                    styles.ballStudioTriggerDesktop,
-                                    tablePreferences.breakFormat === 'umb' ? styles.ballStudioUmbDesktop : styles.ballStudioPbaDesktop,
-                                ]}
-                                onPress={() => setShowBallStudioModal(true)}
-                                disabled={state.isSimulating}
-                                accessibilityLabel={language === 'en' ? 'Ball Studio, Skins and Break' : 'Módulo de Bolas, Skins y Salida'}>
-                                <View style={styles.ballStudioTriggerInner}>
-                                    <Text style={styles.ballStudioTriggerBadge}>
-                                        {tablePreferences.breakFormat === 'umb' ? '🌍 UMB' : `🇰🇷 PBA ${tablePreferences.pbaFormation ?? '159'}`}
-                                    </Text>
-                                    <Text style={styles.ballStudioSkinBadge} numberOfLines={1}>
-                                        {BALL_SKIN_PRESETS.find((s) => s.id === tablePreferences.ballSkin)?.name ?? 'Aramith'}
+                                <View style={styles.titleColumn}>
+                                    <View style={styles.systemTagRow}>
+                                        {categoryName && activeCategoryColor ? (
+                                            <View style={[styles.categoryBadge, { backgroundColor: activeCategoryColor + '22', borderColor: activeCategoryColor + '66' }]}>
+                                                <View style={[styles.categoryDot, { backgroundColor: activeCategoryColor }]} />
+                                                <Text style={[styles.categoryBadgeText, { color: activeCategoryColor }]}>
+                                                    {categoryName}
+                                                </Text>
+                                            </View>
+                                        ) : (
+                                            <Text style={styles.systemTag}>{t('training.sim.tag')}</Text>
+                                        )}
+                                        <View style={styles.systemDot} />
+                                        <Text style={styles.modeTag}>{isEditMode ? t('training.sim.edit') : t('training.sim.shot')}</Text>
+                                    </View>
+                                    <Text style={styles.title} numberOfLines={1}>
+                                        {titleText}
                                     </Text>
                                 </View>
-                                <IconSettings size={14} color="#38bdf8" strokeWidth={2.2} />
-                            </TouchableOpacity>
-                        </View>
+                            </View>
 
-                        <CaromSpinBallWidget
-                            spin={state.spin}
-                            cueBallId={state.cueBallId}
-                            onPress={() => setShowEffectModal(true)}
-                            disabled={state.isSimulating}
-                            categoryColor={activeCategoryColor ?? undefined}
-                            isDark={isDark}
-                        />
-
-                        <CaromTomeDeBolaEclipse
-                            balls={state.balls}
-                            cueBallId={state.cueBallId}
-                            aimDirection={state.aimDirection}
-                            spin={state.spin}
-                            trajectory={state.trajectory}
-                            onAimChange={handleAimChange}
-                            disabled={state.isSimulating}
-                            categoryColor={activeCategoryColor ?? undefined}
-                            isDark={isDark}
-                        />
-
-                        <CaromAimFineTuner
-                            aimDirection={state.aimDirection}
-                            onAimChange={handleAimChange}
-                            disabled={state.isSimulating}
-                        />
-
-                        <View style={styles.utilityActionsRow}>
-                            {state.dynamicTrails && (
+                            {/* Sección Derecha: Práctica, Modo y Reset */}
+                            <View style={styles.headerToolsRow}>
                                 <TouchableOpacity
-                                    style={styles.clearTrailsBtn}
-                                    onPress={clearTrails}
-                                    accessibilityLabel={t('training.sim.clearTrails')}>
-                                    <IconTrash size={14} color="#ef4444" strokeWidth={2} />
-                                    <Text style={styles.clearTrailsText}>{t('training.sim.clearTrails')}</Text>
+                                    style={styles.trainHighlightBtn}
+                                    onPress={handleStartPractice}
+                                    disabled={state.isSimulating}>
+                                    <IconTarget size={14} color="#fff" strokeWidth={2.5} />
+                                    {!isMobile && <Text style={styles.trainBtnText}>{t('common.practice')}</Text>}
                                 </TouchableOpacity>
-                            )}
 
-                            <TouchableOpacity
-                                style={[styles.guidePill, showGuides && styles.guidePillActive]}
-                                onPress={() => setShowGuides((prev) => !prev)}>
-                                <IconEye size={13} color={showGuides ? '#00d2ff' : '#64748b'} strokeWidth={2.2} />
-                                <Text style={[styles.guidePillText, showGuides && styles.guidePillTextActive]}>
-                                    {showGuides ? `${t('training.sim.guides')} ${t('training.sim.active')}` : `${t('training.sim.guides')} ${t('training.sim.off')}`}
-                                </Text>
-                            </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[
+                                        styles.toolIconOnlyBtn,
+                                        isEditMode && styles.toolPillBtnActiveAmber,
+                                    ]}
+                                    onPress={() => setIsEditMode((prev) => !prev)}
+                                    disabled={state.isSimulating}
+                                    accessibilityLabel={t('training.sim.editMode')}>
+                                    <IconPencil size={isMobile ? 14 : 15} color={isEditMode ? '#fbbf24' : '#94a3b8'} strokeWidth={2.2} />
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={styles.toolIconOnlyBtn}
+                                    onPress={handleReset}
+                                    disabled={state.isSimulating}
+                                    accessibilityLabel={t('training.sim.resetTable')}>
+                                    <IconRefresh size={isMobile ? 14 : 16} color="#94a3b8" strokeWidth={2} />
+                                </TouchableOpacity>
+                            </View>
                         </View>
 
-                        <TouchableOpacity
-                            style={[
-                                styles.fireButton,
-                                state.isSimulating && styles.fireButtonDisabled,
-                            ]}
-                            onPress={() => executeShot()}
-                            disabled={state.isSimulating}
-                            accessibilityLabel={t('training.sim.shoot')}>
-                            {state.isSimulating ? (
-                                <IconLoader2 size={18} color="#ffffff" strokeWidth={2.5} />
-                            ) : (
-                                <IconPlayerPlay size={18} color="#ffffff" strokeWidth={2.5} />
-                            )}
-                        </TouchableOpacity>
-                    </View>
+                        {/* ESCENARIO PRINCIPAL */}
+                        <View style={styles.arenaContainer}>
+                            <View style={styles.floatingRefereeBannerWrap} pointerEvents="box-none">
+                                <CaromRefereeBanner
+                                    validation={state.validation}
+                                    isSimulating={state.isSimulating}
+                                    cushionCountLive={state.liveCushionCount}
+                                    ballHitsLive={state.liveBallHits}
+                                    onDismiss={dismissValidation}
+                                />
+                            </View>
+
+                            <View style={[styles.tableAndPowerRow, isMobile && { gap: 6 }]}>
+                                <View style={styles.fixedTableWrap}>
+                                    <InteractiveBilliardsTable
+                                        orientation={tableOrientation}
+                                        style={[styles.tableStage, { width: tableDimensions.width, height: tableDimensions.height }]}
+                                        balls={state.balls}
+                                        cueBallId={state.cueBallId}
+                                        trajectory={state.trajectory}
+                                        dynamicTrails={state.dynamicTrails ?? undefined}
+                                        collisionPulses={state.collisionPulses}
+                                        aimDirection={state.aimDirection}
+                                        powerLevel={state.powerPercentage}
+                                        categoryColor={activeCategoryColor ?? undefined}
+                                        tablePreferences={tablePreferences}
+                                        showCueStick={true}
+                                        showGhostBall={true}
+                                        onBallMove={handleBallMove}
+                                        onAimChange={handleAimChange}
+                                        onPowerChange={setPowerPercentage}
+                                        onShoot={(power) => executeShot(power)}
+                                        isSimulating={state.isSimulating}
+                                        isEditMode={isEditMode}
+                                        showGuides={showGuides}
+                                        showRuler={showRuler}
+                                        numberingAnchors={numberingAnchors}
+                                        numberingFormula={numberingFormula}
+                                        showNumbering={showNumbering}
+                                        onNumberingAnchorsChange={setNumberingAnchors}
+                                    />
+                                </View>
+
+                                {/* DOCK DERECHO EN VERTICAL (BOLA -> POTENCIA -> PLAY) */}
+                                <View style={styles.rightShotControlsDock}>
+                                    {/* 1. La Bola */}
+                                    <CaromCombinedBallWidget
+                                        cueBallId={state.cueBallId}
+                                        spin={state.spin}
+                                        onPress={() => setShowBallControlModal(true)}
+                                        tablePreferences={tablePreferences}
+                                        categoryColor={activeCategoryColor ?? undefined}
+                                        disabled={state.isSimulating}
+                                        compact={true}
+                                        isDark={isDark}
+                                    />
+
+                                    {/* 2. Selector de Potencia */}
+                                    <View style={styles.powerMeterCenterWrap}>
+                                        <CaromPowerMeter
+                                            powerLevel={state.powerPercentage}
+                                            onPowerChange={setPowerPercentage}
+                                            onShoot={(power) => executeShot(power)}
+                                            disabled={state.isSimulating}
+                                            compact={true}
+                                        />
+                                    </View>
+
+                                    {/* 3. Botón de Play */}
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.fireButtonPanoramic,
+                                            state.isSimulating && styles.fireButtonDisabled,
+                                        ]}
+                                        onPress={() => executeShot()}
+                                        disabled={state.isSimulating}
+                                        accessibilityLabel={t('training.sim.shoot')}>
+                                        {state.isSimulating ? (
+                                            <IconLoader2 size={18} color="#ffffff" strokeWidth={2.5} />
+                                        ) : (
+                                            <IconPlayerPlay size={18} color="#ffffff" strokeWidth={2.5} />
+                                        )}
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        </View>
+                    </>
                 )}
 
-                {/* MODALES FLOTANTES (OVERLAYS - CERO REFLOW SOBRE LA MESA) */}
-                <CaromProEffectModal
-                    visible={showEffectModal}
-                    spin={state.spin}
+                {/* MODALES FLOTANTES (OVERLAYS) */}
+                <SimulatorSettingsModal
+                    visible={showToolsMenu}
+                    onClose={() => setShowToolsMenu(false)}
+                    title={titleText}
+                    categoryName={categoryName}
+                    activeCategoryColor={activeCategoryColor}
+                    isEditMode={isEditMode}
+                    onToggleEditMode={() => setIsEditMode((prev) => !prev)}
+                    showGuides={showGuides}
+                    onToggleGuides={() => setShowGuides((prev) => !prev)}
+                    showRuler={showRuler}
+                    onToggleRuler={() => setShowRuler((prev) => !prev)}
+                    showNumbering={showNumbering}
+                    onOpenNumbering={() => setShowNumberingModal(true)}
+                    onOpenCustomizer={() => setShowCustomizer(true)}
+                    onOpenBallStudio={() => setShowBallStudioModal(true)}
+                    onResetTable={handleReset}
+                    onStartPractice={handleStartPractice}
+                    aimDirection={state.aimDirection}
+                    onAimChange={handleAimChange}
+                    hasDynamicTrails={!!state.dynamicTrails}
+                    onClearTrails={clearTrails}
+                    isSimulating={state.isSimulating}
+                />
+
+                <CaromBallControlModal
+                    visible={showBallControlModal}
                     cueBallId={state.cueBallId}
-                    tablePreferences={tablePreferences}
+                    onCueBallChange={handleCueBallChange}
+                    spin={state.spin}
                     onSpinChange={setSpin}
-                    onClose={() => setShowEffectModal(false)}
+                    balls={state.balls}
+                    aimDirection={state.aimDirection}
+                    onAimChange={handleAimChange}
+                    trajectory={state.trajectory}
+                    tablePreferences={tablePreferences}
+                    categoryColor={activeCategoryColor ?? undefined}
+                    onClose={() => setShowBallControlModal(false)}
                 />
 
                 <SystemNumberingModal
@@ -1203,10 +1190,11 @@ const getStyles = (palette: ReturnType<typeof getPalette>, isMobile: boolean, is
             height: '100%',
             borderRadius: 16,
             overflow: 'visible',
+            alignItems: 'center',
+            justifyContent: 'center',
         },
         tableStage: {
-            width: '100%',
-            height: '100%',
+            alignSelf: 'center',
         },
         powerMeterDock: {
             width: 44,
@@ -1459,5 +1447,97 @@ const getStyles = (palette: ReturnType<typeof getPalette>, isMobile: boolean, is
             fontWeight: '600',
             color: isDark ? '#94a3b8' : palette.muted,
             maxWidth: 120,
+        },
+
+        /* PANORAMIC (LANDSCAPE) 3-ZONE LAYOUT */
+        panoramicRootLayout: {
+            flex: 1,
+            flexDirection: 'row',
+            alignItems: 'stretch',
+            gap: 6,
+        },
+        leftToolsDock: {
+            width: 44,
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            backgroundColor: isDark ? 'rgba(15, 23, 42, 0.75)' : palette.card,
+            borderRadius: 18,
+            borderWidth: 1,
+            borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : palette.border,
+            paddingVertical: 8,
+            paddingHorizontal: 4,
+            userSelect: 'none',
+        },
+        dockSeparator: {
+            width: 24,
+            height: 1,
+            backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : palette.border,
+            marginVertical: 2,
+        },
+        menuHighlightBtn: {
+            width: 34,
+            height: 34,
+            borderRadius: 17,
+            backgroundColor: 'rgba(0, 210, 255, 0.12)',
+            borderWidth: 1.5,
+            borderColor: '#00d2ff',
+            alignItems: 'center',
+            justifyContent: 'center',
+        },
+        circleIconBtnGreen: {
+            width: 34,
+            height: 34,
+            borderRadius: 17,
+            backgroundColor: '#059669',
+            borderWidth: 1,
+            borderColor: '#10b981',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 0 8px rgba(16, 185, 129, 0.4)',
+        },
+        circleIconBtnActiveAmber: {
+            backgroundColor: 'rgba(245, 158, 11, 0.15)',
+            borderColor: '#fbbf24',
+        },
+        circleIconBtnActiveCyan: {
+            backgroundColor: 'rgba(0, 210, 255, 0.15)',
+            borderColor: '#00d2ff',
+        },
+        panoramicCenterStage: {
+            flex: 1,
+            height: '100%',
+            alignItems: 'center',
+            justifyContent: 'center',
+            position: 'relative',
+            overflow: 'visible',
+        },
+        rightShotControlsDock: {
+            width: 56,
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            backgroundColor: isDark ? 'rgba(15, 23, 42, 0.75)' : palette.card,
+            borderRadius: 18,
+            borderWidth: 1,
+            borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : palette.border,
+            paddingVertical: 8,
+            paddingHorizontal: 4,
+            userSelect: 'none',
+        },
+        powerMeterCenterWrap: {
+            flex: 1,
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginVertical: 4,
+        },
+        fireButtonPanoramic: {
+            width: 44,
+            height: 40,
+            borderRadius: 16,
+            backgroundColor: '#0d5e2f',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 0 12px rgba(13, 94, 47, 0.6)',
         },
     });

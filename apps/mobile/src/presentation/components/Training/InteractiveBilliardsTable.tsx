@@ -667,7 +667,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
 
     const findBallAtPointRef = useCallback(
         (tableX: number, tableY: number): BallId | null => {
-            const hitRadius = 15;
+            const hitRadius = 18;
             let closestBallId: BallId | null = null;
             let minDistance = hitRadius;
 
@@ -1467,6 +1467,9 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                     const rayEndSvg = mapPointToSvg(guideData.cueRayEnd, orientation, layout);
                     const ghostSvg = guideData.ghostBallPos ? mapPointToSvg(guideData.ghostBallPos, orientation, layout) : null;
 
+                    const isVertical = orientation === 'vertical';
+                    const ghostRadius = isVertical ? 5.5 : 2.75;
+
                     return (
                         <G pointerEvents="none">
                             {/* Resplandor suave del rayo primario */}
@@ -1476,7 +1479,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                                 x2={rayEndSvg.x}
                                 y2={rayEndSvg.y}
                                 stroke={categoryColor ? `${categoryColor}40` : "rgba(56, 189, 248, 0.35)"}
-                                strokeWidth={2.4}
+                                strokeWidth={isVertical ? 2.4 : 1.4}
                                 strokeLinecap="round"
                             />
                             {/* Núcleo punteado de precisión del rayo */}
@@ -1486,7 +1489,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                                 x2={rayEndSvg.x}
                                 y2={rayEndSvg.y}
                                 stroke={categoryColor || "#ffffff"}
-                                strokeWidth={0.9}
+                                strokeWidth={isVertical ? 0.9 : 0.6}
                                 strokeDasharray="3 3"
                                 strokeLinecap="round"
                             />
@@ -1498,21 +1501,21 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                                     <Circle
                                         cx={ghostSvg.x}
                                         cy={ghostSvg.y}
-                                        r={3.075}
+                                        r={ghostRadius}
                                         fill={categoryColor ? `${categoryColor}25` : "rgba(56, 189, 248, 0.16)"}
                                         stroke="#ffffff"
-                                        strokeWidth={0.8}
+                                        strokeWidth={isVertical ? 0.8 : 0.5}
                                     />
                                     <Circle
                                         cx={ghostSvg.x}
                                         cy={ghostSvg.y}
-                                        r={3.075}
+                                        r={ghostRadius}
                                         fill="none"
                                         stroke={categoryColor || "#38bdf8"}
-                                        strokeWidth={0.5}
+                                        strokeWidth={isVertical ? 0.5 : 0.35}
                                         strokeDasharray="2 2"
                                     />
-                                    <Circle cx={ghostSvg.x} cy={ghostSvg.y} r={0.8} fill={categoryColor || "#38bdf8"} />
+                                    <Circle cx={ghostSvg.x} cy={ghostSvg.y} r={isVertical ? 1.2 : 0.6} fill={categoryColor || "#38bdf8"} />
 
                                     {/* Guía corta y nítida de la bola objetivo */}
                                     {guideData.targetBallGuide && (() => {
@@ -1526,12 +1529,12 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                                                     x2={tEnd.x}
                                                     y2={tEnd.y}
                                                     stroke={guideData.targetBallGuide.color}
-                                                    strokeWidth={1.4}
+                                                    strokeWidth={isVertical ? 1.8 : 1.2}
                                                     strokeDasharray="3 2"
                                                     strokeLinecap="round"
                                                     opacity={0.95}
                                                 />
-                                                <Circle cx={tEnd.x} cy={tEnd.y} r={1.2} fill={guideData.targetBallGuide.color} />
+                                                <Circle cx={tEnd.x} cy={tEnd.y} r={isVertical ? 1.2 : 0.6} fill={guideData.targetBallGuide.color} />
                                             </G>
                                         );
                                     })()}
@@ -1547,7 +1550,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                                                 x2={cEnd.x}
                                                 y2={cEnd.y}
                                                 stroke="rgba(255,255,255,0.7)"
-                                                strokeWidth={0.8}
+                                                strokeWidth={isVertical ? 1.2 : 0.7}
                                                 strokeDasharray="2.5 2.5"
                                                 strokeLinecap="round"
                                             />
@@ -1565,15 +1568,15 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                                     : null;
                                 return (
                                     <G>
-                                        <Circle cx={cPoint.x} cy={cPoint.y} r={2.8} fill="rgba(56, 189, 248, 0.3)" />
-                                        <Circle cx={cPoint.x} cy={cPoint.y} r={1.4} fill="#38bdf8" />
+                                        <Circle cx={cPoint.x} cy={cPoint.y} r={isVertical ? 2.8 : 1.4} fill="rgba(56, 189, 248, 0.3)" />
+                                        <Circle cx={cPoint.x} cy={cPoint.y} r={isVertical ? 1.4 : 0.7} fill="#38bdf8" />
                                         <Line
                                             x1={cPoint.x}
                                             y1={cPoint.y}
                                             x2={rEnd.x}
                                             y2={rEnd.y}
                                             stroke="#38bdf8"
-                                            strokeWidth={0.9}
+                                            strokeWidth={isVertical ? 1.4 : 0.8}
                                             strokeDasharray="3 3"
                                             strokeLinecap="round"
                                             opacity={0.85}
@@ -1583,12 +1586,12 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                                                 <Circle
                                                     cx={rGhostSvg.x}
                                                     cy={rGhostSvg.y}
-                                                    r={3.075}
+                                                    r={ghostRadius}
                                                     fill="rgba(56, 189, 248, 0.16)"
                                                     stroke="#ffffff"
-                                                    strokeWidth={0.8}
+                                                    strokeWidth={isVertical ? 0.8 : 0.5}
                                                 />
-                                                <Circle cx={rGhostSvg.x} cy={rGhostSvg.y} r={0.8} fill="#38bdf8" />
+                                                <Circle cx={rGhostSvg.x} cy={rGhostSvg.y} r={isVertical ? 1.2 : 0.6} fill="#38bdf8" />
                                             </G>
                                         )}
                                     </G>
@@ -1610,16 +1613,16 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                     const showDots = tablePreferences.showBallDots !== false;
                     const quat = ballRotationsRef.current[ball.id] ?? INITIAL_BALL_QUATERNION;
                     const isVertical = orientation === 'vertical';
-                    const ballRadiusSvg = 2.75;
+                    const ballRadiusSvg = isVertical ? 5.5 : 2.75;
 
                     return (
                         <G key={ball.id}>
                             {/* Sombra de oclusión y contacto volumétrica sobre el paño */}
                             <Ellipse
-                                cx={mapped.x + 0.5}
-                                cy={mapped.y + 0.6}
-                                rx={3.1}
-                                ry={2.9}
+                                cx={mapped.x + (isVertical ? 0.8 : 0.4)}
+                                cy={mapped.y + (isVertical ? 1.1 : 0.55)}
+                                rx={ballRadiusSvg * 1.13}
+                                ry={ballRadiusSvg * 1.05}
                                 fill={`url(#${tableUid}_ballDropShadow)`}
                             />
 
@@ -1630,7 +1633,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                                 r={ballRadiusSvg}
                                 fill={`url(#${ballStyle.gradientId})`}
                                 stroke={ballStyle.border}
-                                strokeWidth={0.22}
+                                strokeWidth={isVertical ? 0.35 : 0.2}
                             />
 
                             {/* Marcajes oficiales en 3D que ruedan físicamente sobre la esfera */}
@@ -1638,10 +1641,11 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                                 if (ballSkin === 'classic_solid') {
                                     if (ball.id === 'white' || ball.id === 'yellow') {
                                         const dotColor = ball.id === 'white' ? '#dc2626' : '#0f172a';
+                                        const baseDotRadius = isVertical ? 0.84 : 0.42;
                                         return (
                                             <G pointerEvents="none">
                                                 {SPHERE_CLASSIC_DOTS.map((pt, idx) => {
-                                                    const proj = projectSpherePointToSvg(pt, quat, mapped, ballRadiusSvg, 0.42, isVertical);
+                                                    const proj = projectSpherePointToSvg(pt, quat, mapped, ballRadiusSvg, baseDotRadius, isVertical);
                                                     if (!proj) return null;
                                                     return (
                                                         <Ellipse
@@ -1670,20 +1674,21 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
 
                                     const ringSegments1 = projectSphereRingToSvg(PBA_VISION_RING_1, quat, mapped, ballRadiusSvg, isVertical);
                                     const ringSegments2 = projectSphereRingToSvg(PBA_VISION_RING_2, quat, mapped, ballRadiusSvg, isVertical);
+                                    const baseDotRadius = isVertical ? 0.84 : 0.42;
 
                                     return (
                                         <G pointerEvents="none">
                                             {/* Anillos de visión orbitales que giran con la bola */}
                                             {ringSegments1.map((d, i) => (
-                                                <Path key={`pba-ring1-${i}`} d={d} fill="none" stroke={ringColor} strokeWidth={0.24} strokeDasharray="1.2 0.8" />
+                                                <Path key={`pba-ring1-${i}`} d={d} fill="none" stroke={ringColor} strokeWidth={isVertical ? 0.38 : 0.22} strokeDasharray={isVertical ? "1.8 1.2" : "1.0 0.7"} />
                                             ))}
                                             {ringSegments2.map((d, i) => (
-                                                <Path key={`pba-ring2-${i}`} d={d} fill="none" stroke={ringColor} strokeWidth={0.24} strokeDasharray="1.2 0.8" />
+                                                <Path key={`pba-ring2-${i}`} d={d} fill="none" stroke={ringColor} strokeWidth={isVertical ? 0.38 : 0.22} strokeDasharray={isVertical ? "1.8 1.2" : "1.0 0.7"} />
                                             ))}
 
                                             {/* 6 puntos que rotan sobre la esfera con proyección ortográfica esférica */}
                                             {SPHERE_OCTAHEDRAL_DOTS.map((pt, idx) => {
-                                                const proj = projectSpherePointToSvg(pt, quat, mapped, ballRadiusSvg, 0.42, isVertical);
+                                                const proj = projectSpherePointToSvg(pt, quat, mapped, ballRadiusSvg, baseDotRadius, isVertical);
                                                 if (!proj) return null;
                                                 return (
                                                     <Ellipse
@@ -1695,7 +1700,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                                                         transform={`rotate(${proj.rotationDeg} ${proj.cx} ${proj.cy})`}
                                                         fill={dotColor}
                                                         stroke={strokeColor}
-                                                        strokeWidth={0.12}
+                                                        strokeWidth={isVertical ? 0.2 : 0.11}
                                                         opacity={proj.opacity}
                                                     />
                                                 );
@@ -1708,14 +1713,15 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                                     const dotColor = ball.id === 'white' ? '#334155' : ball.id === 'yellow' ? '#1d4ed8' : '#d97706';
                                     const ringColor = ball.id === 'white' ? 'rgba(51,65,85,0.6)' : ball.id === 'yellow' ? 'rgba(29,78,216,0.6)' : 'rgba(217,119,6,0.6)';
                                     const ringSegments = projectSphereRingToSvg(DYNASPHERES_RING, quat, mapped, ballRadiusSvg, isVertical);
+                                    const baseDotRadius = isVertical ? 0.72 : 0.36;
 
                                     return (
                                         <G pointerEvents="none">
                                             {ringSegments.map((d, i) => (
-                                                <Path key={`dyna-ring-${i}`} d={d} fill="none" stroke={ringColor} strokeWidth={0.25} />
+                                                <Path key={`dyna-ring-${i}`} d={d} fill="none" stroke={ringColor} strokeWidth={isVertical ? 0.45 : 0.25} />
                                             ))}
                                             {SPHERE_OCTAHEDRAL_DOTS.map((pt, idx) => {
-                                                const proj = projectSpherePointToSvg(pt, quat, mapped, ballRadiusSvg, 0.36, isVertical);
+                                                const proj = projectSpherePointToSvg(pt, quat, mapped, ballRadiusSvg, baseDotRadius, isVertical);
                                                 if (!proj) return null;
                                                 return (
                                                     <Ellipse
@@ -1736,10 +1742,11 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
 
                                 // Predeterminado: Aramith Super Pro-Cup (UMB) - 6 puntos polka en los 6 polos cardinales
                                 if (ball.id === 'white' || ball.id === 'yellow') {
+                                    const baseDotRadius = isVertical ? 0.88 : 0.44;
                                     return (
                                         <G pointerEvents="none">
                                             {SPHERE_OCTAHEDRAL_DOTS.map((pt, idx) => {
-                                                const proj = projectSpherePointToSvg(pt, quat, mapped, ballRadiusSvg, 0.44, isVertical);
+                                                const proj = projectSpherePointToSvg(pt, quat, mapped, ballRadiusSvg, baseDotRadius, isVertical);
                                                 if (!proj) return null;
                                                 return (
                                                     <Ellipse
@@ -1751,7 +1758,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                                                         transform={`rotate(${proj.rotationDeg} ${proj.cx} ${proj.cy})`}
                                                         fill="#dc2626"
                                                         stroke="rgba(0,0,0,0.28)"
-                                                        strokeWidth={0.12}
+                                                        strokeWidth={isVertical ? 0.2 : 0.11}
                                                         opacity={proj.opacity}
                                                     />
                                                 );
@@ -1767,27 +1774,27 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                             <G pointerEvents="none">
                                 {/* Caperuza curva elíptica de brillo superior izquierdo */}
                                 <Ellipse
-                                    cx={mapped.x - 0.92}
-                                    cy={mapped.y - 0.92}
-                                    rx={1.22}
-                                    ry={0.62}
-                                    transform={`rotate(-42 ${mapped.x - 0.92} ${mapped.y - 0.92})`}
-                                    fill="rgba(255, 255, 255, 0.62)"
+                                    cx={mapped.x - ballRadiusSvg * 0.33}
+                                    cy={mapped.y - ballRadiusSvg * 0.33}
+                                    rx={ballRadiusSvg * 0.44}
+                                    ry={ballRadiusSvg * 0.22}
+                                    transform={`rotate(-42 ${mapped.x - ballRadiusSvg * 0.33} ${mapped.y - ballRadiusSvg * 0.33})`}
+                                    fill="rgba(255, 255, 255, 0.65)"
                                 />
                                 {/* Pinpoint especular de foco puntual cenital */}
                                 <Circle
-                                    cx={mapped.x - 0.8}
-                                    cy={mapped.y - 0.8}
-                                    r={0.4}
+                                    cx={mapped.x - ballRadiusSvg * 0.29}
+                                    cy={mapped.y - ballRadiusSvg * 0.29}
+                                    r={ballRadiusSvg * 0.145}
                                     fill="#ffffff"
                                     opacity={0.96}
                                 />
                                 {/* Resplandor Fresnel secundario en el limbo opuesto (rebote del paño) */}
                                 <Path
-                                    d={`M ${(mapped.x - 0.4).toFixed(2)} ${(mapped.y + 2.7).toFixed(2)} A 2.75 2.75 0 0 0 ${(mapped.x + 2.7).toFixed(2)} ${(mapped.y - 0.4).toFixed(2)}`}
+                                    d={`M ${(mapped.x - ballRadiusSvg * 0.14).toFixed(2)} ${(mapped.y + ballRadiusSvg * 0.98).toFixed(2)} A ${ballRadiusSvg.toFixed(2)} ${ballRadiusSvg.toFixed(2)} 0 0 0 ${(mapped.x + ballRadiusSvg * 0.98).toFixed(2)} ${(mapped.y - ballRadiusSvg * 0.14).toFixed(2)}`}
                                     fill="none"
-                                    stroke="rgba(255, 255, 255, 0.22)"
-                                    strokeWidth={0.42}
+                                    stroke="rgba(255, 255, 255, 0.25)"
+                                    strokeWidth={isVertical ? 0.65 : 0.35}
                                     strokeLinecap="round"
                                 />
                             </G>
@@ -1798,20 +1805,20 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                                     <Circle
                                         cx={mapped.x}
                                         cy={mapped.y}
-                                        r={4.7}
+                                        r={ballRadiusSvg * 1.5}
                                         fill="none"
                                         stroke="#38bdf8"
-                                        strokeWidth={0.65}
-                                        strokeDasharray="2.5 2.5"
-                                        opacity={0.88}
+                                        strokeWidth={isVertical ? 0.8 : 0.5}
+                                        strokeDasharray={isVertical ? "3 3" : "2 2"}
+                                        opacity={0.9}
                                     />
                                     <Circle
                                         cx={mapped.x}
                                         cy={mapped.y}
-                                        r={5.5}
+                                        r={ballRadiusSvg * 1.75}
                                         fill="none"
-                                        stroke="rgba(56, 189, 248, 0.25)"
-                                        strokeWidth={0.5}
+                                        stroke="rgba(56, 189, 248, 0.3)"
+                                        strokeWidth={isVertical ? 0.6 : 0.35}
                                     />
                                 </G>
                             )}
@@ -1888,14 +1895,16 @@ export const InteractiveBilliardsTable = memo(InteractiveBilliardsTableBase);
 
 const styles = StyleSheet.create({
     container: {
-        width: '100%',
+        maxWidth: '100%',
+        maxHeight: '100%',
         overflow: 'visible',
+        alignSelf: 'center',
     },
     pointerEventsNone: {
         pointerEvents: 'none',
     },
     editOverlay: {
-        ...StyleSheet.absoluteFillObject,
+        ...StyleSheet.absoluteFill,
         justifyContent: 'flex-end',
         alignItems: 'flex-end',
         padding: 8,

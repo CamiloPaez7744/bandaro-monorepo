@@ -222,7 +222,7 @@ export function useTrainingSimulation(
 
         let currentBalls = shotBalls;
         const allEvents: any[] = [];
-        const stepsPerFrame = 1; // 1 paso por frame de 60fps para animación fluida, realista y visible
+        const stepsPerFrame = 2; // 2 pasos por frame para velocidad ágil, dinámica y realista a 60fps
 
         // Inicializar recolector de estelas continuas
         const trailsCollector: Record<BallId, { pos: Vec2; timestamp?: number }[]> = {
@@ -235,6 +235,11 @@ export function useTrainingSimulation(
             yellow: [...trailsCollector.yellow],
             red: [...trailsCollector.red],
         });
+
+        let frameCount = 0;
+        let lastLiveCushionCount = -1;
+        let lastHitFirst = false;
+        let lastHitSecond = false;
 
         const animate = () => {
             const anyMoving = currentBalls.some((b) => isBallMoving(b));
@@ -252,6 +257,7 @@ export function useTrainingSimulation(
                 return;
             }
 
+            frameCount++;
             const framePulses: CollisionPulse[] = [];
             const now = Date.now();
 
@@ -287,25 +293,33 @@ export function useTrainingSimulation(
                 });
             }
 
-            // Registrar paso de la estela para cada bola en movimiento
+            // Registrar paso de la estela solo con desplazamiento suficiente (evita sobrecarga de SVG)
             for (const b of currentBalls) {
-                const lastPt = trailsCollector[b.id][trailsCollector[b.id].length - 1];
+                const list = trailsCollector[b.id];
+                const lastPt = list[list.length - 1];
                 const d = Math.hypot(b.pos.x - lastPt.pos.x, b.pos.y - lastPt.pos.y);
-                if (d >= 1.2 || isBallMoving(b)) {
-                    trailsCollector[b.id].push({ pos: { ...b.pos } });
+                if (d >= 2.0) {
+                    list.push({ pos: { ...b.pos } });
                 }
             }
-            setDynamicTrails({
-                white: [...trailsCollector.white],
-                yellow: [...trailsCollector.yellow],
-                red: [...trailsCollector.red],
-            });
 
-            // Actualizar conteo de bandas en tiempo real
+            // Actualizar SVG de estelas throttled cada 3 frames para máximo rendimiento en mobile
+            if (frameCount % 3 === 0) {
+                setDynamicTrails({
+                    white: [...trailsCollector.white],
+                    yellow: [...trailsCollector.yellow],
+                    red: [...trailsCollector.red],
+                });
+            }
+
+            // Actualizar conteo de bandas solo si hubo cambio real
             const cueCushions = allEvents.filter((e) => e.type === 'cushion').length;
-            setLiveCushionCount(cueCushions);
+            if (cueCushions !== lastLiveCushionCount) {
+                lastLiveCushionCount = cueCushions;
+                setLiveCushionCount(cueCushions);
+            }
 
-            // Actualizar estado de bolas objetivo distintas tocadas en vivo
+            // Actualizar estado de bolas objetivo distintas tocadas solo si cambió de estado
             const cueHits = allEvents
                 .filter((e) => e.type === 'ball_collision')
                 .map((e) =>
@@ -319,7 +333,11 @@ export function useTrainingSimulation(
             const distinctHits = new Set(cueHits);
             const hitFirst = distinctHits.size >= 1;
             const hitSecond = distinctHits.size >= 2;
-            setLiveBallHits({ first: hitFirst, second: hitSecond });
+            if (hitFirst !== lastHitFirst || hitSecond !== lastHitSecond) {
+                lastHitFirst = hitFirst;
+                lastHitSecond = hitSecond;
+                setLiveBallHits({ first: hitFirst, second: hitSecond });
+            }
 
             setBalls([...currentBalls]);
 
