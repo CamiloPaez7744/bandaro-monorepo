@@ -1,4 +1,11 @@
 import type { Point2D } from '@/src/presentation/screens/Training/trainingData';
+import {
+    translateSourceSpin,
+    spinToClock,
+    calibrateSourceSpeed,
+    type SpinEffect,
+    type CalibratedPower,
+} from '@bandaro/core';
 
 export type CatalogLanguage = 'es' | 'en' | 'ko';
 
@@ -37,6 +44,11 @@ export interface CatalogShot {
     powerLevel: number;
     effectX: number;
     effectY: number;
+
+    spinEffect?: SpinEffect;
+    spinHour?: number;
+    spinTips?: number;
+    calibratedPower?: CalibratedPower;
 
     isDifficult: boolean;
     isPosition: boolean;
@@ -303,6 +315,18 @@ export function adaptCatalogShot(raw: any): CatalogShot {
     const tipsEn = raw.tips_en || '';
     const tipsKo = raw.tips_ko || '';
 
+    const playId = raw.external_id ?? raw.id;
+    const spinEffect = translateSourceSpin(
+        raw.effect_x !== undefined && raw.effect_y !== undefined
+            ? { x: raw.effect_x, y: raw.effect_y, rotation: raw.rotation }
+            : (raw.tips || raw.spin || 'center'),
+        playId
+    );
+    const clock = spinToClock(spinEffect);
+
+    const rawSpeed = raw.rail_speed ?? raw.speed ?? raw.power_level ?? 3.5;
+    const powerCalib = calibrateSourceSpeed(rawSpeed);
+
     return {
         id: raw.external_id,
         category: raw.category,
@@ -334,10 +358,15 @@ export function adaptCatalogShot(raw: any): CatalogShot {
         objectBall2Trajectory: parseTrajectory(raw.object_ball_2_trajectory),
 
         ballThickness: raw.ball_thickness,
-        railSpeed: raw.rail_speed,
-        powerLevel: raw.power_level,
-        effectX: raw.effect_x,
-        effectY: raw.effect_y,
+        railSpeed: powerCalib.power,
+        powerLevel: powerCalib.power,
+        effectX: spinEffect.x,
+        effectY: spinEffect.y,
+
+        spinEffect,
+        spinHour: clock.hour,
+        spinTips: clock.tips,
+        calibratedPower: powerCalib,
 
         isDifficult: raw.is_difficult,
         isPosition: raw.is_position,

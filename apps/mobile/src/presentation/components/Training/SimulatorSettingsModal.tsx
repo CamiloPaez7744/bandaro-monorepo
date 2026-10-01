@@ -18,12 +18,13 @@ import {
     IconRefresh,
     IconPencil,
     IconTarget,
+    IconSparkles,
 } from '@/src/presentation/components/icons';
 import { useI18n } from '@/components/useLanguage';
 import { useColorScheme } from '@/components/useColorScheme';
 import { getPalette } from '@/constants/theme';
 import { CaromAimFineTuner } from './CaromAimFineTuner';
-import { Vec2 } from '@bandaro/core';
+import { Vec2, TrajectoryGuideConfig } from '@bandaro/core';
 
 interface SimulatorSettingsModalProps {
     visible: boolean;
@@ -41,6 +42,8 @@ interface SimulatorSettingsModalProps {
     onOpenNumbering: () => void;
     onOpenCustomizer: () => void;
     onOpenBallStudio: () => void;
+    onOpenGuideCustomizer?: () => void;
+    guideConfig?: TrajectoryGuideConfig;
     onResetTable: () => void;
     onStartPractice: () => void;
     aimDirection: Vec2;
@@ -66,6 +69,8 @@ export const SimulatorSettingsModal = memo(function SimulatorSettingsModal({
     onOpenNumbering,
     onOpenCustomizer,
     onOpenBallStudio,
+    onOpenGuideCustomizer,
+    guideConfig,
     onResetTable,
     onStartPractice,
     aimDirection,
@@ -321,6 +326,37 @@ export const SimulatorSettingsModal = memo(function SimulatorSettingsModal({
                                 </Text>
                             </View>
                         </TouchableOpacity>
+
+                        {/* Personalizador de Guías de Trayectoria (Photoshop Style) */}
+                        {onOpenGuideCustomizer && (
+                            <TouchableOpacity
+                                style={[styles.settingRow, styles.settingRowActiveCyan]}
+                                onPress={() => {
+                                    onOpenGuideCustomizer();
+                                    onClose();
+                                }}>
+                                <View style={styles.actionLeft}>
+                                    <View style={[styles.iconCircle, styles.iconCircleCyan]}>
+                                        <IconSparkles size={16} color="#00d2ff" strokeWidth={2.2} />
+                                    </View>
+                                    <View style={styles.actionTexts}>
+                                        <Text style={[styles.actionTitle, { color: isDark ? '#f8fafc' : palette.text }]}>
+                                            {isEn ? 'Dual Trajectory Guide System' : 'Personalizador de Guías y Trazos'}
+                                        </Text>
+                                        <Text style={styles.actionSubtext}>
+                                            {guideConfig
+                                                ? `${guideConfig.strokeStyle.toUpperCase()} • ${guideConfig.strokeWeight}px • ${guideConfig.aimMode === 'full' ? 'Full' : 'Exit Only'}`
+                                                : (isEn ? 'Photoshop stroke style, thickness & mode' : 'Grosor, trazo punteado/sólido y modo salida')}
+                                        </Text>
+                                    </View>
+                                </View>
+                                <View style={[styles.statusBadge, styles.statusBadgeCyan]}>
+                                    <Text style={[styles.statusBadgeText, styles.statusBadgeTextCyan]}>
+                                        {isEn ? 'CONFIG' : 'AJUSTAR'}
+                                    </Text>
+                                </View>
+                            </TouchableOpacity>
+                        )}
 
                         {/* Limpiar Trazas */}
                         {hasDynamicTrails && (

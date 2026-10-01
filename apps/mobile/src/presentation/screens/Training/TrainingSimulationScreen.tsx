@@ -56,11 +56,14 @@ import {
     BreakFormat,
     getBreakPosition,
     getDefaultBreakAim,
+    TrajectoryGuideConfig,
+    DEFAULT_GUIDE_CONFIG,
 } from '@bandaro/core';
 import { ApiSnapshotRepository } from '@/src/infrastructure/repositories/ApiSnapshotRepository';
 import { fetchShotDetail } from '@/src/infrastructure/catalog/catalogApi';
 import { adaptCatalogShot, type CatalogShot, getLocalizedCategoryName } from '@/src/infrastructure/catalog/shotAdapter';
 import { CATEGORY_COLORS } from '@/src/presentation/components/Catalog/ShotCatalogCard';
+import { TrajectoryGuideCustomizer } from '@/src/presentation/components/Training/TrajectoryGuideCustomizer';
 
 type Orientation = 'horizontal' | 'vertical';
 
@@ -146,6 +149,8 @@ export function TrainingSimulationScreen() {
     const [showNumberingModal, setShowNumberingModal] = useState(false);
     const [showBallStudioModal, setShowBallStudioModal] = useState(false);
     const [showToolsMenu, setShowToolsMenu] = useState(false);
+    const [guideConfig, setGuideConfig] = useState<TrajectoryGuideConfig>(DEFAULT_GUIDE_CONFIG);
+    const [showGuideCustomizer, setShowGuideCustomizer] = useState(false);
 
     useEffect(() => {
         if (params.snapshotId) {
@@ -462,22 +467,16 @@ export function TrainingSimulationScreen() {
                         setAimDirection(vec2Normalize(vec2Sub(vec2(shot.yellow.x, shot.yellow.y), vec2(shot.white.x, shot.white.y))));
                     }
 
-                    let spinX = 0;
-                    let spinY = 0;
-                    if (shot.effectY < 0) {
-                        const tips = Math.min(3.5, Math.abs(shot.effectY * 5.0));
-                        const rawHour = shot.effectX * 5.0;
-                        const hour = rawHour <= 0.05 ? 12 : rawHour;
-                        const theta = (3 - hour) * (Math.PI / 6);
-                        const mag = Math.min(1.0, tips / 3.5);
-                        spinX = Math.cos(theta) * mag;
-                        spinY = Math.sin(theta) * mag;
+                    if (shot.spinEffect) {
+                        setSpin(shot.spinEffect);
                     } else if (shot.effectX !== 0 || shot.effectY !== 0) {
-                        spinX = Math.max(-1, Math.min(1, shot.effectX));
-                        spinY = Math.max(-1, Math.min(1, shot.effectY));
+                        const spinX = Math.max(-1, Math.min(1, shot.effectX));
+                        const spinY = Math.max(-1, Math.min(1, shot.effectY));
+                        setSpin({ x: spinX, y: spinY, magnitude: Math.min(1, Math.hypot(spinX, spinY)) });
+                    } else {
+                        setSpin({ x: 0, y: 0, magnitude: 0 });
                     }
-                    setSpin({ x: spinX, y: spinY, magnitude: Math.min(1, Math.hypot(spinX, spinY)) });
-                    setPowerLevel(Math.min(5, Math.max(1, shot.powerLevel || shot.railSpeed || 3)));
+                    setPowerLevel(Math.min(5, Math.max(1, shot.powerLevel || shot.railSpeed || 3.5)));
                     setIsEditMode(false);
                     setShowGuides(true);
                 })
@@ -711,6 +710,7 @@ export function TrainingSimulationScreen() {
                                     aimDirection={state.aimDirection}
                                     powerLevel={state.powerPercentage}
                                     categoryColor={activeCategoryColor ?? undefined}
+                                    guideConfig={guideConfig}
                                     tablePreferences={tablePreferences}
                                     showCueStick={true}
                                     showGhostBall={true}
@@ -871,6 +871,7 @@ export function TrainingSimulationScreen() {
                                         aimDirection={state.aimDirection}
                                         powerLevel={state.powerPercentage}
                                         categoryColor={activeCategoryColor ?? undefined}
+                                        guideConfig={guideConfig}
                                         tablePreferences={tablePreferences}
                                         showCueStick={true}
                                         showGhostBall={true}
@@ -952,6 +953,8 @@ export function TrainingSimulationScreen() {
                     onOpenNumbering={() => setShowNumberingModal(true)}
                     onOpenCustomizer={() => setShowCustomizer(true)}
                     onOpenBallStudio={() => setShowBallStudioModal(true)}
+                    onOpenGuideCustomizer={() => setShowGuideCustomizer(true)}
+                    guideConfig={guideConfig}
                     onResetTable={handleReset}
                     onStartPractice={handleStartPractice}
                     aimDirection={state.aimDirection}
@@ -959,6 +962,13 @@ export function TrainingSimulationScreen() {
                     hasDynamicTrails={!!state.dynamicTrails}
                     onClearTrails={clearTrails}
                     isSimulating={state.isSimulating}
+                />
+
+                <TrajectoryGuideCustomizer
+                    visible={showGuideCustomizer}
+                    onClose={() => setShowGuideCustomizer(false)}
+                    config={guideConfig}
+                    onChangeConfig={setGuideConfig}
                 />
 
                 <CaromBallControlModal

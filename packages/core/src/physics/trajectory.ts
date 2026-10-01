@@ -84,8 +84,8 @@ export function predictTrajectory(
     );
 
     // Initialize paths - only cue ball starts with initial position
-    const paths: Record<string, Vec2[]> = {};
-    paths[cueBallId] = [{ x: cueBall.pos.x, y: cueBall.pos.y }];
+    const paths: Record<string, TrajectoryPoint[]> = {};
+    paths[cueBallId] = [{ pos: { x: cueBall.pos.x, y: cueBall.pos.y }, type: 'normal', timestamp: 0 }];
     simBalls.forEach((b) => {
         if (b.id !== cueBallId) {
             paths[b.id] = [];
@@ -106,6 +106,8 @@ export function predictTrajectory(
         const { balls: nextBalls, events } = simulateStep(simBalls, table);
         simBalls = nextBalls;
 
+        const stepEventTypes: Record<string, 'cushion' | 'collision'> = {};
+
         // Process collision and cushion events
         for (const evt of events) {
             if (evt.type === 'cushion') {
@@ -113,12 +115,18 @@ export function predictTrajectory(
                 if (data.ballId === cueBallId) {
                     cushionContacts++;
                 }
+                if (data.ballId) {
+                    stepEventTypes[data.ballId] = 'cushion';
+                }
             } else if (evt.type === 'ball_collision') {
                 const data = evt.data as BallCollision;
                 const isCueBallCollision = data.ball1 === cueBallId || data.ball2 === cueBallId;
                 const alreadyCollided = ballCollisions.some(
                     (c) => (c.ball1 === data.ball1 && c.ball2 === data.ball2) || (c.ball1 === data.ball2 && c.ball2 === data.ball1)
                 );
+
+                stepEventTypes[data.ball1] = 'collision';
+                stepEventTypes[data.ball2] = 'collision';
 
                 if (isCueBallCollision && !alreadyCollided) {
                     const pointIndex = Math.max(0, paths[cueBallId].length - 1);
@@ -136,18 +144,34 @@ export function predictTrajectory(
             }
         }
 
-        // Record positions every step if ball moved significantly
+        // Record positions every step if ball moved significantly or collision/cushion occurred
         simBalls.forEach((ball) => {
             const ballPath = paths[ball.id];
-            if (ballPath.length === 0) {
+            const eventType = stepEventTypes[ball.id];
+
+            if (eventType) {
+                ballPath.push({
+                    pos: { x: ball.pos.x, y: ball.pos.y },
+                    type: eventType,
+                    timestamp: step,
+                });
+            } else if (ballPath.length === 0) {
                 if (ball.vel.x !== 0 || ball.vel.y !== 0) {
-                    ballPath.push({ x: ball.pos.x, y: ball.pos.y });
+                    ballPath.push({
+                        pos: { x: ball.pos.x, y: ball.pos.y },
+                        type: 'normal',
+                        timestamp: step,
+                    });
                 }
             } else {
-                const lastPos = ballPath[ballPath.length - 1];
-                const distFromLast = Math.hypot(ball.pos.x - lastPos.x, ball.pos.y - lastPos.y);
+                const lastPoint = ballPath[ballPath.length - 1];
+                const distFromLast = Math.hypot(ball.pos.x - lastPoint.pos.x, ball.pos.y - lastPoint.pos.y);
                 if (distFromLast >= POINT_DISTANCE_THRESHOLD) {
-                    ballPath.push({ x: ball.pos.x, y: ball.pos.y });
+                    ballPath.push({
+                        pos: { x: ball.pos.x, y: ball.pos.y },
+                        type: 'normal',
+                        timestamp: step,
+                    });
                 }
             }
         });
@@ -159,11 +183,7 @@ export function predictTrajectory(
         if (points.length > 1) {
             trajectoryPaths.push({
                 ballId: ballId as BallId,
-                points: points.map((p) => ({
-                    pos: p,
-                    type: 'normal' as const,
-                    timestamp: 0,
-                })),
+                points,
             });
         }
     });

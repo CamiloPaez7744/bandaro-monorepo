@@ -13,6 +13,11 @@ import {
     vec2,
     vec2Sub,
     vec2Normalize,
+    TrajectoryGuideConfig,
+    DEFAULT_GUIDE_CONFIG,
+    STRICT_BALL_GUIDE_COLORS,
+    getGuideStrokeDashArray,
+    filterAimTrajectory,
 } from '@bandaro/core';
 import { CushionRuler } from './CushionRuler';
 import { SystemNumberingOverlay, NumberAnchor, Formula } from './SystemNumberingOverlay';
@@ -53,6 +58,7 @@ interface InteractiveBilliardsTableProps {
     powerLevel?: number;
     tablePreferences?: TablePreferences;
     categoryColor?: string;
+    guideConfig?: TrajectoryGuideConfig;
     showCueStick?: boolean;
     showGhostBall?: boolean;
     onBallMove?: (ballId: BallId, position: Vec2) => void;
@@ -248,172 +254,6 @@ function getDiamondSvgPosition(
     }
 }
 
-interface AimGuideData {
-    cueRayEnd: Vec2;
-    ghostBallPos: Vec2 | null;
-    targetBallGuide: {
-        ballId: BallId;
-        start: Vec2;
-        end: Vec2;
-        color: string;
-    } | null;
-    cueDeflectionGuide: {
-        start: Vec2;
-        end: Vec2;
-    } | null;
-    cushionHit: {
-        point: Vec2;
-        reflectedEnd: Vec2;
-        reboundGhostPos?: Vec2;
-        reboundTargetBall?: Ball;
-    } | null;
-}
-
-function compute8BallAimGuide(
-    balls: Ball[],
-    cueBallId: BallId,
-    aimDirection: Vec2
-): AimGuideData | null {
-    const cueBall = balls.find((b) => b.id === cueBallId);
-    if (!cueBall) return null;
-
-    const cuePos = cueBall.pos;
-    const dir = vec2Normalize(aimDirection);
-    const BALL_R = 3.075;
-    const HIT_DIST = BALL_R * 2; // 6.15 cm
-
-    // 1. Ray intersection with object balls
-    let closestBallHit: { dist: number; ghostPos: Vec2; targetBall: Ball } | null = null;
-
-    for (const ball of balls) {
-        if (ball.id === cueBallId) continue;
-        const toBall = vec2Sub(ball.pos, cuePos);
-        const proj = toBall.x * dir.x + toBall.y * dir.y;
-        if (proj <= 0) continue;
-
-        const perpSq = (toBall.x * toBall.x + toBall.y * toBall.y) - proj * proj;
-        if (perpSq >= HIT_DIST * HIT_DIST) continue;
-
-        const halfChord = Math.sqrt(HIT_DIST * HIT_DIST - perpSq);
-        const dist = proj - halfChord;
-        if (dist <= 0) continue;
-
-        if (!closestBallHit || dist < closestBallHit.dist) {
-            closestBallHit = {
-                dist,
-                ghostPos: vec2(cuePos.x + dir.x * dist, cuePos.y + dir.y * dist),
-                targetBall: ball,
-            };
-        }
-    }
-
-    // 2. Ray intersection with cushions
-    const X_MIN = BALL_R;
-    const X_MAX = TABLE_W - BALL_R;
-    const Y_MIN = BALL_R;
-    const Y_MAX = TABLE_H - BALL_R;
-
-    let tX = Infinity;
-    let normX = vec2(0, 0);
-    if (dir.x > 0.0001) {
-        tX = (X_MAX - cuePos.x) / dir.x;
-        normX = vec2(-1, 0);
-    } else if (dir.x < -0.0001) {
-        tX = (X_MIN - cuePos.x) / dir.x;
-        normX = vec2(1, 0);
-    }
-
-    let tY = Infinity;
-    let normY = vec2(0, 0);
-    if (dir.y > 0.0001) {
-        tY = (Y_MAX - cuePos.y) / dir.y;
-        normY = vec2(0, -1);
-    } else if (dir.y < -0.0001) {
-        tY = (Y_MIN - cuePos.y) / dir.y;
-        normY = vec2(0, 1);
-    }
-
-    const cushionDist = Math.min(tX, tY);
-    const cushionNormal = tX < tY ? normX : normY;
-
-    // Hits an object ball first:
-    if (closestBallHit && closestBallHit.dist < cushionDist) {
-        const { ghostPos, targetBall } = closestBallHit;
-        const norm = vec2Normalize(vec2Sub(targetBall.pos, ghostPos));
-        const targetGuideLen = 28;
-        const targetEnd = vec2(targetBall.pos.x + norm.x * targetGuideLen, targetBall.pos.y + norm.y * targetGuideLen);
-
-        const dot = dir.x * norm.x + dir.y * norm.y;
-        const tangent = vec2(dir.x - norm.x * dot, dir.y - norm.y * dot);
-        const tanLen = Math.sqrt(tangent.x * tangent.x + tangent.y * tangent.y);
-
-        let cueDeflectionGuide: { start: Vec2; end: Vec2 } | null = null;
-        if (tanLen > 0.05) {
-            const uTan = vec2(tangent.x / tanLen, tangent.y / tanLen);
-            const defLen = 18;
-            cueDeflectionGuide = {
-                start: ghostPos,
-                end: vec2(ghostPos.x + uTan.x * defLen, ghostPos.y + uTan.y * defLen),
-            };
-        }
-
-        const color = targetBall.id === 'yellow' ? '#facc15' : '#ef4444';
-
-        return {
-            cueRayEnd: ghostPos,
-            ghostBallPos: ghostPos,
-            targetBallGuide: {
-                ballId: targetBall.id,
-                start: targetBall.pos,
-                end: targetEnd,
-                color,
-            },
-            cueDeflectionGuide,
-            cushionHit: null,
-        };
-    }
-
-    // Hits cushion first (Bricole / Antes de banda):
-    const cushionPoint = vec2(cuePos.x + dir.x * cushionDist, cuePos.y + dir.y * cushionDist);
-    const dotCN = dir.x * cushionNormal.x + dir.y * cushionNormal.y;
-    const reflDir = vec2Normalize(vec2(dir.x - 2 * dotCN * cushionNormal.x, dir.y - 2 * dotCN * cushionNormal.y));
-    const reflLen = 42;
-    let reflectedEnd = vec2(cushionPoint.x + reflDir.x * reflLen, cushionPoint.y + reflDir.y * reflLen);
-
-    // Check if cushion reflection hits an object ball
-    let reboundGhostPos: Vec2 | undefined = undefined;
-    let reboundTargetBall: Ball | undefined = undefined;
-
-    for (const ball of balls) {
-        if (ball.id === cueBallId) continue;
-        const toBall = vec2Sub(ball.pos, cushionPoint);
-        const proj = toBall.x * reflDir.x + toBall.y * reflDir.y;
-        if (proj <= 0) continue;
-        const perpSq = (toBall.x * toBall.x + toBall.y * toBall.y) - proj * proj;
-        if (perpSq >= HIT_DIST * HIT_DIST) continue;
-        const halfChord = Math.sqrt(HIT_DIST * HIT_DIST - perpSq);
-        const dist = proj - halfChord;
-        if (dist > 0 && dist < reflLen) {
-            reflectedEnd = vec2(cushionPoint.x + reflDir.x * dist, cushionPoint.y + reflDir.y * dist);
-            reboundGhostPos = reflectedEnd;
-            reboundTargetBall = ball;
-            break;
-        }
-    }
-
-    return {
-        cueRayEnd: cushionPoint,
-        ghostBallPos: null,
-        targetBallGuide: null,
-        cueDeflectionGuide: null,
-        cushionHit: {
-            point: cushionPoint,
-            reflectedEnd,
-            reboundGhostPos,
-            reboundTargetBall,
-        },
-    };
-}
 
 function resolveBallDragPosition(
     targetX: number,
@@ -530,6 +370,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
         powerLevel = 0,
         tablePreferences = DEFAULT_TABLE_PREFERENCES,
         categoryColor,
+        guideConfig = DEFAULT_GUIDE_CONFIG,
         showCueStick = true,
         showGhostBall = true,
         onBallMove,
@@ -874,93 +715,131 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
         })
     ).current;
 
+    const filteredAimGuide = useMemo(() => {
+        if (!showGuides || guideConfig.showAimGuide === false || !trajectory || trajectory.paths.length === 0) {
+            return null;
+        }
+        return filterAimTrajectory(trajectory, cueBallId, guideConfig.aimMode);
+    }, [showGuides, guideConfig.showAimGuide, guideConfig.aimMode, trajectory, cueBallId]);
+
     const renderTrajectory = useMemo(() => {
-        if (!showGuides || !trajectory || trajectory.paths.length === 0) return null;
+        if (!filteredAimGuide || filteredAimGuide.paths.length === 0) return null;
 
-        return trajectory.paths.map((path) => {
-            if (path.points.length < 2) return null;
+        const baseWeight = guideConfig.strokeWeight;
+        const dashArray = getGuideStrokeDashArray(guideConfig.strokeStyle);
 
-            // Encontrar el punto más cercano a la posición actual de la bola
-            const currentBall = balls.find((b) => b.id === path.ballId);
-            if (!currentBall) return null;
+        return (
+            <G pointerEvents="none">
+                {filteredAimGuide.paths.map((path) => {
+                    if (path.points.length < 2) return null;
 
-            let startIndex = 0;
-            
-            // Si estamos simulando, filtrar puntos ya recorridos
-            if (isSimulating) {
-                let minDistance = Infinity;
-                for (let i = 0; i < path.points.length; i++) {
-                    const point = path.points[i];
-                    const dx = point.pos.x - currentBall.pos.x;
-                    const dy = point.pos.y - currentBall.pos.y;
-                    const distance = Math.sqrt(dx * dx + dy * dy);
-                    
-                    if (distance < minDistance) {
-                        minDistance = distance;
-                        startIndex = i;
+                    const currentBall = balls.find((b) => b.id === path.ballId);
+                    if (!currentBall) return null;
+
+                    let startIndex = 0;
+                    if (isSimulating) {
+                        let minDistance = Infinity;
+                        for (let i = 0; i < path.points.length; i++) {
+                            const point = path.points[i];
+                            const dx = point.pos.x - currentBall.pos.x;
+                            const dy = point.pos.y - currentBall.pos.y;
+                            const distance = Math.sqrt(dx * dx + dy * dy);
+                            if (distance < minDistance) {
+                                minDistance = distance;
+                                startIndex = i;
+                            }
+                        }
                     }
-                }
-            }
 
-            // Filtrar puntos ya recorridos durante simulación
-            const isCueBall = path.ballId === cueBallId;
-            const filteredPoints = path.points.slice(startIndex);
+                    const isCueBall = path.ballId === cueBallId;
+                    const filteredPoints = path.points.slice(startIndex);
+                    if (filteredPoints.length < 2) return null;
 
-            if (filteredPoints.length < 2) return null;
-
-            const points = filteredPoints
-                .map((p) => {
-                    const svgPos = mapPointToSvg(p.pos, orientation, layout);
-                    return `${svgPos.x},${svgPos.y}`;
-                })
-                .join(' ');
-
-            const defaultColor = path.ballId === 'white' ? '#f8fafc' : path.ballId === 'yellow' ? '#facc15' : '#ef4444';
-            const color = isCueBall && categoryColor ? categoryColor : defaultColor;
-            const glowColor = isCueBall && categoryColor ? `${categoryColor}40` : 'rgba(255,255,255,0.18)';
-            
-            // Different stroke widths for cue ball vs target balls - trazos delgados con 80% opacidad
-            const glowWidth = isCueBall ? 1.4 : 1.0;
-            const lineWidth = isCueBall ? 0.65 : 0.45;
-
-            return (
-                <G key={path.ballId} opacity={0.80}>
-                    <Polyline
-                        points={points}
-                        fill="none"
-                        stroke={glowColor}
-                        strokeWidth={glowWidth}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                    />
-                    <Polyline
-                        points={points}
-                        fill="none"
-                        stroke={color}
-                        strokeWidth={lineWidth}
-                        strokeDasharray="3 3"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                    />
-                    {filteredPoints
-                        .filter((p) => p.type === 'cushion')
-                        .map((p, idx) => {
+                    const points = filteredPoints
+                        .map((p) => {
                             const svgPos = mapPointToSvg(p.pos, orientation, layout);
-                            return (
-                                <Circle
-                                    key={`cushion-${path.ballId}-${idx}`}
-                                    cx={svgPos.x}
-                                    cy={svgPos.y}
-                                    r={isCueBall ? 1.5 : 1.0}
-                                    fill={color}
-                                    opacity={0.9}
-                                />
-                            );
-                        })}
-                </G>
-            );
-        });
-    }, [trajectory, orientation, layout, balls, cueBallId, showGuides, isSimulating, categoryColor]);
+                            return `${svgPos.x.toFixed(1)},${svgPos.y.toFixed(1)}`;
+                        })
+                        .join(' ');
+
+                    // STRICT COLOR ENFORCEMENT: Strictly White, Yellow, Red per ball.
+                    const ballColors = STRICT_BALL_GUIDE_COLORS[path.ballId];
+                    const strokeColor = ballColors.stroke;
+                    const glowColor = ballColors.glow;
+
+                    const glowWidth = isCueBall ? baseWeight * 2.4 : baseWeight * 1.8;
+                    const lineWidth = isCueBall ? baseWeight : baseWeight * 0.75;
+
+                    return (
+                        <G key={`aim-path-${path.ballId}`} opacity={0.88}>
+                            {/* Resplandor exterior suave */}
+                            <Polyline
+                                points={points}
+                                fill="none"
+                                stroke={glowColor}
+                                strokeWidth={glowWidth}
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            />
+                            {/* Trazo nítido principal con estilo configurable (Solid / Dashed / Dotted) */}
+                            <Polyline
+                                points={points}
+                                fill="none"
+                                stroke={strokeColor}
+                                strokeWidth={lineWidth}
+                                strokeDasharray={dashArray}
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            />
+                            {/* Puntos de impacto en banda calculados */}
+                            {filteredPoints
+                                .filter((p) => p.type === 'cushion')
+                                .map((p, idx) => {
+                                    const svgPos = mapPointToSvg(p.pos, orientation, layout);
+                                    return (
+                                        <Circle
+                                            key={`cushion-${path.ballId}-${idx}`}
+                                            cx={svgPos.x}
+                                            cy={svgPos.y}
+                                            r={isCueBall ? baseWeight * 1.5 : baseWeight * 1.0}
+                                            fill={strokeColor}
+                                            opacity={0.9}
+                                        />
+                                    );
+                                })}
+                        </G>
+                    );
+                })}
+
+                {/* Bola fantasma en el primer impacto calculada por predictTrajectory con cero discrepancia */}
+                {!isSimulating && showGhostBall && filteredAimGuide.ghostBallPos && (() => {
+                    const ghostSvg = mapPointToSvg(filteredAimGuide.ghostBallPos, orientation, layout);
+                    const isVertical = orientation === 'vertical';
+                    const ghostRadius = isVertical ? 5.5 : 2.75;
+
+                    return (
+                        <G key="unified-ghost-ball">
+                            <Circle
+                                cx={ghostSvg.x}
+                                cy={ghostSvg.y}
+                                r={ghostRadius}
+                                fill="rgba(255, 255, 255, 0.12)"
+                                stroke="#ffffff"
+                                strokeWidth={isVertical ? 0.7 : 0.4}
+                                strokeDasharray="2 2"
+                            />
+                            <Circle
+                                cx={ghostSvg.x}
+                                cy={ghostSvg.y}
+                                r={isVertical ? 1.0 : 0.5}
+                                fill="#ffffff"
+                            />
+                        </G>
+                    );
+                })()}
+            </G>
+        );
+    }, [filteredAimGuide, balls, cueBallId, isSimulating, orientation, layout, guideConfig, showGhostBall]);
 
     return (
         <View
@@ -1365,14 +1244,15 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                     );
                 })}
 
-                {/* 10. Trazas dinámicas continuas estilo Billiard-Bible con 80% de opacidad (⚪ 🟡 🔴) */}
-                {dynamicTrails && (
-                    <G opacity={0.80}>
+                {/* 10. Trazas dinámicas continuas (Execution Guide / Trail) con configuración compartida */}
+                {dynamicTrails && guideConfig.showExecutionTrail !== false && (
+                    <G opacity={0.88}>
                         {(['white', 'yellow', 'red'] as BallId[]).map((ballId) => {
                             const trail = dynamicTrails[ballId];
                             if (!trail || trail.length < 2) return null;
-                            const strokeColor = ballId === 'white' ? '#ffffff' : ballId === 'yellow' ? '#facc15' : '#ef4444';
-                            const glowColor = ballId === 'white' ? 'rgba(255,255,255,0.22)' : ballId === 'yellow' ? 'rgba(250,204,21,0.22)' : 'rgba(239,68,68,0.22)';
+                            const ballColors = STRICT_BALL_GUIDE_COLORS[ballId];
+                            const strokeColor = ballColors.stroke;
+                            const glowColor = ballColors.glow;
                             const pointsStr = trail
                                 .map((p) => {
                                     const svgPos = mapPointToSvg(p.pos, orientation, layout);
@@ -1380,23 +1260,29 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                                 })
                                 .join(' ');
 
+                            const baseWeight = guideConfig.strokeWeight;
+                            const glowWidth = baseWeight * 2.2;
+                            const lineWidth = baseWeight;
+                            const dashArray = getGuideStrokeDashArray(guideConfig.strokeStyle);
+
                             return (
                                 <G key={`dynamic-trail-${ballId}`}>
-                                    {/* Resplandor exterior delgado */}
+                                    {/* Resplandor exterior */}
                                     <Polyline
                                         points={pointsStr}
                                         fill="none"
                                         stroke={glowColor}
-                                        strokeWidth={1.5}
+                                        strokeWidth={glowWidth}
                                         strokeLinecap="round"
                                         strokeLinejoin="round"
                                     />
-                                    {/* Línea viva interior nítida */}
+                                    {/* Línea viva interior con estilo configurable */}
                                     <Polyline
                                         points={pointsStr}
                                         fill="none"
                                         stroke={strokeColor}
-                                        strokeWidth={0.75}
+                                        strokeWidth={lineWidth}
+                                        strokeDasharray={dashArray}
                                         strokeLinecap="round"
                                         strokeLinejoin="round"
                                     />
@@ -1455,153 +1341,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                     });
                 })()}
 
-                {/* 11. Guía láser de puntería limpia y profesional estilo 8 Ball Pool */}
-                {showGuides && !isSimulating && (() => {
-                    const guideData = compute8BallAimGuide(balls, cueBallId, aimDirection);
-                    if (!guideData) return null;
-
-                    const cueBall = balls.find((b) => b.id === cueBallId);
-                    if (!cueBall) return null;
-
-                    const cueSvg = mapPointToSvg(cueBall.pos, orientation, layout);
-                    const rayEndSvg = mapPointToSvg(guideData.cueRayEnd, orientation, layout);
-                    const ghostSvg = guideData.ghostBallPos ? mapPointToSvg(guideData.ghostBallPos, orientation, layout) : null;
-
-                    const isVertical = orientation === 'vertical';
-                    const ghostRadius = isVertical ? 5.5 : 2.75;
-
-                    return (
-                        <G pointerEvents="none">
-                            {/* Resplandor suave del rayo primario */}
-                            <Line
-                                x1={cueSvg.x}
-                                y1={cueSvg.y}
-                                x2={rayEndSvg.x}
-                                y2={rayEndSvg.y}
-                                stroke={categoryColor ? `${categoryColor}40` : "rgba(56, 189, 248, 0.35)"}
-                                strokeWidth={isVertical ? 2.4 : 1.4}
-                                strokeLinecap="round"
-                            />
-                            {/* Núcleo punteado de precisión del rayo */}
-                            <Line
-                                x1={cueSvg.x}
-                                y1={cueSvg.y}
-                                x2={rayEndSvg.x}
-                                y2={rayEndSvg.y}
-                                stroke={categoryColor || "#ffffff"}
-                                strokeWidth={isVertical ? 0.9 : 0.6}
-                                strokeDasharray="3 3"
-                                strokeLinecap="round"
-                            />
-
-                            {/* Impacto en bola: Bola Fantasma + Guía de Bola Objetivo + Deflexión */}
-                            {ghostSvg && (
-                                <G>
-                                    {/* Bola Fantasma translúcida */}
-                                    <Circle
-                                        cx={ghostSvg.x}
-                                        cy={ghostSvg.y}
-                                        r={ghostRadius}
-                                        fill={categoryColor ? `${categoryColor}25` : "rgba(56, 189, 248, 0.16)"}
-                                        stroke="#ffffff"
-                                        strokeWidth={isVertical ? 0.8 : 0.5}
-                                    />
-                                    <Circle
-                                        cx={ghostSvg.x}
-                                        cy={ghostSvg.y}
-                                        r={ghostRadius}
-                                        fill="none"
-                                        stroke={categoryColor || "#38bdf8"}
-                                        strokeWidth={isVertical ? 0.5 : 0.35}
-                                        strokeDasharray="2 2"
-                                    />
-                                    <Circle cx={ghostSvg.x} cy={ghostSvg.y} r={isVertical ? 1.2 : 0.6} fill={categoryColor || "#38bdf8"} />
-
-                                    {/* Guía corta y nítida de la bola objetivo */}
-                                    {guideData.targetBallGuide && (() => {
-                                        const tStart = mapPointToSvg(guideData.targetBallGuide.start, orientation, layout);
-                                        const tEnd = mapPointToSvg(guideData.targetBallGuide.end, orientation, layout);
-                                        return (
-                                            <G>
-                                                <Line
-                                                    x1={tStart.x}
-                                                    y1={tStart.y}
-                                                    x2={tEnd.x}
-                                                    y2={tEnd.y}
-                                                    stroke={guideData.targetBallGuide.color}
-                                                    strokeWidth={isVertical ? 1.8 : 1.2}
-                                                    strokeDasharray="3 2"
-                                                    strokeLinecap="round"
-                                                    opacity={0.95}
-                                                />
-                                                <Circle cx={tEnd.x} cy={tEnd.y} r={isVertical ? 1.2 : 0.6} fill={guideData.targetBallGuide.color} />
-                                            </G>
-                                        );
-                                    })()}
-
-                                    {/* Guía corta de deflexión / tangente de la bola blanca */}
-                                    {guideData.cueDeflectionGuide && (() => {
-                                        const cStart = mapPointToSvg(guideData.cueDeflectionGuide.start, orientation, layout);
-                                        const cEnd = mapPointToSvg(guideData.cueDeflectionGuide.end, orientation, layout);
-                                        return (
-                                            <Line
-                                                x1={cStart.x}
-                                                y1={cStart.y}
-                                                x2={cEnd.x}
-                                                y2={cEnd.y}
-                                                stroke="rgba(255,255,255,0.7)"
-                                                strokeWidth={isVertical ? 1.2 : 0.7}
-                                                strokeDasharray="2.5 2.5"
-                                                strokeLinecap="round"
-                                            />
-                                        );
-                                    })()}
-                                </G>
-                            )}
-
-                            {/* Impacto en banda (Bricole): Punto de rebote + Línea reflejada única */}
-                            {guideData.cushionHit && (() => {
-                                const cPoint = mapPointToSvg(guideData.cushionHit.point, orientation, layout);
-                                const rEnd = mapPointToSvg(guideData.cushionHit.reflectedEnd, orientation, layout);
-                                const rGhostSvg = guideData.cushionHit.reboundGhostPos
-                                    ? mapPointToSvg(guideData.cushionHit.reboundGhostPos, orientation, layout)
-                                    : null;
-                                return (
-                                    <G>
-                                        <Circle cx={cPoint.x} cy={cPoint.y} r={isVertical ? 2.8 : 1.4} fill="rgba(56, 189, 248, 0.3)" />
-                                        <Circle cx={cPoint.x} cy={cPoint.y} r={isVertical ? 1.4 : 0.7} fill="#38bdf8" />
-                                        <Line
-                                            x1={cPoint.x}
-                                            y1={cPoint.y}
-                                            x2={rEnd.x}
-                                            y2={rEnd.y}
-                                            stroke="#38bdf8"
-                                            strokeWidth={isVertical ? 1.4 : 0.8}
-                                            strokeDasharray="3 3"
-                                            strokeLinecap="round"
-                                            opacity={0.85}
-                                        />
-                                        {rGhostSvg && (
-                                            <G>
-                                                <Circle
-                                                    cx={rGhostSvg.x}
-                                                    cy={rGhostSvg.y}
-                                                    r={ghostRadius}
-                                                    fill="rgba(56, 189, 248, 0.16)"
-                                                    stroke="#ffffff"
-                                                    strokeWidth={isVertical ? 0.8 : 0.5}
-                                                />
-                                                <Circle cx={rGhostSvg.x} cy={rGhostSvg.y} r={isVertical ? 1.2 : 0.6} fill="#38bdf8" />
-                                            </G>
-                                        )}
-                                    </G>
-                                );
-                            })()}
-                        </G>
-                    );
-                })()}
-
-                {/* 12. Trayectoria teórica calculada con color de categoría */}
+                {/* 11. Guía de Puntería Unificada (Aiming Guide) calculada con el mismo motor físico */}
                 {renderTrajectory}
 
                 {/* 13. Bolas de Carambola en 3D fotorrealistas con física de rodadura real (8 Ball Pool) */}
