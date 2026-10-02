@@ -38,6 +38,7 @@ export interface CatalogShot {
     cueBallTrajectory: Point2D[];
     objectBall1Trajectory: Point2D[];
     objectBall2Trajectory: Point2D[];
+    cueStickTrajectory: Point2D[];
 
     ballThickness: number;
     railSpeed: number;
@@ -316,15 +317,38 @@ export function adaptCatalogShot(raw: any): CatalogShot {
     const tipsKo = raw.tips_ko || '';
 
     const playId = raw.external_id ?? raw.id;
-    const spinEffect = translateSourceSpin(
-        raw.effect_x !== undefined && raw.effect_y !== undefined
-            ? { x: raw.effect_x, y: raw.effect_y, rotation: raw.rotation }
-            : (raw.tips || raw.spin || 'center'),
-        playId
-    );
-    const clock = spinToClock(spinEffect);
+    let spinInput: any = null;
+    if (raw.spin_hour !== undefined && raw.spin_hour !== null && raw.spin_tips !== undefined && raw.spin_tips !== null) {
+        spinInput = { hour: parseFloat(raw.spin_hour), tips: parseFloat(raw.spin_tips) };
+    } else if (raw.ball_contract_point && typeof raw.ball_contract_point === 'string') {
+        const parts = raw.ball_contract_point.split('|');
+        const hr = parseFloat(parts[0]);
+        const tp = parseFloat(parts[1] ?? '0');
+        if (!isNaN(hr)) {
+            spinInput = { hour: hr, tips: isNaN(tp) ? 2.5 : tp };
+        }
+    }
 
-    const rawSpeed = raw.rail_speed ?? raw.speed ?? raw.power_level ?? 3.5;
+    if (!spinInput) {
+        if (raw.effect_x !== undefined && raw.effect_y !== undefined) {
+            spinInput = {
+                x: parseFloat(raw.effect_x),
+                y: parseFloat(raw.effect_y),
+                rotation: raw.rotation !== undefined && raw.rotation !== null ? parseFloat(raw.rotation) : undefined,
+            };
+        } else {
+            spinInput = raw.tips || raw.spin || 'center';
+        }
+    }
+
+    const spinEffect = translateSourceSpin(spinInput, playId);
+    const clock = (spinInput && typeof spinInput === 'object' && spinInput.hour !== undefined)
+        ? { hour: spinInput.hour, tips: spinInput.tips ?? 2.5, description: `${spinInput.hour} o'clock` }
+        : spinToClock(spinEffect);
+
+    const rawSpeed = raw.rail_speed !== undefined && raw.rail_speed !== null
+        ? parseFloat(raw.rail_speed)
+        : (raw.speed ?? raw.power_level ?? 3.5);
     const powerCalib = calibrateSourceSpeed(rawSpeed);
 
     return {
@@ -356,6 +380,7 @@ export function adaptCatalogShot(raw: any): CatalogShot {
         cueBallTrajectory,
         objectBall1Trajectory: parseTrajectory(raw.object_ball_1_trajectory),
         objectBall2Trajectory: parseTrajectory(raw.object_ball_2_trajectory),
+        cueStickTrajectory: parseTrajectory(raw.cue_stick_trajectory),
 
         ballThickness: raw.ball_thickness,
         railSpeed: powerCalib.power,
@@ -379,4 +404,46 @@ export function adaptCatalogShot(raw: any): CatalogShot {
 
 export function adaptCatalogShotList(raw: any[]): CatalogShot[] {
     return raw.map(adaptCatalogShot);
+}
+
+/**
+ * Calculates the exact initial aim direction vector towards the true pre-impact contact point
+ * on Object Ball 1. Uses the authoritative cue stick stroke vector if available, avoiding pixel-quantization errors.
+ */
+export function getShotAimVector(shot: {
+    white: Point2D;
+    yellow: Point2D;
+    red?: Point2D;
+    cueBallTrajectory?: Point2D[];
+    cueStickTrajectory?: Point2D[];
+}): { x: number; y: number } {
+    const cueStickTraj = shot.cueStickTrajectory;
+    if (cueStickTraj && cueStickTraj.length >= 2) {
+        const pFirst = cueStickTraj[0];
+        const pLast = cueStickTraj[cueStickTraj.length - 1];
+        const dx = pLast.x - pFirst.x;
+        const dy = pLast.y - pFirst.y;
+        const len = Math.hypot(dx, dy);
+        if (len > 0.5) {
+            return { x: dx / len, y: dy / len };
+        }
+    }
+
+    const traj = shot.cueBallTrajectory;
+    if (traj && traj.length >= 2) {
+        for (let i = 1; i < traj.length; i++) {
+            const dx = traj[i].x - shot.white.x;
+            const dy = traj[i].y - shot.white.y;
+            const d = Math.hypot(dx, dy);
+            if (d >= 3.5) {
+                return { x: dx / d, y: dy / d };
+            }
+        }
+    }
+
+    // Default: aim directly along the center line between white and yellow
+    const dx = shot.yellow.x - shot.white.x;
+    const dy = shot.yellow.y - shot.white.y;
+    const len = Math.hypot(dx, dy);
+    return len > 0.1 ? { x: dx / len, y: dy / len } : { x: 1, y: 0 };
 }

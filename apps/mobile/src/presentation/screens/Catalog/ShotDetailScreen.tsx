@@ -16,6 +16,7 @@ import { fetchShotDetail, toggleFavoriteShot, type CatalogShotRaw } from '@/src/
 import {
     adaptCatalogShot,
     getLocalizedShot,
+    getShotAimVector,
     type CatalogShot,
     type CatalogLanguage,
 } from '@/src/infrastructure/catalog/shotAdapter';
@@ -191,34 +192,14 @@ export function ShotDetailScreen({ shotId: propShotId, onClose, onSimulate }: Sh
 
         setModalVisible(false);
 
-        // Calculate aim vector from cue ball trajectory if available
-        let aimX = '1';
-        let aimY = '0';
-        if (shot.cueBallTrajectory && shot.cueBallTrajectory.length >= 2) {
-            const p0 = shot.cueBallTrajectory[0];
-            const p1 = shot.cueBallTrajectory[1];
-            aimX = String(p1.x - p0.x);
-            aimY = String(p1.y - p0.y);
-        } else {
-            aimX = String(shot.yellow.x - shot.white.x);
-            aimY = String(shot.yellow.y - shot.white.y);
-        }
+        // Calculate precise aim vector from cue ball trajectory towards pre-impact target contact point
+        const aimVec = getShotAimVector(shot);
+        const aimX = String(aimVec.x);
+        const aimY = String(aimVec.y);
 
-        // Calculate spin
-        let sX = 0;
-        let sY = 0;
-        if (shot.effectY < 0) {
-            const tips = Math.min(3.5, Math.abs(shot.effectY * 5.0));
-            const rawHour = shot.effectX * 5.0;
-            const hour = rawHour <= 0.05 ? 12 : rawHour;
-            const theta = (3 - hour) * (Math.PI / 6);
-            const mag = Math.min(1.0, tips / 3.5);
-            sX = Math.cos(theta) * mag;
-            sY = Math.sin(theta) * mag;
-        } else if (shot.effectX !== 0 || shot.effectY !== 0) {
-            sX = Math.max(-1, Math.min(1, shot.effectX));
-            sY = Math.max(-1, Math.min(1, shot.effectY));
-        }
+        // Use calibrated spin directly from shot
+        const sX = shot.spinEffect?.x ?? shot.effectX ?? 0;
+        const sY = shot.spinEffect?.y ?? shot.effectY ?? 0;
 
         if (onClose) {
             onClose();
@@ -238,7 +219,9 @@ export function ShotDetailScreen({ shotId: propShotId, onClose, onSimulate }: Sh
                 aimY,
                 spinX: String(sX),
                 spinY: String(sY),
-                powerLevel: String(shot.powerLevel || shot.railSpeed || 3),
+                spinHour: shot.spinHour !== undefined ? String(shot.spinHour) : '',
+                spinTips: shot.spinTips !== undefined ? String(shot.spinTips) : '',
+                powerLevel: String(shot.railSpeed || shot.powerLevel || 3.5),
                 category: shot.category,
                 categoryName: shot.categoryName,
                 categoryColor: color ? encodeURIComponent(color) : '',
@@ -440,6 +423,8 @@ export function ShotDetailScreen({ shotId: propShotId, onClose, onSimulate }: Sh
                             ballThickness={shot.ballThickness}
                             effectX={shot.effectX}
                             effectY={shot.effectY}
+                            hour={shot.spinHour}
+                            tips={shot.spinTips}
                             railSpeed={shot.railSpeed}
                             categoryColor={color}
                             isDifficult={shot.isDifficult}
@@ -459,6 +444,8 @@ export function ShotDetailScreen({ shotId: propShotId, onClose, onSimulate }: Sh
                     ballThickness={shot.ballThickness}
                     effectX={shot.effectX}
                     effectY={shot.effectY}
+                    hour={shot.spinHour}
+                    tips={shot.spinTips}
                     railSpeed={shot.railSpeed}
                     categoryColor={color}
                     isDifficult={shot.isDifficult}

@@ -82,7 +82,16 @@ export const ShotCatalogCard = memo(function ShotCatalogCard({
     const color = CATEGORY_COLORS[shot.category] ?? '#6B7280';
     const langCode = (language as string) === 'en' ? 'en' : (language as string) === 'ko' ? 'ko' : 'es';
     const thicknessInfo = getThicknessInfo(shot.ballThickness, langCode);
-    const englishInfo = resolveEnglish({ effectX: shot.effectX, effectY: shot.effectY }, 10, langCode);
+    const englishInfo = resolveEnglish(
+        {
+            hour: shot.spinHour,
+            tips: shot.spinTips,
+            effectX: shot.effectX,
+            effectY: shot.effectY,
+        },
+        10,
+        langCode
+    );
     const [isHovered, setIsHovered] = useState(false);
     const [isSimulating, setIsSimulating] = useState(false);
 

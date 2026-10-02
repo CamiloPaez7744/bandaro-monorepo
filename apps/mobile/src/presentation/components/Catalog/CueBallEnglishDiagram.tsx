@@ -58,36 +58,33 @@ export function resolveEnglish(
     if (props.hour != null && props.tips != null) {
         hour = props.hour;
         tips = Math.max(0, Math.min(3.5, props.tips));
+    } else if (props.hour != null) {
+        hour = props.hour;
+        tips = props.tips ?? (hour === 12 ? 0 : 2.5);
     } else if (props.effectX != null || props.effectY != null) {
         const ex = props.effectX ?? 0;
         const ey = props.effectY ?? 0;
+        const mag = Math.hypot(ex, ey);
 
-        if (Math.abs(ex) < 0.001 && Math.abs(ey) < 0.001) {
+        if (mag < 0.05) {
             hour = 12;
             tips = 0;
-        } else if (ey < 0) {
-            // Billiard bible scraper format: effectY = -contract_y / 5.0, effectX = contract_x / 5.0
-            tips = Math.min(3.5, Math.max(0, Math.abs(ey * 5.0)));
-            const rawHour = ex * 5.0;
-            if (rawHour <= 0.05 && tips > 0) {
-                hour = 12;
-            } else {
-                hour = Math.round(rawHour * 10) / 10;
-                if (hour === 0) hour = 12;
-            }
         } else {
-            // Standard Cartesian [-1, 1] vector (ex = right/left, ey = top/bottom)
-            const angle = Math.atan2(ey, ex); // rad
-            // Convert to clock hour (0 rad = 3 o'clock, pi/2 = 6 o'clock, pi = 9, -pi/2 = 12)
-            let h = ((angle + Math.PI / 2) / (2 * Math.PI)) * 12;
-            if (h <= 0) h += 12;
-            hour = Math.round(h * 2) / 2;
-            if (hour === 0) hour = 12;
-            tips = Math.min(3.5, Math.hypot(ex, ey) * 3.0);
+            // Standard Cartesian SpinEffect:
+            // ex = +1 right (3 o'clock), -1 left (9 o'clock)
+            // ey = +1 top (12 o'clock), -1 bottom (6 o'clock)
+            let angleRad = Math.atan2(ex, ey);
+            if (angleRad < 0) {
+                angleRad += 2 * Math.PI;
+            }
+            let h = (angleRad / (2 * Math.PI)) * 12;
+            if (h <= 0.05) h = 12;
+            hour = Math.round(h * 10) / 10;
+            tips = Math.min(3.0, Math.round(mag * 3.0 * 10) / 10);
         }
     }
 
-    // Format clock string (e.g. "2:30", "9:00", "12:00")
+    // Format clock string (e.g. "2:30", "8:30", "9:00", "12:00")
     const hourWhole = Math.floor(hour);
     const minuteFrac = hour - hourWhole;
     const minutes = Math.round(minuteFrac * 60);
@@ -126,21 +123,22 @@ export function resolveEnglish(
     if (tips <= 0.2) {
         spinDescription = lang === 'en' ? 'Center Hit' : lang === 'ko' ? '중단 무회전' : 'Bola Plana';
     } else {
-        const isFollow = hour >= 10.5 || hour <= 1.5;
-        const isDraw = hour >= 4.5 && hour <= 7.5;
-        const isRight = hour > 1.5 && hour < 4.5;
-        const isLeft = hour > 7.5 && hour < 10.5;
-
-        if (isFollow) {
+        if (hour >= 11.5 || hour <= 0.5) {
             spinDescription = lang === 'en' ? 'Top / Follow' : lang === 'ko' ? '상단 (밀어치기)' : 'Corrido (Arriba)';
-        } else if (isDraw) {
-            spinDescription = lang === 'en' ? 'Bottom / Draw' : lang === 'ko' ? '하단 (끌어치기)' : 'Retroceso (Abajo)';
-        } else if (isRight) {
+        } else if (hour > 0.5 && hour < 2.5) {
+            spinDescription = lang === 'en' ? 'Top-Right' : lang === 'ko' ? '우상단' : 'Arriba-Derecha';
+        } else if (hour >= 2.5 && hour <= 3.5) {
             spinDescription = lang === 'en' ? 'Right English' : lang === 'ko' ? '우측 회전' : 'Efecto Derecho';
-        } else if (isLeft) {
+        } else if (hour > 3.5 && hour < 5.5) {
+            spinDescription = lang === 'en' ? 'Bottom-Right' : lang === 'ko' ? '우하단' : 'Abajo-Derecha';
+        } else if (hour >= 5.5 && hour <= 6.5) {
+            spinDescription = lang === 'en' ? 'Bottom / Draw' : lang === 'ko' ? '하단 (끌어치기)' : 'Retroceso (Abajo)';
+        } else if (hour > 6.5 && hour < 8.8) {
+            spinDescription = lang === 'en' ? 'Bottom-Left' : lang === 'ko' ? '좌하단' : 'Abajo-Izquierda';
+        } else if (hour >= 8.8 && hour <= 9.5) {
             spinDescription = lang === 'en' ? 'Left English' : lang === 'ko' ? '좌측 회전' : 'Efecto Izquierdo';
         } else {
-            spinDescription = lang === 'en' ? 'Side Spin' : lang === 'ko' ? '복합 당점' : 'Efecto Compuesto';
+            spinDescription = lang === 'en' ? 'Top-Left' : lang === 'ko' ? '좌상단' : 'Arriba-Izquierda';
         }
     }
 
