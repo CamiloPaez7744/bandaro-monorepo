@@ -18,6 +18,7 @@ import {
     STRICT_BALL_GUIDE_COLORS,
     getGuideStrokeDashArray,
     filterAimTrajectory,
+    simplifyTrajectoryPoints,
 } from '@bandaro/core';
 import { CushionRuler } from './CushionRuler';
 import { SystemNumberingOverlay, NumberAnchor, Formula } from './SystemNumberingOverlay';
@@ -716,11 +717,12 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
     ).current;
 
     const filteredAimGuide = useMemo(() => {
-        if (!showGuides || guideConfig.showAimGuide === false || !trajectory || trajectory.paths.length === 0) {
+        // Regla 6: En modo edición el taco y las guías no se mostrarán
+        if (isEditMode || !showGuides || guideConfig.showAimGuide === false || !trajectory || trajectory.paths.length === 0) {
             return null;
         }
         return filterAimTrajectory(trajectory, cueBallId, guideConfig.aimMode);
-    }, [showGuides, guideConfig.showAimGuide, guideConfig.aimMode, trajectory, cueBallId]);
+    }, [isEditMode, showGuides, guideConfig.showAimGuide, guideConfig.aimMode, trajectory, cueBallId]);
 
     const renderTrajectory = useMemo(() => {
         if (!filteredAimGuide || filteredAimGuide.paths.length === 0) return null;
@@ -791,20 +793,32 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
                             />
-                            {/* Puntos de impacto en banda calculados */}
+                            {/* Puntos de impacto exacto en banda (pegados a la goma de la banda) */}
                             {filteredPoints
                                 .filter((p) => p.type === 'cushion')
                                 .map((p, idx) => {
-                                    const svgPos = mapPointToSvg(p.pos, orientation, layout);
+                                    const contactPos = p.cushionPos ?? p.pos;
+                                    const svgPos = mapPointToSvg(contactPos, orientation, layout);
+                                    const r = isCueBall ? baseWeight * 1.6 : baseWeight * 1.1;
                                     return (
-                                        <Circle
-                                            key={`cushion-${path.ballId}-${idx}`}
-                                            cx={svgPos.x}
-                                            cy={svgPos.y}
-                                            r={isCueBall ? baseWeight * 1.5 : baseWeight * 1.0}
-                                            fill={strokeColor}
-                                            opacity={0.9}
-                                        />
+                                        <G key={`cushion-${path.ballId}-${idx}`}>
+                                            <Circle
+                                                cx={svgPos.x}
+                                                cy={svgPos.y}
+                                                r={r * 1.6}
+                                                fill={glowColor}
+                                                opacity={0.6}
+                                            />
+                                            <Circle
+                                                cx={svgPos.x}
+                                                cy={svgPos.y}
+                                                r={r}
+                                                fill={strokeColor}
+                                                stroke="#000000"
+                                                strokeWidth={0.3}
+                                                opacity={0.95}
+                                            />
+                                        </G>
                                     );
                                 })}
                         </G>
@@ -812,10 +826,10 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                 })}
 
                 {/* Bola fantasma en el primer impacto calculada por predictTrajectory con cero discrepancia */}
-                {!isSimulating && showGhostBall && filteredAimGuide.ghostBallPos && (() => {
+                {!isSimulating && !isEditMode && showGhostBall && filteredAimGuide.ghostBallPos && (() => {
                     const ghostSvg = mapPointToSvg(filteredAimGuide.ghostBallPos, orientation, layout);
                     const isVertical = orientation === 'vertical';
-                    const ghostRadius = isVertical ? 5.5 : 2.75;
+                    const ghostRadius = isVertical ? 6.15 : 3.075;
 
                     return (
                         <G key="unified-ghost-ball">
@@ -1244,8 +1258,8 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                     );
                 })}
 
-                {/* 10. Trazas dinámicas continuas (Execution Guide / Trail) con configuración compartida */}
-                {dynamicTrails && guideConfig.showExecutionTrail !== false && (
+                {/* 10. Trazas dinámicas continuas (Execution Guide / Trail) con configuración compartida (Regla 5 y Regla 6) */}
+                {dynamicTrails && !isEditMode && guideConfig.showExecutionTrail !== false && (
                     <G opacity={0.88}>
                         {(['white', 'yellow', 'red'] as BallId[]).map((ballId) => {
                             const trail = dynamicTrails[ballId];
@@ -1253,7 +1267,14 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                             const ballColors = STRICT_BALL_GUIDE_COLORS[ballId];
                             const strokeColor = ballColors.stroke;
                             const glowColor = ballColors.glow;
-                            const pointsStr = trail
+
+                            // Regla 5: Mostrar la trayectoria en línea recta (simplificando tramos colineales)
+                            const straightPoints = simplifyTrajectoryPoints(
+                                trail.map((p, idx) => ({ pos: p.pos, type: 'normal' as const, timestamp: p.timestamp ?? idx })),
+                                0.4
+                            );
+
+                            const pointsStr = straightPoints
                                 .map((p) => {
                                     const svgPos = mapPointToSvg(p.pos, orientation, layout);
                                     return `${svgPos.x.toFixed(1)},${svgPos.y.toFixed(1)}`;
@@ -1353,7 +1374,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                     const showDots = tablePreferences.showBallDots !== false;
                     const quat = ballRotationsRef.current[ball.id] ?? INITIAL_BALL_QUATERNION;
                     const isVertical = orientation === 'vertical';
-                    const ballRadiusSvg = isVertical ? 5.5 : 2.75;
+                    const ballRadiusSvg = isVertical ? 6.15 : 3.075;
 
                     return (
                         <G key={ball.id}>
@@ -1566,12 +1587,11 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                     );
                 })}
 
-                {/* 14. Taco de Billar interactivo sobre la mesa estilo 8 Ball Pool */}
-                {showCueStick && !isSimulating && (
+                {/* 14. Taco de Billar interactivo sobre la mesa estilo 8 Ball Pool (Regla 6: Oculto en modo edición) */}
+                {showCueStick && !isSimulating && !isEditMode && (
                     (() => {
                         const cueBall = balls.find((b) => b.id === cueBallId);
                         if (!cueBall) return null;
-                        if (isEditMode && draggingBallId === cueBallId) return null;
                         const mappedCue = mapPointToSvg(cueBall.pos, orientation, layout);
                         return (
                             <CaromCueGadget

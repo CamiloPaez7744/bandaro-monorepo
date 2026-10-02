@@ -58,10 +58,11 @@ import {
     getDefaultBreakAim,
     TrajectoryGuideConfig,
     DEFAULT_GUIDE_CONFIG,
+    clockToSpin,
 } from '@bandaro/core';
 import { ApiSnapshotRepository } from '@/src/infrastructure/repositories/ApiSnapshotRepository';
 import { fetchShotDetail } from '@/src/infrastructure/catalog/catalogApi';
-import { adaptCatalogShot, type CatalogShot, getLocalizedCategoryName } from '@/src/infrastructure/catalog/shotAdapter';
+import { adaptCatalogShot, type CatalogShot, getLocalizedCategoryName, getShotAimVector } from '@/src/infrastructure/catalog/shotAdapter';
 import { CATEGORY_COLORS } from '@/src/presentation/components/Catalog/ShotCatalogCard';
 import { TrajectoryGuideCustomizer } from '@/src/presentation/components/Training/TrajectoryGuideCustomizer';
 
@@ -98,7 +99,11 @@ export function TrainingSimulationScreen() {
         aimY?: string;
         spinX?: string;
         spinY?: string;
+        spinHour?: string;
+        spinTips?: string;
         powerLevel?: string;
+        power?: string;
+        railSpeed?: string;
         whiteX?: string;
         whiteY?: string;
         yellowX?: string;
@@ -420,27 +425,41 @@ export function TrainingSimulationScreen() {
             resetBalls(pos);
             setCueBall('white');
 
+            let initialAim = vec2(1, 0);
             if (params.aimX && params.aimY) {
                 const ax = Number(params.aimX);
                 const ay = Number(params.aimY);
                 if (!isNaN(ax) && !isNaN(ay) && (ax !== 0 || ay !== 0)) {
-                    setAimDirection(vec2Normalize(vec2(ax, ay)));
+                    initialAim = vec2Normalize(vec2(ax, ay));
                 }
             } else {
-                const aimVec = vec2Normalize(vec2Sub(pos.yellow, pos.white));
-                setAimDirection(aimVec);
+                initialAim = vec2Normalize(vec2Sub(pos.yellow, pos.white));
             }
+            setAimDirection(initialAim);
+            lastPlayedShotRef.current = { positions: pos, aimDirection: initialAim };
 
-            if (params.spinX !== undefined && params.spinY !== undefined) {
+            if (params.spinHour && params.spinTips) {
+                const hr = parseFloat(params.spinHour);
+                const tp = parseFloat(params.spinTips);
+                if (!isNaN(hr)) {
+                    setSpin(clockToSpin(hr, isNaN(tp) ? 2.5 : tp));
+                }
+            } else if (params.spinX !== undefined && params.spinY !== undefined) {
                 const sx = Number(params.spinX) || 0;
                 const sy = Number(params.spinY) || 0;
                 const mag = Math.min(1, Math.hypot(sx, sy));
                 setSpin({ x: sx, y: sy, magnitude: mag });
             }
 
-            if (params.powerLevel) {
-                const pl = Math.min(5, Math.max(1, Number(params.powerLevel) || 3));
-                setPowerLevel(pl);
+            const rawPower = params.powerLevel || params.power || (params.railSpeed ? Number(params.railSpeed) * 20 : undefined);
+            if (rawPower !== undefined) {
+                const pNum = Number(rawPower);
+                if (!isNaN(pNum) && pNum > 0) {
+                    const pct = pNum <= 5 ? pNum * 20 : pNum;
+                    const lvl = Math.min(5, Math.max(1, Math.round(pct / 20)));
+                    setPowerLevel(lvl);
+                    setPowerPercentage(pct);
+                }
             }
 
             setIsEditMode(false);
@@ -459,13 +478,10 @@ export function TrainingSimulationScreen() {
                     resetBalls(pos);
                     setCueBall('white');
 
-                    if (shot.cueBallTrajectory && shot.cueBallTrajectory.length >= 2) {
-                        const p0 = shot.cueBallTrajectory[0];
-                        const p1 = shot.cueBallTrajectory[1];
-                        setAimDirection(vec2Normalize(vec2Sub(vec2(p1.x, p1.y), vec2(p0.x, p0.y))));
-                    } else {
-                        setAimDirection(vec2Normalize(vec2Sub(vec2(shot.yellow.x, shot.yellow.y), vec2(shot.white.x, shot.white.y))));
-                    }
+                    const aimVec = getShotAimVector(shot);
+                    const normAim = vec2Normalize(vec2(aimVec.x, aimVec.y));
+                    setAimDirection(normAim);
+                    lastPlayedShotRef.current = { positions: pos, aimDirection: normAim };
 
                     if (shot.spinEffect) {
                         setSpin(shot.spinEffect);
@@ -476,7 +492,10 @@ export function TrainingSimulationScreen() {
                     } else {
                         setSpin({ x: 0, y: 0, magnitude: 0 });
                     }
-                    setPowerLevel(Math.min(5, Math.max(1, shot.powerLevel || shot.railSpeed || 3.5)));
+                    const speed = shot.railSpeed ?? 3.5;
+                    const pct = speed * 20;
+                    setPowerLevel(Math.min(5, Math.max(1, Math.round(speed))));
+                    setPowerPercentage(pct);
                     setIsEditMode(false);
                     setShowGuides(true);
                 })
@@ -511,6 +530,11 @@ export function TrainingSimulationScreen() {
         [setBallPosition]
     );
 
+    const lastPlayedShotRef = useRef<{
+        positions: { white: Vec2; yellow: Vec2; red: Vec2 };
+        aimDirection: Vec2;
+    } | null>(null);
+
     const handleAimChange = useCallback(
         (direction: Vec2) => {
             setAimDirection(direction);
@@ -518,24 +542,53 @@ export function TrainingSimulationScreen() {
         [setAimDirection]
     );
 
+    const handleExecuteShot = useCallback(
+        (customPower?: number) => {
+            // Guardar configuración exacta de las bolas y mira antes del tiro para que "Reiniciar" siempre reinicie este tiro (Regla 5)
+            const wB = state.balls.find((b) => b.id === 'white');
+            const yB = state.balls.find((b) => b.id === 'yellow');
+            const rB = state.balls.find((b) => b.id === 'red');
+            if (wB && yB && rB) {
+                lastPlayedShotRef.current = {
+                    positions: {
+                        white: { x: wB.pos.x, y: wB.pos.y },
+                        yellow: { x: yB.pos.x, y: yB.pos.y },
+                        red: { x: rB.pos.x, y: rB.pos.y },
+                    },
+                    aimDirection: { x: state.aimDirection.x, y: state.aimDirection.y },
+                };
+            }
+
+            // Regla 1: Resetear las guías a la configuración recta por defecto
+            setGuideConfig(DEFAULT_GUIDE_CONFIG);
+
+            executeShot(customPower);
+        },
+        [state.balls, state.aimDirection, executeShot]
+    );
+
     const handleReset = useCallback(() => {
-        if (!system && (!snapshotBalls || snapshotBalls.length === 0) && !params.whiteX && !params.shotId) {
-            const breakPos = getBreakPosition(tablePreferences.breakFormat, {
-                pbaFormation: tablePreferences.pbaFormation,
-                umbSide: tablePreferences.umbSide,
-            });
-            resetBalls(breakPos);
-            setAimDirection(getDefaultBreakAim(breakPos));
+        // Regla 5: Siempre que se dé reiniciar, se reiniciará el tiro recién jugado y no el por defecto 'Salida'
+        if (lastPlayedShotRef.current) {
+            resetBalls(lastPlayedShotRef.current.positions);
+            setAimDirection(lastPlayedShotRef.current.aimDirection);
             return;
         }
-        resetBalls(initialPositions);
+
+        if (initialPositions) {
+            resetBalls(initialPositions);
+            return;
+        }
+
+        const breakPos = getBreakPosition(tablePreferences.breakFormat, {
+            pbaFormation: tablePreferences.pbaFormation,
+            umbSide: tablePreferences.umbSide,
+        });
+        resetBalls(breakPos);
+        setAimDirection(getDefaultBreakAim(breakPos));
     }, [
         resetBalls,
         initialPositions,
-        system,
-        snapshotBalls,
-        params.whiteX,
-        params.shotId,
         tablePreferences.breakFormat,
         tablePreferences.pbaFormation,
         tablePreferences.umbSide,
@@ -709,7 +762,6 @@ export function TrainingSimulationScreen() {
                                     collisionPulses={state.collisionPulses}
                                     aimDirection={state.aimDirection}
                                     powerLevel={state.powerPercentage}
-                                    categoryColor={activeCategoryColor ?? undefined}
                                     guideConfig={guideConfig}
                                     tablePreferences={tablePreferences}
                                     showCueStick={true}
@@ -717,7 +769,7 @@ export function TrainingSimulationScreen() {
                                     onBallMove={handleBallMove}
                                     onAimChange={handleAimChange}
                                     onPowerChange={setPowerPercentage}
-                                    onShoot={(power) => executeShot(power)}
+                                    onShoot={(power) => handleExecuteShot(power)}
                                     isSimulating={state.isSimulating}
                                     isEditMode={isEditMode}
                                     showGuides={showGuides}
@@ -738,7 +790,6 @@ export function TrainingSimulationScreen() {
                                 spin={state.spin}
                                 onPress={() => setShowBallControlModal(true)}
                                 tablePreferences={tablePreferences}
-                                categoryColor={activeCategoryColor ?? undefined}
                                 disabled={state.isSimulating}
                                 compact={true}
                                 isDark={isDark}
@@ -749,9 +800,10 @@ export function TrainingSimulationScreen() {
                                 <CaromPowerMeter
                                     powerLevel={state.powerPercentage}
                                     onPowerChange={setPowerPercentage}
-                                    onShoot={(power) => executeShot(power)}
+                                    onShoot={(power) => handleExecuteShot(power)}
                                     disabled={state.isSimulating}
                                     compact={true}
+                                    isDark={isDark}
                                 />
                             </View>
 
@@ -761,7 +813,7 @@ export function TrainingSimulationScreen() {
                                     styles.fireButtonPanoramic,
                                     state.isSimulating && styles.fireButtonDisabled,
                                 ]}
-                                onPress={() => executeShot()}
+                                onPress={() => handleExecuteShot()}
                                 disabled={state.isSimulating}
                                 accessibilityLabel={t('training.sim.shoot')}>
                                 {state.isSimulating ? (
@@ -867,10 +919,9 @@ export function TrainingSimulationScreen() {
                                         cueBallId={state.cueBallId}
                                         trajectory={state.trajectory}
                                         dynamicTrails={state.dynamicTrails ?? undefined}
-                                        collisionPulses={state.collisionPulses}
+                                         collisionPulses={state.collisionPulses}
                                         aimDirection={state.aimDirection}
                                         powerLevel={state.powerPercentage}
-                                        categoryColor={activeCategoryColor ?? undefined}
                                         guideConfig={guideConfig}
                                         tablePreferences={tablePreferences}
                                         showCueStick={true}
@@ -878,7 +929,7 @@ export function TrainingSimulationScreen() {
                                         onBallMove={handleBallMove}
                                         onAimChange={handleAimChange}
                                         onPowerChange={setPowerPercentage}
-                                        onShoot={(power) => executeShot(power)}
+                                        onShoot={(power) => handleExecuteShot(power)}
                                         isSimulating={state.isSimulating}
                                         isEditMode={isEditMode}
                                         showGuides={showGuides}
@@ -898,7 +949,6 @@ export function TrainingSimulationScreen() {
                                         spin={state.spin}
                                         onPress={() => setShowBallControlModal(true)}
                                         tablePreferences={tablePreferences}
-                                        categoryColor={activeCategoryColor ?? undefined}
                                         disabled={state.isSimulating}
                                         compact={true}
                                         isDark={isDark}
@@ -909,9 +959,10 @@ export function TrainingSimulationScreen() {
                                         <CaromPowerMeter
                                             powerLevel={state.powerPercentage}
                                             onPowerChange={setPowerPercentage}
-                                            onShoot={(power) => executeShot(power)}
+                                            onShoot={(power) => handleExecuteShot(power)}
                                             disabled={state.isSimulating}
                                             compact={true}
+                                            isDark={isDark}
                                         />
                                     </View>
 
@@ -921,7 +972,7 @@ export function TrainingSimulationScreen() {
                                             styles.fireButtonPanoramic,
                                             state.isSimulating && styles.fireButtonDisabled,
                                         ]}
-                                        onPress={() => executeShot()}
+                                        onPress={() => handleExecuteShot()}
                                         disabled={state.isSimulating}
                                         accessibilityLabel={t('training.sim.shoot')}>
                                         {state.isSimulating ? (
@@ -982,7 +1033,6 @@ export function TrainingSimulationScreen() {
                     onAimChange={handleAimChange}
                     trajectory={state.trajectory}
                     tablePreferences={tablePreferences}
-                    categoryColor={activeCategoryColor ?? undefined}
                     onClose={() => setShowBallControlModal(false)}
                 />
 

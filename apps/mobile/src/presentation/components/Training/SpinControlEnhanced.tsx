@@ -75,7 +75,7 @@ function SpinControlEnhancedBase(props: Readonly<SpinControlEnhancedProps>) {
     }, [onSpinChange]);
 
     const indicatorX = ballRadius + spin.x * (ballRadius - indicatorRadius - 5);
-    const indicatorY = ballRadius + spin.y * (ballRadius - indicatorRadius - 5);
+    const indicatorY = ballRadius - spin.y * (ballRadius - indicatorRadius - 5);
 
     const getImpactLevel = (): { label: string; color: string; percentage: number } => {
         const percentage = spin.magnitude * 100;

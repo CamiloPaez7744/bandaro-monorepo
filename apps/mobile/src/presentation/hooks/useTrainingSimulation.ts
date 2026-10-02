@@ -22,6 +22,7 @@ import {
     isBallMoving,
     calculateShotVelocity,
 } from '@bandaro/core';
+import { billiardAudio } from '../audio/BilliardAudioManager';
 
 export interface CollisionPulse {
     id: string;
@@ -90,6 +91,8 @@ export function useTrainingSimulation(
             : (cb) => setTimeout(() => cb(0), 16) as any
     );
 
+    const trailResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
     const ballsRef = useRef(balls);
     ballsRef.current = balls;
     const cueBallIdRef = useRef(cueBallId);
@@ -105,6 +108,9 @@ export function useTrainingSimulation(
         return () => {
             if (simulationRef.current !== null) {
                 cancelAnimationFrame(simulationRef.current);
+            }
+            if (trailResetTimeoutRef.current) {
+                clearTimeout(trailResetTimeoutRef.current);
             }
         };
     }, []);
@@ -151,7 +157,6 @@ export function useTrainingSimulation(
         setValidation(null);
         setLiveCushionCount(0);
         setLiveBallHits({ first: false, second: false });
-        setSpinState({ x: 0, y: 0, magnitude: 0 });
     }, []);
 
     const dismissValidation = useCallback(() => {
@@ -197,8 +202,36 @@ export function useTrainingSimulation(
             ? customPowerPercentage
             : (currentPowerPct > 0 ? currentPowerPct : 50);
 
-        // Reiniciar el valor del taco y potencia a cero de inmediato para la siguiente jugada
+        if (trailResetTimeoutRef.current) {
+            clearTimeout(trailResetTimeoutRef.current);
+            trailResetTimeoutRef.current = null;
+        }
+
+        // Regla 3: Por defecto cada vez que se haga un tiro en el simulador se deben resetear el efecto, tome de bola y potencia a 0
         setPowerPercentage(0);
+        setSpinState({ x: 0, y: 0, magnitude: 0 });
+        spinRef.current = { x: 0, y: 0, magnitude: 0 };
+
+        // Resetear tome de bola a 0 (apuntamiento directo al centro de la bola objetivo sin desvío de corte)
+        const otherBalls = currentBallsList.filter((b) => b.id !== currentCueBallId);
+        const cueBallBefore = currentBallsList.find((b) => b.id === currentCueBallId);
+        if (cueBallBefore && otherBalls.length > 0) {
+            const nearestTarget = otherBalls.reduce((closest, b) => {
+                const d1 = Math.hypot(b.pos.x - cueBallBefore.pos.x, b.pos.y - cueBallBefore.pos.y);
+                const d2 = Math.hypot(closest.pos.x - cueBallBefore.pos.x, closest.pos.y - cueBallBefore.pos.y);
+                return d1 < d2 ? b : closest;
+            }, otherBalls[0]);
+            const dx = nearestTarget.pos.x - cueBallBefore.pos.x;
+            const dy = nearestTarget.pos.y - cueBallBefore.pos.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist > 0.1) {
+                const zeroTomeAim = vec2(dx / dist, dy / dist);
+                setAimDirectionState(zeroTomeAim);
+                aimDirectionRef.current = zeroTomeAim;
+            }
+        }
+
+        billiardAudio.playCueStrike(effectivePct);
 
         const velocity = calculateShotVelocity(effectivePct);
 
@@ -215,6 +248,7 @@ export function useTrainingSimulation(
                     ...ball,
                     vel: { x: normalizedDir.x * velocity, y: normalizedDir.y * velocity },
                     spin: vec2(currentSpin.x * currentSpin.magnitude, currentSpin.y * currentSpin.magnitude),
+                    spinHeading: normalizedDir,
                 };
             }
             return ball;
@@ -248,12 +282,19 @@ export function useTrainingSimulation(
                 setBalls(currentBalls);
                 const shotValidation = validateThreeCushionShot(allEvents, cueBallId);
                 setValidation(shotValidation);
+                if (shotValidation.isValid) {
+                    billiardAudio.playCaromSuccess();
+                }
                 setIsSimulating(false);
-                // Eliminar / reiniciar los trazos al detenerse las bolas
-                setDynamicTrails(null);
-                setCollisionPulses([]);
-                // Reiniciar el efecto a cero (mitad / centro de la bola)
-                setSpinState({ x: 0, y: 0, magnitude: 0 });
+                // Regla 4: Mantener el trazo y resetearlo exactamente 1 segundo después de que se detengan las bolas
+                if (trailResetTimeoutRef.current) {
+                    clearTimeout(trailResetTimeoutRef.current);
+                }
+                trailResetTimeoutRef.current = setTimeout(() => {
+                    setDynamicTrails(null);
+                    setCollisionPulses([]);
+                    trailResetTimeoutRef.current = null;
+                }, 1000);
                 return;
             }
 
@@ -266,9 +307,21 @@ export function useTrainingSimulation(
                 currentBalls = newBalls;
                 allEvents.push(...events);
 
-                // Capturar impactos de bolas y bandas para ondas de choque 3D inmediatas
+                // Capturar impactos de bolas y bandas para ondas de choque 3D inmediatas y audio acústico
                 for (const ev of events) {
                     if (ev.type === 'ball_collision' && ev.data && 'position' in ev.data) {
+                        const colData = ev.data as any;
+                        const b1 = currentBalls.find((b) => b.id === colData.ball1);
+                        const b2 = currentBalls.find((b) => b.id === colData.ball2);
+                        const relSpeed = b1 ? Math.hypot(b1.vel.x, b1.vel.y) : 10;
+                        let thickness = 0.6;
+                        if (b1 && b2) {
+                            const normal = vec2Normalize(vec2Sub(b2.pos, b1.pos));
+                            const velDir = vec2Normalize(b1.vel);
+                            thickness = Math.abs(normal.x * velDir.x + normal.y * velDir.y);
+                        }
+                        billiardAudio.playBallCollision(relSpeed, thickness);
+
                         framePulses.push({
                             id: `hit-${now}-${Math.random()}`,
                             pos: { ...ev.data.position },
@@ -276,6 +329,11 @@ export function useTrainingSimulation(
                             timestamp: now,
                         });
                     } else if (ev.type === 'cushion' && ev.data && 'position' in ev.data) {
+                        const cData = ev.data as any;
+                        const cBall = currentBalls.find((b) => b.id === cData.ballId);
+                        const bounceSpeed = cBall ? Math.hypot(cBall.vel.x, cBall.vel.y) : 8;
+                        billiardAudio.playCushionBounce(bounceSpeed);
+
                         framePulses.push({
                             id: `cushion-${now}-${Math.random()}`,
                             pos: { ...ev.data.position },
@@ -348,6 +406,10 @@ export function useTrainingSimulation(
     }, [balls, cueBallId, aimDirection, powerPercentage, spin, isSimulating, setPowerPercentage]);
 
     const resetBalls = useCallback((positions: { white: Vec2; yellow: Vec2; red: Vec2 }) => {
+        if (trailResetTimeoutRef.current) {
+            clearTimeout(trailResetTimeoutRef.current);
+            trailResetTimeoutRef.current = null;
+        }
         setBalls([
             createBall('white', positions.white.x, positions.white.y),
             createBall('yellow', positions.yellow.x, positions.yellow.y),
@@ -365,6 +427,10 @@ export function useTrainingSimulation(
         if (simulationRef.current) {
             cancelAnimationFrame(simulationRef.current);
             simulationRef.current = null;
+        }
+        if (trailResetTimeoutRef.current) {
+            clearTimeout(trailResetTimeoutRef.current);
+            trailResetTimeoutRef.current = null;
         }
         setIsSimulating(false);
         setDynamicTrails(null);

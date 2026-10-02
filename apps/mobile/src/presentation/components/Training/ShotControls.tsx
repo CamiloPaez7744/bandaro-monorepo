@@ -72,7 +72,7 @@ function SpinControlBase(props: Readonly<SpinControlProps>) {
     }, [onSpinChange]);
 
     const indicatorX = ballRadius + spin.x * (ballRadius - 15);
-    const indicatorY = ballRadius + spin.y * (ballRadius - 15);
+    const indicatorY = ballRadius - spin.y * (ballRadius - 15);
 
     const getSpinLabel = (): string => {
         if (spin.magnitude < 0.1) return language === 'en' ? 'Center' : 'Centro';

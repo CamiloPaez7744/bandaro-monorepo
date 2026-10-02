@@ -25,6 +25,7 @@ import {
     Ball,
     BallId,
     SpinEffect,
+    spinToClock,
     TrajectoryPrediction,
     Vec2,
     vec2,
@@ -219,6 +220,22 @@ export const CaromBallControlModal = memo(function CaromBallControlModal({
         return Math.min(4, Math.max(1, Math.round(spin.magnitude / 0.23)));
     }, [spin.magnitude]);
 
+    const clockInfo = useMemo(() => {
+        if (spin.magnitude < 0.05) return null;
+        const clock = spinToClock(spin);
+        const wholeH = Math.floor(clock.hour);
+        const frac = clock.hour - wholeH;
+        let mins = '00';
+        let displayH = wholeH;
+        if (frac >= 0.25 && frac <= 0.75) {
+            mins = '30';
+        } else if (frac > 0.75) {
+            displayH = wholeH + 1;
+        }
+        if (displayH === 0) displayH = 12;
+        return `${displayH}:${mins} • ${clock.tips.toFixed(1)}T`;
+    }, [spin]);
+
     return (
         <Modal
             visible={visible}
@@ -229,7 +246,10 @@ export const CaromBallControlModal = memo(function CaromBallControlModal({
                 <View style={[
                     styles.modalCard,
                     isLandscape ? styles.modalCardLandscape : styles.modalCardPortrait,
-                    { borderColor: `${activeColor}55` },
+                    {
+                        backgroundColor: isDark ? '#0a0f1d' : palette.card,
+                        borderColor: isDark ? `${activeColor}55` : palette.border,
+                    },
                 ]}>
                     {/* HEADER */}
                     <View style={styles.headerRow}>
@@ -244,7 +264,10 @@ export const CaromBallControlModal = memo(function CaromBallControlModal({
 
                         {/* SELECTOR DE BOLA BLANCA / AMARILLA */}
                         {onCueBallChange && (
-                            <View style={styles.cueBallSelectorPill}>
+                            <View style={[
+                                styles.cueBallSelectorPill,
+                                !isDark && { backgroundColor: '#f1f5f9', borderColor: palette.border },
+                            ]}>
                                 <TouchableOpacity
                                     style={[
                                         styles.ballOptionBtn,
@@ -285,14 +308,18 @@ export const CaromBallControlModal = memo(function CaromBallControlModal({
                         showsVerticalScrollIndicator={false}>
 
                         {/* 1. SECCIÓN DE EFECTO (SPIN) */}
-                        <View style={[styles.panelCard, isLandscape && styles.panelCardSide]}>
+                        <View style={[
+                            styles.panelCard,
+                            isLandscape && styles.panelCardSide,
+                            !isDark && { backgroundColor: '#f8fafc', borderColor: palette.border },
+                        ]}>
                             <View style={styles.panelHeader}>
                                 <Text style={[styles.panelTitle, { color: activeColor }]}>
                                     {language === 'en' ? '1. SPIN (EFFECT)' : '1. EFECTO (SPIN)'}
                                 </Text>
                                 <View style={[styles.levelBadge, { backgroundColor: `${activeColor}22`, borderColor: `${activeColor}55` }]}>
                                     <Text style={[styles.levelBadgeText, { color: activeColor }]}>
-                                        {effectLevel === 0 ? (language === 'en' ? 'E0 Center' : 'E0 Centro') : `E${effectLevel}`}
+                                        {clockInfo ?? (effectLevel === 0 ? (language === 'en' ? 'E0 Center' : 'E0 Centro') : `E${effectLevel}`)}
                                     </Text>
                                 </View>
                             </View>
@@ -394,7 +421,11 @@ export const CaromBallControlModal = memo(function CaromBallControlModal({
                         </View>
 
                         {/* 2. SECCIÓN DE TOME DE BOLA (ECLIPSE) */}
-                        <View style={[styles.panelCard, isLandscape && styles.panelCardSide]}>
+                        <View style={[
+                            styles.panelCard,
+                            isLandscape && styles.panelCardSide,
+                            !isDark && { backgroundColor: '#f8fafc', borderColor: palette.border },
+                        ]}>
                             <View style={styles.panelHeader}>
                                 <Text style={[styles.panelTitle, { color: activeColor }]}>
                                     {language === 'en' ? '2. FULLNESS (TOME)' : '2. TOME DE BOLA'}

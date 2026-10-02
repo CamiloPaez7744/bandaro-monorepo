@@ -345,7 +345,7 @@ export const SimulatorSettingsModal = memo(function SimulatorSettingsModal({
                                         </Text>
                                         <Text style={styles.actionSubtext}>
                                             {guideConfig
-                                                ? `${guideConfig.strokeStyle.toUpperCase()} • ${guideConfig.strokeWeight}px • ${guideConfig.aimMode === 'full' ? 'Full' : 'Exit Only'}`
+                                                ? `${guideConfig.strokeStyle.toUpperCase()} • ${guideConfig.strokeWeight}px • ${guideConfig.aimMode === 'straight' ? (isEn ? 'Straight' : 'Recta') : guideConfig.aimMode === 'full' ? (isEn ? 'Full' : 'Completa') : (isEn ? 'Exit' : 'Salida')}`
                                                 : (isEn ? 'Photoshop stroke style, thickness & mode' : 'Grosor, trazo punteado/sólido y modo salida')}
                                         </Text>
                                     </View>

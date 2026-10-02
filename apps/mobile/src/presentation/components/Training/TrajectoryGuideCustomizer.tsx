@@ -6,6 +6,7 @@ import {
     TouchableOpacity,
     Modal,
     ScrollView,
+    useWindowDimensions,
 } from 'react-native';
 import {
     IconX,
@@ -16,6 +17,7 @@ import {
     IconSparkles,
 } from '@/src/presentation/components/icons';
 import { useColorScheme } from '@/components/useColorScheme';
+import { useI18n } from '@/components/useLanguage';
 import { getPalette } from '@/constants/theme';
 import {
     TrajectoryGuideConfig,
@@ -32,16 +34,16 @@ interface TrajectoryGuideCustomizerProps {
     onChangeConfig: (newConfig: TrajectoryGuideConfig) => void;
 }
 
-const STROKE_STYLE_OPTIONS: { id: GuideStrokeStyle; label: string; preview: string }[] = [
-    { id: 'solid', label: 'Solid', preview: '━━━━━━' },
-    { id: 'dashed', label: 'Dashed', preview: '━  ━  ━' },
-    { id: 'dotted', label: 'Dotted', preview: '•  •  •  •' },
+const STROKE_STYLE_OPTIONS: { id: GuideStrokeStyle; labelEn: string; labelEs: string; preview: string }[] = [
+    { id: 'solid', labelEn: 'Solid', labelEs: 'Sólido', preview: '━━━━━━' },
+    { id: 'dashed', labelEn: 'Dashed', labelEs: 'Discontinuo', preview: '━  ━  ━' },
+    { id: 'dotted', labelEn: 'Dotted', labelEs: 'Punteado', preview: '•  •  •  •' },
 ];
 
-const WEIGHT_PRESETS: { label: string; weight: number }[] = [
-    { label: 'Fine (0.6)', weight: 0.6 },
-    { label: 'Medium (1.0)', weight: 1.0 },
-    { label: 'Bold (1.8)', weight: 1.8 },
+const WEIGHT_PRESETS: { labelEn: string; labelEs: string; weight: number }[] = [
+    { labelEn: 'Fine (0.6)', labelEs: 'Fino (0.6)', weight: 0.6 },
+    { labelEn: 'Medium (1.0)', labelEs: 'Medio (1.0)', weight: 1.0 },
+    { labelEn: 'Bold (1.8)', labelEs: 'Grueso (1.8)', weight: 1.8 },
 ];
 
 export const TrajectoryGuideCustomizer = memo(function TrajectoryGuideCustomizer({
@@ -50,9 +52,13 @@ export const TrajectoryGuideCustomizer = memo(function TrajectoryGuideCustomizer
     config,
     onChangeConfig,
 }: TrajectoryGuideCustomizerProps) {
+    const { width, height } = useWindowDimensions();
+    const isLandscape = width > height;
     const colorScheme = useColorScheme();
     const isDark = colorScheme !== 'light';
     const palette = getPalette(colorScheme);
+    const { language } = useI18n();
+    const isEn = language === 'en';
 
     const updateField = useCallback(
         <K extends keyof TrajectoryGuideConfig>(field: K, value: TrajectoryGuideConfig[K]) => {
@@ -83,26 +89,33 @@ export const TrajectoryGuideCustomizer = memo(function TrajectoryGuideCustomizer
             animationType="fade"
             onRequestClose={onClose}>
             <View style={styles.backdrop}>
-                <View style={[styles.modalCard, { backgroundColor: isDark ? 'rgba(15, 23, 42, 0.96)' : palette.card }]}>
+                <View style={[
+                    styles.modalCard,
+                    {
+                        backgroundColor: isDark ? 'rgba(15, 23, 42, 0.96)' : palette.card,
+                        borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : palette.border,
+                        maxHeight: isLandscape ? '94%' : '88%',
+                    },
+                ]}>
                     {/* Header */}
-                    <View style={styles.header}>
+                    <View style={[styles.header, !isDark && { borderBottomColor: palette.border }]}>
                         <View style={styles.headerTitleWrap}>
                             <IconSparkles size={20} color="#00d2ff" strokeWidth={2.2} />
                             <Text style={[styles.headerTitle, { color: isDark ? '#f8fafc' : palette.text }]}>
-                                Trajectory Guide Engine
+                                {isEn ? 'Trajectory Guide Engine' : 'Motor de Guías de Trayectoria'}
                             </Text>
                         </View>
                         <View style={styles.headerActions}>
                             <TouchableOpacity
-                                style={styles.iconBtn}
+                                style={[styles.iconBtn, !isDark && { backgroundColor: 'rgba(0, 0, 0, 0.05)' }]}
                                 onPress={handleReset}
-                                accessibilityLabel="Reset to defaults">
+                                accessibilityLabel={isEn ? 'Reset to defaults' : 'Restablecer valores por defecto'}>
                                 <IconRefresh size={16} color={isDark ? '#94a3b8' : palette.muted} strokeWidth={2} />
                             </TouchableOpacity>
                             <TouchableOpacity
-                                style={styles.iconBtn}
+                                style={[styles.iconBtn, !isDark && { backgroundColor: 'rgba(0, 0, 0, 0.05)' }]}
                                 onPress={onClose}
-                                accessibilityLabel="Close customizer">
+                                accessibilityLabel={isEn ? 'Close customizer' : 'Cerrar personalizador'}>
                                 <IconX size={18} color={isDark ? '#f8fafc' : palette.text} strokeWidth={2.4} />
                             </TouchableOpacity>
                         </View>
@@ -110,11 +123,13 @@ export const TrajectoryGuideCustomizer = memo(function TrajectoryGuideCustomizer
 
                     <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                         {/* SECCIÓN 1: GUÍA DE PUNTERÍA (AIMING GUIDE / PREDICTION) */}
-                        <View style={styles.sectionCard}>
+                        <View style={[styles.sectionCard, !isDark && { backgroundColor: '#f8fafc', borderColor: palette.border }]}>
                             <View style={styles.sectionHeaderRow}>
                                 <View style={styles.sectionHeaderLabelWrap}>
                                     <IconTarget size={16} color="#38bdf8" strokeWidth={2.2} />
-                                    <Text style={styles.sectionTitle}>Aiming Guide (Prediction)</Text>
+                                    <Text style={[styles.sectionTitle, { color: isDark ? '#f8fafc' : palette.text }]}>
+                                        {isEn ? 'Aiming Guide (Prediction)' : 'Guía de Apuntado (Predicción)'}
+                                    </Text>
                                 </View>
                                 <TouchableOpacity
                                     style={[
@@ -125,63 +140,95 @@ export const TrajectoryGuideCustomizer = memo(function TrajectoryGuideCustomizer
                                     {config.showAimGuide ? (
                                         <>
                                             <IconEye size={13} color="#ffffff" strokeWidth={2.2} />
-                                            <Text style={styles.togglePillTextActive}>Visible</Text>
+                                            <Text style={styles.togglePillTextActive}>{isEn ? 'Visible' : 'Visible'}</Text>
                                         </>
                                     ) : (
                                         <>
-                                            <IconEye size={13} color="#94a3b8" strokeWidth={2.2} />
-                                            <Text style={styles.togglePillTextInactive}>Hidden</Text>
+                                            <IconEye size={13} color={isDark ? '#94a3b8' : palette.muted} strokeWidth={2.2} />
+                                            <Text style={[styles.togglePillTextInactive, !isDark && { color: palette.muted }]}>{isEn ? 'Hidden' : 'Oculto'}</Text>
                                         </>
                                     )}
                                 </TouchableOpacity>
                             </View>
 
-                            <Text style={styles.sectionSubtitle}>
-                                Pre-shot trajectory calculated with zero discrepancy from physics engine.
+                            <Text style={[styles.sectionSubtitle, { color: isDark ? '#94a3b8' : palette.muted }]}>
+                                {isEn
+                                    ? 'Pre-shot trajectory calculated with zero discrepancy from physics engine.'
+                                    : 'Trayectoria previa al tiro calculada con cero discrepancia del motor físico.'}
                             </Text>
 
-                            {/* Visibility Mode Selector: Full vs Exit Only */}
+                            {/* Visibility Mode Selector: Straight vs Exit Only vs Full */}
                             <View style={styles.modeSelectorWrap}>
                                 <TouchableOpacity
                                     style={[
                                         styles.modeOptionBtn,
-                                        config.aimMode === 'full' && styles.modeOptionBtnActive,
+                                        !isDark && { backgroundColor: '#f1f5f9', borderColor: palette.border },
+                                        config.aimMode === 'straight' && styles.modeOptionBtnActive,
                                     ]}
-                                    onPress={() => updateField('aimMode', 'full')}>
+                                    onPress={() => updateField('aimMode', 'straight')}>
                                     <Text
                                         style={[
                                             styles.modeOptionText,
-                                            config.aimMode === 'full' && styles.modeOptionTextActive,
+                                            !isDark && { color: palette.text },
+                                            config.aimMode === 'straight' && styles.modeOptionTextActive,
                                         ]}>
-                                        Show Full Trajectory
+                                        {isEn ? 'Straight Angle (Default)' : 'Línea Recta (Por defecto)'}
                                     </Text>
-                                    <Text style={styles.modeOptionHint}>Complete multi-rail carom path</Text>
+                                    <Text style={[styles.modeOptionHint, !isDark && { color: palette.muted }]}>
+                                        {isEn ? 'Short departure vector with ghost ball and exit stubs' : 'Vector corto con bola fantasma y desvíos de salida'}
+                                    </Text>
                                 </TouchableOpacity>
 
                                 <TouchableOpacity
                                     style={[
                                         styles.modeOptionBtn,
+                                        !isDark && { backgroundColor: '#f1f5f9', borderColor: palette.border },
                                         config.aimMode === 'exit_only' && styles.modeOptionBtnActive,
                                     ]}
                                     onPress={() => updateField('aimMode', 'exit_only')}>
                                     <Text
                                         style={[
                                             styles.modeOptionText,
+                                            !isDark && { color: palette.text },
                                             config.aimMode === 'exit_only' && styles.modeOptionTextActive,
                                         ]}>
-                                        Exit Trajectory Only
+                                        {isEn ? 'Exit Trajectory' : 'Solo Salida'}
                                     </Text>
-                                    <Text style={styles.modeOptionHint}>Cue ball path after first impact</Text>
+                                    <Text style={[styles.modeOptionHint, !isDark && { color: palette.muted }]}>
+                                        {isEn ? 'Path after first impact' : 'Trayectoria tras primer impacto'}
+                                    </Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={[
+                                        styles.modeOptionBtn,
+                                        !isDark && { backgroundColor: '#f1f5f9', borderColor: palette.border },
+                                        config.aimMode === 'full' && styles.modeOptionBtnActive,
+                                    ]}
+                                    onPress={() => updateField('aimMode', 'full')}>
+                                    <Text
+                                        style={[
+                                            styles.modeOptionText,
+                                            !isDark && { color: palette.text },
+                                            config.aimMode === 'full' && styles.modeOptionTextActive,
+                                        ]}>
+                                        {isEn ? 'Full Path' : 'Completa'}
+                                    </Text>
+                                    <Text style={[styles.modeOptionHint, !isDark && { color: palette.muted }]}>
+                                        {isEn ? 'Multi-rail prediction' : 'Predicción multi-bandas'}
+                                    </Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
 
                         {/* SECCIÓN 2: GUÍA DE EJECUCIÓN (EXECUTION GUIDE / TRAIL) */}
-                        <View style={styles.sectionCard}>
+                        <View style={[styles.sectionCard, !isDark && { backgroundColor: '#f8fafc', borderColor: palette.border }]}>
                             <View style={styles.sectionHeaderRow}>
                                 <View style={styles.sectionHeaderLabelWrap}>
                                     <IconRoute size={16} color="#facc15" strokeWidth={2.2} />
-                                    <Text style={styles.sectionTitle}>Execution Guide (Trail)</Text>
+                                    <Text style={[styles.sectionTitle, { color: isDark ? '#f8fafc' : palette.text }]}>
+                                        {isEn ? 'Execution Guide (Trail)' : 'Guía de Ejecución (Estela)'}
+                                    </Text>
                                 </View>
                                 <TouchableOpacity
                                     style={[
@@ -192,48 +239,62 @@ export const TrajectoryGuideCustomizer = memo(function TrajectoryGuideCustomizer
                                     {config.showExecutionTrail ? (
                                         <>
                                             <IconEye size={13} color="#ffffff" strokeWidth={2.2} />
-                                            <Text style={styles.togglePillTextActive}>Visible</Text>
+                                            <Text style={styles.togglePillTextActive}>{isEn ? 'Visible' : 'Visible'}</Text>
                                         </>
                                     ) : (
                                         <>
-                                            <IconEye size={13} color="#94a3b8" strokeWidth={2.2} />
-                                            <Text style={styles.togglePillTextInactive}>Hidden</Text>
+                                            <IconEye size={13} color={isDark ? '#94a3b8' : palette.muted} strokeWidth={2.2} />
+                                            <Text style={[styles.togglePillTextInactive, !isDark && { color: palette.muted }]}>{isEn ? 'Hidden' : 'Oculto'}</Text>
                                         </>
                                     )}
                                 </TouchableOpacity>
                             </View>
-                            <Text style={styles.sectionSubtitle}>
-                                Actual path traveled by the balls during and after the shot execution.
+                            <Text style={[styles.sectionSubtitle, { color: isDark ? '#94a3b8' : palette.muted }]}>
+                                {isEn
+                                    ? 'Actual path traveled by the balls during and after the shot execution.'
+                                    : 'Recorrido real realizado por las bolas durante y después del tiro.'}
                             </Text>
                         </View>
 
                         {/* SECCIÓN 3: PROPIEDADES DE TRAZO (PHOTOSHOP STYLE) */}
-                        <View style={styles.sectionCard}>
-                            <Text style={styles.sectionTitle}>Stroke Style (Estilo de Trazo)</Text>
+                        <View style={[styles.sectionCard, !isDark && { backgroundColor: '#f8fafc', borderColor: palette.border }]}>
+                            <Text style={[styles.sectionTitle, { color: isDark ? '#f8fafc' : palette.text }]}>
+                                {isEn ? 'Stroke Style' : 'Estilo de Trazo'}
+                            </Text>
                             <View style={styles.strokeStyleRow}>
                                 {STROKE_STYLE_OPTIONS.map((styleOpt) => {
                                     const isSelected = config.strokeStyle === styleOpt.id;
                                     return (
                                         <TouchableOpacity
                                             key={styleOpt.id}
-                                            style={[styles.styleBtn, isSelected && styles.styleBtnActive]}
+                                            style={[
+                                                styles.styleBtn,
+                                                !isDark && { backgroundColor: '#f1f5f9', borderColor: palette.border },
+                                                isSelected && styles.styleBtnActive,
+                                            ]}
                                             onPress={() => updateField('strokeStyle', styleOpt.id)}>
                                             <Text style={[styles.stylePreview, isSelected && styles.stylePreviewActive]}>
                                                 {styleOpt.preview}
                                             </Text>
-                                            <Text style={[styles.styleBtnLabel, isSelected && styles.styleBtnLabelActive]}>
-                                                {styleOpt.label}
+                                            <Text style={[
+                                                styles.styleBtnLabel,
+                                                !isDark && { color: palette.text },
+                                                isSelected && styles.styleBtnLabelActive,
+                                            ]}>
+                                                {isEn ? styleOpt.labelEn : styleOpt.labelEs}
                                             </Text>
                                         </TouchableOpacity>
                                     );
                                 })}
                             </View>
 
-                            <View style={styles.divider} />
+                            <View style={[styles.divider, !isDark && { backgroundColor: palette.border }]} />
 
                             {/* Grosor de Línea (Thickness) */}
                             <View style={styles.weightHeaderRow}>
-                                <Text style={styles.sectionTitle}>Thickness (Stroke Weight)</Text>
+                                <Text style={[styles.sectionTitle, { color: isDark ? '#f8fafc' : palette.text }]}>
+                                    {isEn ? 'Thickness (Stroke Weight)' : 'Grosor de Línea'}
+                                </Text>
                                 <View style={styles.weightValueBadge}>
                                     <Text style={styles.weightValueText}>{config.strokeWeight.toFixed(1)} px</Text>
                                 </View>
@@ -245,11 +306,19 @@ export const TrajectoryGuideCustomizer = memo(function TrajectoryGuideCustomizer
                                     const isSelected = Math.abs(config.strokeWeight - preset.weight) < 0.05;
                                     return (
                                         <TouchableOpacity
-                                            key={preset.label}
-                                            style={[styles.presetBtn, isSelected && styles.presetBtnActive]}
+                                            key={preset.labelEn}
+                                            style={[
+                                                styles.presetBtn,
+                                                !isDark && { backgroundColor: '#f1f5f9', borderColor: palette.border },
+                                                isSelected && styles.presetBtnActive,
+                                            ]}
                                             onPress={() => updateField('strokeWeight', preset.weight)}>
-                                            <Text style={[styles.presetBtnText, isSelected && styles.presetBtnTextActive]}>
-                                                {preset.label}
+                                            <Text style={[
+                                                styles.presetBtnText,
+                                                !isDark && { color: palette.text },
+                                                isSelected && styles.presetBtnTextActive,
+                                            ]}>
+                                                {isEn ? preset.labelEn : preset.labelEs}
                                             </Text>
                                         </TouchableOpacity>
                                     );
@@ -259,9 +328,9 @@ export const TrajectoryGuideCustomizer = memo(function TrajectoryGuideCustomizer
                             {/* Stepper de Precisión */}
                             <View style={styles.stepperRow}>
                                 <TouchableOpacity
-                                    style={styles.stepBtn}
+                                    style={[styles.stepBtn, !isDark && { backgroundColor: '#e2e8f0' }]}
                                     onPress={() => handleAdjustWeight(-0.1)}>
-                                    <Text style={styles.stepBtnText}>- 0.1</Text>
+                                    <Text style={[styles.stepBtnText, !isDark && { color: palette.text }]}>- 0.1</Text>
                                 </TouchableOpacity>
                                 <View style={styles.strokePreviewSample}>
                                     <View
@@ -275,36 +344,48 @@ export const TrajectoryGuideCustomizer = memo(function TrajectoryGuideCustomizer
                                     />
                                 </View>
                                 <TouchableOpacity
-                                    style={styles.stepBtn}
+                                    style={[styles.stepBtn, !isDark && { backgroundColor: '#e2e8f0' }]}
                                     onPress={() => handleAdjustWeight(0.1)}>
-                                    <Text style={styles.stepBtnText}>+ 0.1</Text>
+                                    <Text style={[styles.stepBtnText, !isDark && { color: palette.text }]}>+ 0.1</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
 
                         {/* SECCIÓN 4: ESTRICTEZ DE COLORES (COLOR STRICTNESS) */}
-                        <View style={styles.sectionCard}>
-                            <Text style={styles.sectionTitle}>Color Strictness (Reglamento)</Text>
-                            <Text style={styles.sectionSubtitle}>
-                                Simulator trajectory lines strictly match the official 3-cushion ball colors:
+                        <View style={[styles.sectionCard, !isDark && { backgroundColor: '#f8fafc', borderColor: palette.border }]}>
+                            <Text style={[styles.sectionTitle, { color: isDark ? '#f8fafc' : palette.text }]}>
+                                {isEn ? 'Color Strictness (Regulations)' : 'Reglamento de Colores'}
+                            </Text>
+                            <Text style={[styles.sectionSubtitle, { color: isDark ? '#94a3b8' : palette.muted }]}>
+                                {isEn
+                                    ? 'Simulator trajectory lines strictly match the official 3-cushion ball colors:'
+                                    : 'Las líneas de trayectoria coinciden estrictamente con los colores oficiales de las bolas:'}
                             </Text>
 
                             <View style={styles.colorsStrictRow}>
-                                <View style={styles.colorPill}>
+                                <View style={[styles.colorPill, !isDark && { backgroundColor: '#f1f5f9' }]}>
                                     <View style={[styles.colorDot, { backgroundColor: STRICT_BALL_GUIDE_COLORS.white.stroke }]} />
-                                    <Text style={styles.colorPillText}>White (Blanca)</Text>
+                                    <Text style={[styles.colorPillText, !isDark && { color: palette.text }]}>
+                                        {isEn ? 'White' : 'Blanca'}
+                                    </Text>
                                 </View>
-                                <View style={styles.colorPill}>
+                                <View style={[styles.colorPill, !isDark && { backgroundColor: '#f1f5f9' }]}>
                                     <View style={[styles.colorDot, { backgroundColor: STRICT_BALL_GUIDE_COLORS.yellow.stroke }]} />
-                                    <Text style={styles.colorPillText}>Yellow (Amarilla)</Text>
+                                    <Text style={[styles.colorPillText, !isDark && { color: palette.text }]}>
+                                        {isEn ? 'Yellow' : 'Amarilla'}
+                                    </Text>
                                 </View>
-                                <View style={styles.colorPill}>
+                                <View style={[styles.colorPill, !isDark && { backgroundColor: '#f1f5f9' }]}>
                                     <View style={[styles.colorDot, { backgroundColor: STRICT_BALL_GUIDE_COLORS.red.stroke }]} />
-                                    <Text style={styles.colorPillText}>Red (Roja)</Text>
+                                    <Text style={[styles.colorPillText, !isDark && { color: palette.text }]}>
+                                        {isEn ? 'Red' : 'Roja'}
+                                    </Text>
                                 </View>
                             </View>
-                            <Text style={styles.strictNote}>
-                                Catalog custom colors are suppressed to guarantee maximum visual clarity and tactical precision.
+                            <Text style={[styles.strictNote, !isDark && { color: palette.muted }]}>
+                                {isEn
+                                    ? 'Catalog custom colors are suppressed to guarantee maximum visual clarity and tactical precision.'
+                                    : 'Los colores del catálogo se suprimen para garantizar máxima claridad visual y precisión reglamentaria.'}
                             </Text>
                         </View>
                     </ScrollView>
