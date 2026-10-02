@@ -3,6 +3,7 @@ import IconSparkles from '@tabler/icons-react-native/IconSparkles';
 import IconTarget from '@tabler/icons-react-native/IconTarget';
 import IconArrowRight from '@tabler/icons-react-native/IconArrowRight';
 import IconArrowLeft from '@tabler/icons-react-native/IconArrowLeft';
+import IconArrowUp from '@tabler/icons-react-native/IconArrowUp';
 import IconFlame from '@tabler/icons-react-native/IconFlame';
 import IconPlus from '@tabler/icons-react-native/IconPlus';
 import IconX from '@tabler/icons-react-native/IconX';
@@ -72,6 +73,7 @@ export {
     IconTarget,
     IconArrowRight,
     IconArrowLeft,
+    IconArrowUp,
     IconFlame,
     IconPlus,
     IconX,
