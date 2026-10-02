@@ -36,3 +36,15 @@
   - Aiming Guide (Prediction): Pre-shot path calculated from `predictTrajectory`.
   - Execution Guide (Trail): Dynamic trail during and after stroke from `simulateStep`.
   - Mathematical Unity: Both guides consume identical physics constants and step integration.
+
+## 5. Mandatory System Rules (Reglas Inviolables)
+1. **Bilingüe (EN/ES)**: Todo nuevo desarrollo o texto debe adaptarse en inglés y español con `useI18n()`.
+2. **Modo Claro y Oscuro**: Colores y componentes deben ajustarse a la paleta oficial para ambos modos.
+3. **Reseteo tras Tiro**: Cada tiro en el simulador resetea de inmediato efecto, tome de bola y potencia a 0.
+4. **Guías Rectas por Defecto**: La configuración inicial de las guías es siempre línea recta (`straight` / `solid`).
+5. **Trayectorias Post-Tiro y Borrado en 1s**: Muestra el trazo recorrido de cada bola con su color propio en línea recta, eliminándose 1s después de que las bolas se detengan.
+6. **Modo Edición Limpio**: Taco de billar y guías se ocultan por completo en modo edición (`isEditMode === true`).
+7. **Color Propio del Simulador**: El simulador mantiene sus colores propios por defecto sin absorber colores de categorías del catálogo en sus bordes o paño.
+8. **Apuntado Corto por Defecto**: Modelo de apuntado corto (estilo 8-Ball): línea recta a bola fantasma, círculo de impacto, y desvíos cortos rectos para ambas bolas (~18 cm).
+9. **Modales Responsive**: Todos los modales deben adaptarse al tamaño de pantalla donde se visualizan, con scroll interno y compatibilidad de tema.
+10. **Commits Prohibidos sin Aprobación**: NUNCA hacer commits en Git sin pruebas previas y sin petición explícita del usuario.

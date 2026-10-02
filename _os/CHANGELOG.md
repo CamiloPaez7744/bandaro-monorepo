@@ -23,4 +23,10 @@
 ### Fixed
 - **Diverging Trajectory Guides**: Completely removed legacy `compute8BallAimGuide` raycaster from `InteractiveBilliardsTable.tsx`. Reconciled Aiming Guide and Execution Trail to calculate against the exact same `@bandaro/core` physics engine instance, eliminating path divergence.
 - **Guide Color Inconsistency**: Eliminated catalog category color tints on trajectory paths, strictly locking paths to cue ball (White), object ball 1 (Yellow), and object ball 2 (Red).
+- **Edit Mode Guide & Cue Stick Visibility (Rule 6)**: Fixed `InteractiveBilliardsTable.tsx` to unconditionally hide the cue stick, ghost ball, and aiming guides when `isEditMode === true`.
+- **Default Short Aiming Model (Rule 4 & Rule 8)**: Updated `filterAimTrajectory` to implement the classic short aiming model with straight approach line, ghost ball circle, and short straight exit stubs for both cue ball deflection and target ball.
+- **Shot Reset to 0 (Rule 3)**: Fixed `useTrainingSimulation.ts` to reset power, spin, and tome de bola (aim direction aligned to center-to-center direct aim) to 0 immediately upon shot execution.
+- **Straight Execution Trails (Rule 5)**: Enforced straight-line simplification on post-shot dynamic trails (`simplifyTrajectoryPoints`), keeping trails strictly in ball colors and disappearing 1 second after balls stop.
+- **i18n & Theme Parity in Modals (Rule 1, 2 & 9)**: Added complete Spanish and English translations to `TrajectoryGuideCustomizer.tsx` and adapted `CaromBallControlModal.tsx` and customizers to light and dark theme palettes.
+- **Mandatory Project Rules Enforcement (Rule 10)**: Created `.agents/rules/mandatory-project-rules.md`, `GEMINI.md`, `AGENTS.md`, and updated `_os/` state files with the 10 non-negotiable development rules, including strict prohibition of unapproved Git commits.
 
