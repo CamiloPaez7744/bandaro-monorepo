@@ -6,12 +6,16 @@ export interface Vec2 {
     y: number;
 }
 
+export type StrokeType = 'normal' | 'extended' | 'dry' | 'dead_ball' | 'follow' | 'semi_follow';
+
 export interface Ball {
     id: BallId;
     pos: Vec2;
     vel: Vec2;
     spin: Vec2; // x: lateral (sidespin / horario / antihorario), y: longitudinal (corrido > 0 / retroceso < 0)
     radius: number;
+    spinHeading?: Vec2;
+    strokeType?: StrokeType;
 }
 
 export interface SpinEffect {
@@ -40,6 +44,7 @@ export interface BallCollision {
     ball1: BallId;
     ball2: BallId;
     position: Vec2;
+    ghostBallPos?: Vec2;
     timestamp: number;
 }
 
@@ -95,9 +100,9 @@ export const PHYSICS = {
     cushionRestitution: 0.74,
     cushionFriction: 0.22,
     ballRestitution: 0.95,
-    spinDecay: 0.970,
+    spinDecay: 0.994,
     spinInfluence: 0.25,
-    englishBounceFactor: 1.25,
+    englishBounceFactor: 1.18,
 };
 
 export const VELOCITY_CALIBRATION_POINTS = [

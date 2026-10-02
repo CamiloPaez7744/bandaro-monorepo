@@ -74,6 +74,35 @@ describe('Trajectory Guide System & Visual Customization', () => {
         expect(exitFiltered.ghostBallPos).toEqual(fullFiltered.ghostBallPos);
     });
 
+    it('filters trajectory in straight short aim mode with ghost ball and short exit stubs (Rule 8)', () => {
+        const balls = [
+            createBall('white', 71, 71),
+            createBall('yellow', 100, 71),
+            createBall('red', 180, 71),
+        ];
+
+        const prediction = predictTrajectory(
+            balls,
+            'white',
+            vec2(1, 0),
+            6.0,
+            { x: 0, y: 0, magnitude: 0 },
+            500
+        );
+
+        const straightFiltered = filterAimTrajectory(prediction, 'white', 'straight');
+        expect(straightFiltered.firstImpactType).toBe('ball_collision');
+        expect(straightFiltered.ghostBallPos).toBeDefined();
+        // Straight short mode returns cue ball path and target ball exit path
+        expect(straightFiltered.paths.length).toBe(2);
+        const cuePath = straightFiltered.paths.find((p) => p.ballId === 'white');
+        const targetPath = straightFiltered.paths.find((p) => p.ballId === 'yellow');
+        expect(cuePath).toBeDefined();
+        expect(targetPath).toBeDefined();
+        expect(cuePath!.points.length).toBeGreaterThanOrEqual(2);
+        expect(targetPath!.points.length).toBeGreaterThanOrEqual(2);
+    });
+
     it('handles empty trajectory safely', () => {
         const filtered = filterAimTrajectory({ paths: [], cushionContacts: 0, ballCollisions: [], isValid: false }, 'white', 'full');
         expect(filtered.paths).toEqual([]);

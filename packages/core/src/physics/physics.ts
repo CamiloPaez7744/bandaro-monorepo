@@ -59,16 +59,34 @@ export function isBallMoving(ball: Ball): boolean {
 }
 
 export function applyFriction(ball: Ball): Ball {
+    let spinDecay = PHYSICS.spinDecay;
+    if (ball.strokeType === 'extended') spinDecay = 0.997; // Taco alargado conserva rotación más tiempo
+    else if (ball.strokeType === 'dry') spinDecay = 0.985; // Golpe seco libera rotación más rápido
+
     return {
         ...ball,
         vel: vec2Scale(ball.vel, PHYSICS.friction),
-        spin: vec2Scale(ball.spin, PHYSICS.spinDecay),
+        spin: vec2Scale(ball.spin, spinDecay),
     };
 }
 
 export function updateBallPosition(ball: Ball, dt: number): Ball {
-    const spinInfluence = vec2Scale(ball.spin, PHYSICS.spinInfluence * dt);
-    const newVel = vec2Add(ball.vel, spinInfluence);
+    const speed = vec2Length(ball.vel);
+    let newVel = ball.vel;
+
+    // Modificadores físicos por tipo de tacada / marcación
+    let spinInfluence = PHYSICS.spinInfluence;
+    if (ball.strokeType === 'extended') spinInfluence *= 1.35;
+    else if (ball.strokeType === 'dry') spinInfluence *= 0.85;
+    else if (ball.strokeType === 'follow') spinInfluence *= 1.45;
+    else if (ball.strokeType === 'semi_follow') spinInfluence *= 1.15;
+
+    // Aceleración continua por rotación longitudinal (corridos y retrocesos)
+    const heading = ball.spinHeading ?? (speed > 0.05 ? vec2Normalize(ball.vel) : null);
+    if (heading && Math.abs(ball.spin.y) > 0.01) {
+        const longitudinalAcc = vec2Scale(heading, ball.spin.y * spinInfluence * dt);
+        newVel = vec2Add(ball.vel, longitudinalAcc);
+    }
     const newPos = vec2Add(ball.pos, vec2Scale(newVel, dt));
     return {
         ...ball,
@@ -162,14 +180,45 @@ export function resolveCushionCollision(ball: Ball, normal: Vec2): Ball {
     const spinImpulse = computeCushionSpinImpulse(ball.spin, normal, normalVel);
     const finalVel = vec2Add(vec2Add(reboundedNormal, dampedTangent), spinImpulse);
 
-    // Cushion consumes part of the spin
-    const remainingSpin = vec2(ball.spin.x * 0.65, ball.spin.y * 0.80);
+    // Cushion consumes small fraction of spin in realistic carom physics
+    const remainingSpin = vec2(ball.spin.x * 0.85, ball.spin.y * 0.85);
+    const newSpinHeading = ball.spinHeading ? vec2Normalize(finalVel) : undefined;
 
     return {
         ...ball,
         vel: finalVel,
         spin: remainingSpin,
+        spinHeading: newSpinHeading,
     };
+}
+
+/**
+ * Calculates the exact mathematical tangent position of the cue ball
+ * at the moment of impact with the target ball.
+ * Distance between the ghost ball center and the target ball center is GUARANTEED to be 2 * radius (6.15 cm).
+ * Eliminates the visual gap on thin cuts where the post-collision step position would appear detached.
+ */
+export function computeGhostBallPosition(
+    cuePos: Vec2,
+    cueDir: Vec2,
+    targetPos: Vec2,
+    ballRadius = BALL_RADIUS
+): Vec2 {
+    const dir = vec2Normalize(cueDir);
+    const toTarget = vec2Sub(targetPos, cuePos);
+    const d = vec2Dot(toTarget, dir);
+    const perpSq = vec2Dot(toTarget, toTarget) - d * d;
+    const colDist = ballRadius * 2;
+    const colDistSq = colDist * colDist;
+
+    if (perpSq >= colDistSq || d <= 0) {
+        // Tangent along line of centers
+        const normal = vec2Normalize(vec2Sub(cuePos, targetPos));
+        return vec2Add(targetPos, vec2Scale(normal, colDist));
+    }
+
+    const tContact = d - Math.sqrt(Math.max(0, colDistSq - perpSq));
+    return vec2Add(cuePos, vec2Scale(dir, tContact));
 }
 
 export function checkBallCollision(b1: Ball, b2: Ball): boolean {
@@ -186,21 +235,25 @@ export function applyLongitudinalSpinAfterCollision(
     const longitudinalSpin = cueBall.spin.y; // +1 = corrido (follow), -1 = retroceso (draw)
     if (Math.abs(longitudinalSpin) < 0.05) return cueBall;
 
+    const preCollisionHeading = cueBall.spinHeading ?? vec2Normalize(cueBall.vel);
+
     if (longitudinalSpin > 0) {
-        // Corrido (Follow / Topspin): empuja hacia adelante a lo largo del vector de impacto
-        const followBoost = vec2Scale(normal, longitudinalSpin * impulseMagnitude * 0.38);
+        // Corrido (Follow / Topspin): empuja hacia adelante a lo largo del heading previo
+        const followBoost = vec2Scale(preCollisionHeading, longitudinalSpin * impulseMagnitude * 0.40);
         return {
             ...cueBall,
             vel: vec2Add(cueBall.vel, followBoost),
-            spin: vec2(cueBall.spin.x * 0.75, cueBall.spin.y * 0.40),
+            spinHeading: preCollisionHeading,
+            spin: vec2(cueBall.spin.x * 0.85, cueBall.spin.y * 0.85),
         };
     } else {
-        // Retroceso (Draw / Backspin): frena y muerde el paño hacia atrás (-normal)
-        const drawPull = vec2Scale(normal, longitudinalSpin * impulseMagnitude * 0.55); // longitudinalSpin es negativo
+        // Retroceso (Draw / Backspin): frena y muerde el paño hacia atrás (-preCollisionHeading)
+        const drawPull = vec2Scale(preCollisionHeading, longitudinalSpin * impulseMagnitude * 0.60); // longitudinalSpin es negativo
         return {
             ...cueBall,
             vel: vec2Add(cueBall.vel, drawPull),
-            spin: vec2(cueBall.spin.x * 0.75, cueBall.spin.y * 0.30),
+            spinHeading: preCollisionHeading,
+            spin: vec2(cueBall.spin.x * 0.85, cueBall.spin.y * 0.80),
         };
     }
 }
@@ -217,6 +270,10 @@ export function resolveBallCollision(b1: Ball, b2: Ball): [Ball, Ball] {
 
     let newB1Vel = vec2Sub(b1.vel, impulse);
     const newB2Vel = vec2Add(b2.vel, impulse);
+
+    if (b1.strokeType === 'dead_ball') {
+        newB1Vel = vec2Scale(newB1Vel, 0.35); // Amortigua la velocidad residual en mate de bola
+    }
 
     // Apply spin reactions for draw / follow if either ball has longitudinal spin
     let b1Result: Ball = {
@@ -313,13 +370,24 @@ export function simulateStep(
                 const resolved = resolveCushionCollision({ ...ball, pos: clampedPos }, normal);
                 updatedBalls[i] = resolved;
 
+                let cushionContactPos: Vec2 = { x: clampedPos.x, y: clampedPos.y };
+                if (side === 'top') {
+                    cushionContactPos = { x: clampedPos.x, y: 0 };
+                } else if (side === 'bottom') {
+                    cushionContactPos = { x: clampedPos.x, y: table.height };
+                } else if (side === 'left') {
+                    cushionContactPos = { x: 0, y: clampedPos.y };
+                } else if (side === 'right') {
+                    cushionContactPos = { x: table.width, y: clampedPos.y };
+                }
+
                 events.push({
                     type: 'cushion',
                     timestamp: 0,
                     data: {
                         ballId: ball.id,
                         side,
-                        position: { x: clampedPos.x, y: clampedPos.y },
+                        position: cushionContactPos,
                         normal,
                         timestamp: 0,
                     },
@@ -347,6 +415,9 @@ export function simulateStep(
                     updatedBalls[i] = res1;
                     updatedBalls[j] = res2;
 
+                    const colNormal = vec2Normalize(vec2Sub(b2.pos, b1.pos));
+                    const b1GhostPos = vec2Sub(b2.pos, vec2Scale(colNormal, b1.radius + b2.radius));
+
                     events.push({
                         type: 'ball_collision',
                         timestamp: 0,
@@ -354,6 +425,7 @@ export function simulateStep(
                             ball1: b1.id,
                             ball2: b2.id,
                             position: { x: (b1.pos.x + b2.pos.x) / 2, y: (b1.pos.y + b2.pos.y) / 2 },
+                            ghostBallPos: b1GhostPos,
                             timestamp: 0,
                         },
                     });
