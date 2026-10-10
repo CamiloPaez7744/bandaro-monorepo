@@ -1331,6 +1331,38 @@ function TableVisionStudioModalBase({
     })
   );
 
+  const webGestureHandlers = useMemo(() => {
+    if (Platform.OS !== 'web') return panResponder.current.panHandlers;
+    let isDown = false;
+    let startX = 0;
+    let startY = 0;
+    return {
+      onPointerDown: (e: any) => {
+        isDown = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        e.currentTarget?.setPointerCapture?.(e.pointerId);
+        panResponder.current.panHandlers.onResponderGrant?.({
+          nativeEvent: { locationX: e.nativeEvent?.offsetX ?? 0, locationY: e.nativeEvent?.offsetY ?? 0, clientX: e.clientX, clientY: e.clientY },
+        } as any);
+      },
+      onPointerMove: (e: any) => {
+        if (!isDown && e.buttons !== 1) return;
+        panResponder.current.panHandlers.onResponderMove?.({
+          nativeEvent: { locationX: e.nativeEvent?.offsetX ?? 0, locationY: e.nativeEvent?.offsetY ?? 0, clientX: e.clientX, clientY: e.clientY },
+          dx: e.clientX - startX,
+          dy: e.clientY - startY,
+        } as any);
+      },
+      onPointerUp: (e: any) => {
+        if (!isDown) return;
+        isDown = false;
+        try { e.currentTarget?.releasePointerCapture?.(e.pointerId); } catch {}
+        panResponder.current.panHandlers.onResponderRelease?.({} as any);
+      },
+    };
+  }, []);
+
   // Precision Nudge for Active Target (Corner or Ball) with D-Pad
   const nudgeActiveTarget = useCallback(
     (dx: number, dy: number) => {
@@ -1789,7 +1821,7 @@ function TableVisionStudioModalBase({
                           StyleSheet.absoluteFill,
                           { width: containerSize.width, height: containerSize.height },
                         ]}
-                        {...panResponder.current.panHandlers}
+                        {...webGestureHandlers}
                       >
                         <Svg
                           width={containerSize.width}
@@ -1801,9 +1833,9 @@ function TableVisionStudioModalBase({
                               width: containerSize.width,
                               height: containerSize.height,
                               overflow: 'visible',
+                              pointerEvents: 'none',
                             },
                           ]}
-                          pointerEvents="none"
                         >
                         {/* LAYER 0.1: Photo Frame Boundary (when canvas is expanded) */}
                         {canvasZoom === 'expanded' && (

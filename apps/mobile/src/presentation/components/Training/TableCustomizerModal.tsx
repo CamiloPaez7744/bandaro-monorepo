@@ -8,11 +8,29 @@ import {
   Switch,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
   Image,
   useWindowDimensions,
 } from 'react-native';
+
+const TouchableOpacity = ({
+  style,
+  activeOpacity = 0.7,
+  children,
+  disabled,
+  ...props
+}: any) => (
+  <Pressable
+    {...props}
+    disabled={disabled}
+    style={({ pressed }) => [
+      typeof style === 'function' ? style({ pressed }) : style,
+      pressed && !disabled && { opacity: activeOpacity },
+    ]}
+  >
+    {children}
+  </Pressable>
+);
 import { useColorScheme } from '@/components/useColorScheme';
 import { useI18n } from '@/components/useLanguage';
 import { getPalette } from '@/constants/theme';
@@ -1078,10 +1096,14 @@ const getStyles = (palette: ReturnType<typeof getPalette>, isDark: boolean) =>
       borderWidth: 1,
       borderColor: isDark ? '#1e382e' : palette.border,
       overflow: 'hidden',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 12 },
-      shadowOpacity: isDark ? 0.5 : 0.15,
-      shadowRadius: 28,
+      ...(Platform.OS === 'web'
+        ? { boxShadow: isDark ? '0 12px 28px rgba(0, 0, 0, 0.5)' : '0 12px 28px rgba(0, 0, 0, 0.15)' }
+        : {
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 12 },
+            shadowOpacity: isDark ? 0.5 : 0.15,
+            shadowRadius: 28,
+          }),
       elevation: 20,
     },
     header: {
@@ -1503,9 +1525,13 @@ const getStyles = (palette: ReturnType<typeof getPalette>, isDark: boolean) =>
     decalVisualCardActive: {
       borderColor: '#10b981',
       backgroundColor: isDark ? '#173b2a' : '#ecfdf5',
-      shadowColor: '#10b981',
-      shadowOpacity: 0.35,
-      shadowRadius: 8,
+      ...(Platform.OS === 'web'
+        ? { boxShadow: '0 0 8px rgba(16, 185, 129, 0.35)' }
+        : {
+            shadowColor: '#10b981',
+            shadowOpacity: 0.35,
+            shadowRadius: 8,
+          }),
       elevation: 4,
     },
     decalVisualPreview: {

@@ -1,11 +1,31 @@
 import React, { memo, useCallback, useMemo, useState } from 'react';
 import {
+    Platform,
+    Pressable,
     StyleSheet,
     Text,
-    TouchableOpacity,
     View,
     useWindowDimensions,
 } from 'react-native';
+
+const TouchableOpacity = ({
+    style,
+    activeOpacity = 0.7,
+    children,
+    disabled,
+    ...props
+}: any) => (
+    <Pressable
+        {...props}
+        disabled={disabled}
+        style={({ pressed }) => [
+            typeof style === 'function' ? style({ pressed }) : style,
+            pressed && !disabled && { opacity: activeOpacity },
+        ]}
+    >
+        {children}
+    </Pressable>
+);
 import Svg, {
     Circle,
     Defs,
@@ -274,7 +294,11 @@ export const CaromTomeDeBolaEclipse = memo(function CaromTomeDeBolaEclipse({
                 style={[
                     styles.cardContainer,
                     compact && styles.cardContainerCompact,
-                    categoryColor ? { borderColor: `${categoryColor}55`, shadowColor: categoryColor } : null,
+                    categoryColor
+                        ? (Platform.OS === 'web'
+                            ? { borderColor: `${categoryColor}55`, boxShadow: `0 2px 8px ${categoryColor}50` }
+                            : { borderColor: `${categoryColor}55`, shadowColor: categoryColor })
+                        : null,
                     !isDark ? { backgroundColor: '#ffffff', borderColor: categoryColor ? `${categoryColor}60` : 'rgba(0, 0, 0, 0.12)' } : null,
                 ]}
                 onPress={() => setShowPresets((prev) => !prev)}
@@ -487,10 +511,14 @@ const styles = StyleSheet.create({
         paddingLeft: 4,
         paddingRight: 10,
         paddingVertical: 3,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.35,
-        shadowRadius: 8,
+        ...(Platform.OS === 'web'
+            ? { boxShadow: '0 2px 8px rgba(0, 0, 0, 0.45)' }
+            : {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.35,
+                shadowRadius: 8,
+            }),
         elevation: 4,
     },
     cardContainerCompact: {

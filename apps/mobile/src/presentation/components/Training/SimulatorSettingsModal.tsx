@@ -4,9 +4,29 @@ import {
     View,
     Text,
     StyleSheet,
-    TouchableOpacity,
+    Pressable,
+    Platform,
     ScrollView,
 } from 'react-native';
+
+const TouchableOpacity = ({
+    style,
+    activeOpacity = 0.7,
+    children,
+    disabled,
+    ...props
+}: any) => (
+    <Pressable
+        {...props}
+        disabled={disabled}
+        style={({ pressed }) => [
+            typeof style === 'function' ? style({ pressed }) : style,
+            pressed && !disabled && { opacity: activeOpacity },
+        ]}
+    >
+        {children}
+    </Pressable>
+);
 import {
     IconX,
     IconPalette,
@@ -431,19 +451,27 @@ const styles = StyleSheet.create({
     modalCardDark: {
         backgroundColor: '#0b1320',
         borderColor: 'rgba(255, 255, 255, 0.12)',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.6,
-        shadowRadius: 20,
+        ...(Platform.OS === 'web'
+            ? { boxShadow: '0 10px 25px rgba(0, 0, 0, 0.6)' }
+            : {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 10 },
+                shadowOpacity: 0.6,
+                shadowRadius: 20,
+            }),
         elevation: 12,
     },
     modalCardLight: {
         backgroundColor: '#ffffff',
         borderColor: 'rgba(0, 0, 0, 0.1)',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.2,
-        shadowRadius: 16,
+        ...(Platform.OS === 'web'
+            ? { boxShadow: '0 8px 20px rgba(0, 0, 0, 0.2)' }
+            : {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 8 },
+                shadowOpacity: 0.2,
+                shadowRadius: 16,
+            }),
         elevation: 8,
     },
     headerRow: {

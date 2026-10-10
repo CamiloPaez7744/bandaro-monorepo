@@ -397,10 +397,14 @@ const getStyles = (palette: ReturnType<typeof getPalette>) =>
       borderColor: palette.border,
       padding: theme.spacing.md,
       gap: 14,
-      shadowColor: '#000000',
-      shadowOffset: { width: 0, height: -4 },
-      shadowOpacity: 0.2,
-      shadowRadius: 16,
+      ...(Platform.OS === 'web'
+        ? { boxShadow: '0 -4px 16px rgba(0, 0, 0, 0.2)' }
+        : {
+            shadowColor: '#000000',
+            shadowOffset: { width: 0, height: -4 },
+            shadowOpacity: 0.2,
+            shadowRadius: 16,
+          }),
       elevation: 6,
     },
     recordHeader: {
@@ -540,10 +544,14 @@ const getStyles = (palette: ReturnType<typeof getPalette>) =>
       paddingVertical: 12,
       alignItems: 'center',
       justifyContent: 'center',
-      shadowColor: palette.primary,
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.3,
-      shadowRadius: 6,
+      ...(Platform.OS === 'web'
+        ? { boxShadow: `0 2px 6px ${palette.primary}4d` }
+        : {
+            shadowColor: palette.primary,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.3,
+            shadowRadius: 6,
+          }),
       elevation: 4,
     },
     btnPrimaryText: {

@@ -125,7 +125,7 @@ export function AnimatedTabBar({ state, descriptors, navigation }: TabBarProps) 
       Animated.timing(anim.active, {
         toValue: i === state.index ? 1 : 0,
         duration: 200,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }).start()
     );
 
@@ -139,9 +139,9 @@ export function AnimatedTabBar({ state, descriptors, navigation }: TabBarProps) 
   const dotCy = TOP_OVERHANG + 4.5;
 
   return (
-    <View style={[styles.root, { height: rootH }]} pointerEvents="box-none">
+    <View style={[styles.root, { height: rootH, pointerEvents: 'box-none' }]}>
       {/* ── Full width bar background & scoop via SVG ── */}
-      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <View style={[StyleSheet.absoluteFill, { pointerEvents: 'none' }]}>
         <Svg width={screenWidth} height={rootH}>
           {/* Main filled bar shape */}
           <Path d={barPath(dotCx, screenWidth, rootH)} fill={barBg} />

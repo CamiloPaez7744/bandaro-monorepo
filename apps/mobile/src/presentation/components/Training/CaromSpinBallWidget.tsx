@@ -1,5 +1,24 @@
 import { memo, useMemo } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+
+const TouchableOpacity = ({
+    style,
+    activeOpacity = 0.7,
+    children,
+    disabled,
+    ...props
+}: any) => (
+    <Pressable
+        {...props}
+        disabled={disabled}
+        style={({ pressed }) => [
+            typeof style === 'function' ? style({ pressed }) : style,
+            pressed && !disabled && { opacity: activeOpacity },
+        ]}
+    >
+        {children}
+    </Pressable>
+);
 import Svg, { Circle, Defs, Line, RadialGradient, Stop } from 'react-native-svg';
 import { BallId, SpinEffect } from '@bandaro/core';
 import { useI18n } from '@/components/useLanguage';
@@ -72,7 +91,11 @@ export const CaromSpinBallWidget = memo(function CaromSpinBallWidget({
             style={[
                 styles.container,
                 compact && styles.containerCompact,
-                categoryColor ? { borderColor: `${categoryColor}60`, shadowColor: categoryColor } : null,
+                categoryColor
+                    ? (Platform.OS === 'web'
+                        ? { borderColor: `${categoryColor}60`, boxShadow: `0 0 10px ${categoryColor}50` }
+                        : { borderColor: `${categoryColor}60`, shadowColor: categoryColor })
+                    : null,
                 !isDark ? { backgroundColor: '#ffffff', borderColor: categoryColor ? `${categoryColor}60` : 'rgba(0, 0, 0, 0.12)' } : null,
             ]}
             onPress={onPress}
@@ -179,10 +202,14 @@ const styles = StyleSheet.create({
         paddingRight: 10,
         paddingVertical: 3,
         userSelect: 'none',
-        shadowColor: '#00d2ff',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.25,
-        shadowRadius: 8,
+        ...(Platform.OS === 'web'
+            ? { boxShadow: '0 0 8px rgba(0, 210, 255, 0.35)' }
+            : {
+                shadowColor: '#00d2ff',
+                shadowOffset: { width: 0, height: 0 },
+                shadowOpacity: 0.25,
+                shadowRadius: 8,
+            }),
         elevation: 4,
     },
     containerCompact: {

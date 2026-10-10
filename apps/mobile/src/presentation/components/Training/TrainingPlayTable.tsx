@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Circle, Defs, G, Line, LinearGradient, Path, Polygon, RadialGradient, Rect, Stop, Text as SvgText, Image as SvgImage } from 'react-native-svg';
 
 import { resolveBilliardPhysics } from './billiardPhysics';
@@ -31,6 +31,7 @@ export interface TrainingPlayTableProps {
   onSimulationEnd?: () => void;
   showGrid?: boolean;
   showDiamondNumbers?: boolean;
+  systemMode?: 'none' | 'standard' | 'llk_hoppe' | 'base_50';
   clothColor?: string;
   diamondShape?: DiamondShape;
   diamondCount?: DiamondCount;
@@ -62,6 +63,7 @@ function TrainingPlayTableBase({
   onSimulationEnd,
   showGrid = true,
   showDiamondNumbers = false,
+  systemMode = 'none',
   clothColor = 'tournament_blue',
   diamondShape = 'rhombus',
   diamondCount = '9_5',
@@ -346,8 +348,122 @@ function TrainingPlayTableBase({
           );
         })}
 
-        {/* Optional Diamond System Numbers */}
-        {activeShowNumbers && (
+        {/* Willie Hoppe LLK System Numbers & Rails Labels */}
+        {systemMode === 'llk_hoppe' && (
+          <G>
+            {/* Top Long Rail: SUMA label + 2, 4, 6, 8 diamonds */}
+            <SvgText
+              x={PLAY_OFFSET_X + 2.5 * (TABLE_W / 8)}
+              y={RAIL_T * 0.42}
+              fontSize={4.2}
+              fill="#38bdf8"
+              fontWeight="bold"
+              textAnchor="middle"
+            >
+              Suma
+            </SvgText>
+            {[
+              { d: 1, val: '2' },
+              { d: 2, val: '4' },
+              { d: 3, val: '6' },
+              { d: 4, val: '8' },
+            ].map((item) => (
+              <SvgText
+                key={`hoppe-top-${item.d}`}
+                x={PLAY_OFFSET_X + item.d * (TABLE_W / 8)}
+                y={RAIL_T * 0.88}
+                fontSize={5.5}
+                fill="#ef4444"
+                fontWeight="bold"
+                textAnchor="middle"
+              >
+                {item.val}
+              </SvgText>
+            ))}
+
+            {/* Left Short Rail: RESTA label + -1, -2, -3 */}
+            <SvgText
+              x={RAIL_T * 0.32}
+              y={PLAY_OFFSET_Y + TABLE_H * 0.5}
+              fontSize={3.8}
+              fill="#38bdf8"
+              fontWeight="bold"
+              textAnchor="middle"
+              transform={`rotate(-90, ${RAIL_T * 0.32}, ${PLAY_OFFSET_Y + TABLE_H * 0.5})`}
+            >
+              resta
+            </SvgText>
+            {[
+              { d: 1, val: '-1' },
+              { d: 2, val: '-2' },
+              { d: 3, val: '-3' },
+            ].map((item) => (
+              <SvgText
+                key={`hoppe-left-${item.d}`}
+                x={RAIL_T * 0.75}
+                y={PLAY_OFFSET_Y + item.d * (TABLE_H / 4) + 1.8}
+                fontSize={5.2}
+                fill="#38bdf8"
+                fontWeight="bold"
+                textAnchor="middle"
+              >
+                {item.val}
+              </SvgText>
+            ))}
+
+            {/* Right Short Rail: RESTA label + -4, -5, -6 */}
+            <SvgText
+              x={TOTAL_W - RAIL_T * 0.32}
+              y={PLAY_OFFSET_Y + TABLE_H * 0.5}
+              fontSize={3.8}
+              fill="#38bdf8"
+              fontWeight="bold"
+              textAnchor="middle"
+              transform={`rotate(90, ${TOTAL_W - RAIL_T * 0.32}, ${PLAY_OFFSET_Y + TABLE_H * 0.5})`}
+            >
+              resta
+            </SvgText>
+            {[
+              { d: 1, val: '-4' },
+              { d: 2, val: '-5' },
+              { d: 3, val: '-6' },
+            ].map((item) => (
+              <SvgText
+                key={`hoppe-right-${item.d}`}
+                x={TOTAL_W - 2.8}
+                y={PLAY_OFFSET_Y + item.d * (TABLE_H / 4) + 1.8}
+                fontSize={5.2}
+                fill="#38bdf8"
+                fontWeight="bold"
+                textAnchor="middle"
+              >
+                {item.val}
+              </SvgText>
+            ))}
+
+            {/* Bottom Long Rail: -1, -2, -3 */}
+            {[
+              { d: 5, val: '-1' },
+              { d: 6, val: '-2' },
+              { d: 7, val: '-3' },
+            ].map((item) => (
+              <SvgText
+                key={`hoppe-bottom-${item.d}`}
+                x={PLAY_OFFSET_X + item.d * (TABLE_W / 8)}
+                y={TOTAL_H - 1.8}
+                fontSize={5.2}
+                fill="#38bdf8"
+                fontWeight="bold"
+                textAnchor="middle"
+              >
+                {item.val}
+              </SvgText>
+            ))}
+          </G>
+        )}
+
+        {/* Optional Standard / Base 50 Diamond System Numbers */}
+        {(activeShowNumbers || systemMode === 'standard' || systemMode === 'base_50') && systemMode !== 'llk_hoppe' && (
           <G opacity={0.75}>
             {longDiamonds.map((ratio, i) => {
               const x = PLAY_OFFSET_X + ratio * TABLE_W;
@@ -673,11 +789,15 @@ const styles = StyleSheet.create({
     aspectRatio: 316 / 174,
     borderRadius: 8,
     overflow: 'hidden',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.45,
-    shadowRadius: 16,
-    elevation: 8,
+    ...(Platform.OS === 'web'
+      ? { boxShadow: '0 8px 16px rgba(0, 0, 0, 0.45)' }
+      : {
+          shadowColor: '#000000',
+          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: 0.45,
+          shadowRadius: 16,
+          elevation: 8,
+        }),
   },
   svg: {
     width: '100%',

@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
-import { PanResponder, Pressable, StyleSheet, Text, View, type GestureResponderEvent, type StyleProp, type ViewStyle } from 'react-native';
+import { PanResponder, Platform, Pressable, StyleSheet, Text, View, type GestureResponderEvent, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Circle, ClipPath, Defs, G, Line, LinearGradient, RadialGradient, Stop } from 'react-native-svg';
 
 import { useI18n } from '@/components/useLanguage';
@@ -89,6 +89,31 @@ function EffectBallSelectorBase(props: Readonly<EffectBallSelectorProps>) {
         [applySpinAt, disabled]
     );
 
+    const handleWebPointer = useCallback(
+        (e: any) => {
+            if (disabled) return;
+            const rect = e.currentTarget?.getBoundingClientRect?.();
+            if (rect) {
+                applySpinAt(e.clientX - rect.left, e.clientY - rect.top);
+            }
+        },
+        [applySpinAt, disabled]
+    );
+
+    const gestureHandlers = Platform.OS === 'web' ? {
+        onPointerDown: (e: any) => {
+            if (disabled) return;
+            e.currentTarget?.setPointerCapture?.(e.pointerId);
+            handleWebPointer(e);
+        },
+        onPointerMove: (e: any) => {
+            if (e.buttons === 1) handleWebPointer(e);
+        },
+        onPointerUp: (e: any) => {
+            try { e.currentTarget?.releasePointerCapture?.(e.pointerId); } catch {}
+        },
+    } : panResponder.panHandlers;
+
     const indicatorX = ballCenter + spin.x * maxDrag;
     const indicatorY = ballCenter - spin.y * maxDrag;
 
@@ -97,7 +122,7 @@ function EffectBallSelectorBase(props: Readonly<EffectBallSelectorProps>) {
             <View style={styles.canvasWrap}>
                 <View style={styles.outerHalo} />
                 <View style={[styles.canvasShell, { width: size, height: size }]}>
-                    <View style={[styles.canvasHitArea, { width: size, height: size }]} {...panResponder.panHandlers}>
+                    <View style={[styles.canvasHitArea, { width: size, height: size }]} {...gestureHandlers}>
                         <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
                             <Defs>
                                 <ClipPath id={clipId}>

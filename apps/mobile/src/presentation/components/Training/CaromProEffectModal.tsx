@@ -1,15 +1,35 @@
 import React, { memo, useCallback, useMemo, useRef } from 'react';
 import {
     Modal,
+    Platform,
+    Pressable,
     ScrollView,
     StyleSheet,
     Text,
-    TouchableOpacity,
     View,
     PanResponder,
     useWindowDimensions,
     type GestureResponderEvent,
 } from 'react-native';
+
+const TouchableOpacity = ({
+    style,
+    activeOpacity = 0.7,
+    children,
+    disabled,
+    ...props
+}: any) => (
+    <Pressable
+        {...props}
+        disabled={disabled}
+        style={({ pressed }) => [
+            typeof style === 'function' ? style({ pressed }) : style,
+            pressed && !disabled && { opacity: activeOpacity },
+        ]}
+    >
+        {children}
+    </Pressable>
+);
 import Svg, {
     Circle,
     Defs,
@@ -136,6 +156,29 @@ export const CaromProEffectModal = memo(function CaromProEffectModal({
         })
     ).current;
 
+    const handleWebPointer = useCallback(
+        (e: any) => {
+            const rect = e.currentTarget?.getBoundingClientRect?.();
+            if (rect) {
+                updateFromCoords(e.clientX - rect.left, e.clientY - rect.top);
+            }
+        },
+        [updateFromCoords]
+    );
+
+    const gestureHandlers = Platform.OS === 'web' ? {
+        onPointerDown: (e: any) => {
+            e.currentTarget?.setPointerCapture?.(e.pointerId);
+            handleWebPointer(e);
+        },
+        onPointerMove: (e: any) => {
+            if (e.buttons === 1) handleWebPointer(e);
+        },
+        onPointerUp: (e: any) => {
+            try { e.currentTarget?.releasePointerCapture?.(e.pointerId); } catch {}
+        },
+    } : panResponder.panHandlers;
+
     const setPreset = useCallback(
         (x: number, y: number) => {
             const mag = Math.hypot(x, y);
@@ -205,7 +248,7 @@ export const CaromProEffectModal = memo(function CaromProEffectModal({
                         <View style={styles.stageWrap}>
                             <View
                                 style={[styles.svgContainer, { width: size, height: size }]}
-                                {...panResponder.panHandlers}>
+                                {...gestureHandlers}>
                                 <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
                                     <Defs>
                                         <RadialGradient id={`${modalUid}_sphereShadeYellow`} cx="42%" cy="38%" r="65%">
@@ -252,7 +295,7 @@ export const CaromProEffectModal = memo(function CaromProEffectModal({
                                             const dotR = sphereRadius * 0.085;
                                             const dOffset = sphereRadius * 0.44;
                                             return (
-                                                <G pointerEvents="none" opacity={0.88}>
+                                                <G style={{ pointerEvents: 'none' }} opacity={0.88}>
                                                     <Circle cx={center} cy={center} r={dotR} fill="#dc2626" />
                                                     <Circle cx={center - dOffset} cy={center - dOffset * 0.5} r={dotR} fill="#dc2626" />
                                                     <Circle cx={center + dOffset} cy={center - dOffset * 0.5} r={dotR} fill="#dc2626" />
@@ -268,7 +311,7 @@ export const CaromProEffectModal = memo(function CaromProEffectModal({
                                             const dotR = sphereRadius * 0.085;
                                             const dOffset = sphereRadius * 0.44;
                                             return (
-                                                <G pointerEvents="none">
+                                                <G style={{ pointerEvents: 'none' }}>
                                                     <Circle cx={center} cy={center} r={sphereRadius * 0.55} fill="none" stroke={ringColor} strokeWidth={1.2} strokeDasharray="3 2" />
                                                     <Circle cx={center} cy={center} r={sphereRadius * 0.82} fill="none" stroke={ringColor} strokeWidth={1} strokeDasharray="2 3" />
                                                     <Circle cx={center} cy={center} r={dotR} fill={dotColor} />
@@ -285,7 +328,7 @@ export const CaromProEffectModal = memo(function CaromProEffectModal({
                                             const dotR = sphereRadius * 0.075;
                                             const dOffset = sphereRadius * 0.42;
                                             return (
-                                                <G pointerEvents="none">
+                                                <G style={{ pointerEvents: 'none' }}>
                                                     <Circle cx={center} cy={center} r={sphereRadius * 0.58} fill="none" stroke={ringColor} strokeWidth={1.3} />
                                                     <Circle cx={center} cy={center} r={dotR} fill={dotColor} />
                                                     <Circle cx={center - dOffset} cy={center} r={dotR} fill={dotColor} />
@@ -298,7 +341,7 @@ export const CaromProEffectModal = memo(function CaromProEffectModal({
                                         if (ballSkin === 'classic_solid') {
                                             const dotColor = isYellow ? '#dc2626' : '#0f172a';
                                             return (
-                                                <G pointerEvents="none">
+                                                <G style={{ pointerEvents: 'none' }}>
                                                     <Circle cx={center} cy={center} r={sphereRadius * 0.075} fill={dotColor} opacity={0.8} />
                                                 </G>
                                             );
@@ -664,10 +707,14 @@ const getStyles = (palette: ReturnType<typeof getPalette>, isDark: boolean) => S
         borderColor: isDark ? 'rgba(0, 210, 255, 0.25)' : palette.border,
         padding: 16,
         gap: 10,
-        shadowColor: isDark ? '#00d2ff' : '#000000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: isDark ? 0.25 : 0.12,
-        shadowRadius: 24,
+        ...(Platform.OS === 'web'
+            ? { boxShadow: isDark ? '0 8px 24px rgba(0, 210, 255, 0.25)' : '0 8px 24px rgba(0, 0, 0, 0.12)' }
+            : {
+                shadowColor: isDark ? '#00d2ff' : '#000000',
+                shadowOffset: { width: 0, height: 8 },
+                shadowOpacity: isDark ? 0.25 : 0.12,
+                shadowRadius: 24,
+            }),
         elevation: 12,
     },
     modalCardMobile: {

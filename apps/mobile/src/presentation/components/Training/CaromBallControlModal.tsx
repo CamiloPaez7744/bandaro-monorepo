@@ -2,14 +2,34 @@ import React, { memo, useCallback, useMemo, useRef, useState } from 'react';
 import {
     Modal,
     PanResponder,
+    Platform,
+    Pressable,
     ScrollView,
     StyleSheet,
     Text,
-    TouchableOpacity,
     View,
     useWindowDimensions,
     GestureResponderEvent,
 } from 'react-native';
+
+const TouchableOpacity = ({
+    style,
+    activeOpacity = 0.7,
+    children,
+    disabled,
+    ...props
+}: any) => (
+    <Pressable
+        {...props}
+        disabled={disabled}
+        style={({ pressed }) => [
+            typeof style === 'function' ? style({ pressed }) : style,
+            pressed && !disabled && { opacity: activeOpacity },
+        ]}
+    >
+        {children}
+    </Pressable>
+);
 import { useColorScheme } from '@/components/useColorScheme';
 import Svg, {
     Circle,
@@ -151,6 +171,29 @@ export const CaromBallControlModal = memo(function CaromBallControlModal({
             },
         })
     ).current;
+
+    const handleWebPointer = useCallback(
+        (e: any) => {
+            const rect = e.currentTarget?.getBoundingClientRect?.();
+            if (rect) {
+                updateSpinFromCoords(e.clientX - rect.left, e.clientY - rect.top);
+            }
+        },
+        [updateSpinFromCoords]
+    );
+
+    const gestureHandlers = Platform.OS === 'web' ? {
+        onPointerDown: (e: any) => {
+            e.currentTarget?.setPointerCapture?.(e.pointerId);
+            handleWebPointer(e);
+        },
+        onPointerMove: (e: any) => {
+            if (e.buttons === 1) handleWebPointer(e);
+        },
+        onPointerUp: (e: any) => {
+            try { e.currentTarget?.releasePointerCapture?.(e.pointerId); } catch {}
+        },
+    } : panResponder.panHandlers;
 
     const setSpinPreset = useCallback((x: number, y: number) => {
         const mag = Math.hypot(x, y);
@@ -328,7 +371,7 @@ export const CaromBallControlModal = memo(function CaromBallControlModal({
                             <View style={styles.stageWrap}>
                                 <View
                                     style={[styles.svgBox, { width: sphereSize, height: sphereSize }]}
-                                    {...panResponder.panHandlers}>
+                                    {...gestureHandlers}>
                                     <Svg width={sphereSize} height={sphereSize} viewBox={`0 0 ${sphereSize} ${sphereSize}`}>
                                         <Defs>
                                             <RadialGradient id={`${modalUid}_gradYellow`} cx="38%" cy="32%" r="68%">
@@ -603,10 +646,14 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         borderWidth: 1.5,
         overflow: 'hidden',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.5,
-        shadowRadius: 16,
+        ...(Platform.OS === 'web'
+            ? { boxShadow: '0 8px 20px rgba(0, 0, 0, 0.5)' }
+            : {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 8 },
+                shadowOpacity: 0.5,
+                shadowRadius: 16,
+            }),
         elevation: 12,
     },
     modalCardLandscape: {

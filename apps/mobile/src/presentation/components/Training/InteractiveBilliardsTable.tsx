@@ -562,159 +562,197 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
         []
     );
 
+    const isPointerActiveRef = useRef(false);
+
+    const handleGestureStart = useCallback((locationX: number, locationY: number) => {
+        if (isSimulatingRef.current) return;
+
+        const size = containerSizeRef.current;
+        const lay = layoutRef.current;
+
+        if (size.width === 0 || size.height === 0) return;
+
+        const svgX = locationX * (lay.viewBox.width / size.width);
+        const svgY = locationY * (lay.viewBox.height / size.height);
+
+        if (isEditModeRef.current) {
+            // Check if tapping on a number (when numbering is visible)
+            if (showNumberingRef.current) {
+                const numberId = findNumberAtSvgPoint(svgX, svgY);
+                if (numberId) {
+                    draggingNumberIdRef.current = numberId;
+                    return;
+                }
+            }
+
+            // Check if tapping on a ball
+            const tablePos = screenToTableRef(locationX, locationY);
+            const ballId = findBallAtPointRef(tablePos.x, tablePos.y);
+            if (ballId) {
+                draggingBallIdRef.current = ballId;
+                setDraggingBallId(ballId);
+            }
+        } else {
+            const tablePos = screenToTableRef(locationX, locationY);
+            const cueBall = ballsRef.current.find((b) => b.id === cueBallIdRef.current);
+            if (!cueBall) return;
+
+            const aimDir = vec2Normalize(aimDirectionRef.current);
+            const toTouch = vec2Sub(tablePos, cueBall.pos);
+            // Projection along reverse aim vector (where the cue stick body extends):
+            const projBack = toTouch.x * (-aimDir.x) + toTouch.y * (-aimDir.y);
+            const perpDist = Math.abs(toTouch.x * aimDir.y - toTouch.y * aimDir.x);
+
+            // If user touches along the cue stick body:
+            if (projBack > 4 && projBack < 280 && perpDist < 26) {
+                isDraggingCueRef.current = true;
+                cueDragStartProjRef.current = projBack;
+                cueDragStartPowerRef.current = currentPowerRef.current;
+                return;
+            }
+
+            // Otherwise user touched on table to aim:
+            isDraggingCueRef.current = false;
+            if (onAimChangeRef.current) {
+                const direction = vec2Normalize(toTouch);
+                onAimChangeRef.current(direction);
+            }
+        }
+    }, [findNumberAtSvgPoint, findBallAtPointRef, screenToTableRef]);
+
+    const handleGestureMove = useCallback((locationX: number, locationY: number) => {
+        if (isSimulatingRef.current) return;
+
+        const size = containerSizeRef.current;
+        const lay = layoutRef.current;
+
+        if (size.width === 0 || size.height === 0) return;
+
+        const svgX = locationX * (lay.viewBox.width / size.width);
+        const svgY = locationY * (lay.viewBox.height / size.height);
+
+        // Handle number dragging
+        const currentDraggingNumber = draggingNumberIdRef.current;
+        if (isEditModeRef.current && currentDraggingNumber && onNumberingAnchorsChangeRef.current) {
+            const anchors = numberingAnchorsRef.current;
+            const updatedAnchors = anchors.map((anchor) => {
+                if (anchor.id === currentDraggingNumber) {
+                    return { ...anchor, x: svgX, y: svgY, side: undefined, diamondIndex: undefined };
+                }
+                return anchor;
+            });
+            onNumberingAnchorsChangeRef.current(updatedAnchors);
+            return;
+        }
+
+        // Handle ball dragging
+        const tablePos = screenToTableRef(locationX, locationY);
+        const currentDraggingBall = draggingBallIdRef.current;
+
+        if (isEditModeRef.current && currentDraggingBall && onBallMoveRef.current) {
+            const draggingBall = ballsRef.current.find((b) => b.id === currentDraggingBall);
+            if (!draggingBall) return;
+
+            const ballRadius = draggingBall.radius;
+            
+            const otherBalls = ballsRef.current.filter((b) => b.id !== currentDraggingBall);
+            const resolved = resolveBallDragPosition(
+                tablePos.x,
+                tablePos.y,
+                ballRadius,
+                TABLE_W,
+                TABLE_H,
+                otherBalls
+            );
+
+            onBallMoveRef.current(currentDraggingBall, vec2(resolved.x, resolved.y));
+        } else if (!isEditModeRef.current) {
+            const cueBall = ballsRef.current.find((b) => b.id === cueBallIdRef.current);
+            if (!cueBall) return;
+
+            if (isDraggingCueRef.current) {
+                const aimDir = vec2Normalize(aimDirectionRef.current);
+                const toTouch = vec2Sub(tablePos, cueBall.pos);
+                const currentProj = toTouch.x * (-aimDir.x) + toTouch.y * (-aimDir.y);
+                const delta = currentProj - cueDragStartProjRef.current;
+                // 45 units pull = 100% power
+                const newPower = Math.max(0, Math.min(100, Math.round(cueDragStartPowerRef.current + (delta / 45) * 100)));
+                currentPowerRef.current = newPower;
+                onPowerChangeRef.current?.(newPower);
+            } else if (onAimChangeRef.current) {
+                const toTouch = vec2Sub(tablePos, cueBall.pos);
+                const direction = vec2Normalize(toTouch);
+                onAimChangeRef.current(direction);
+            }
+        }
+    }, [screenToTableRef]);
+
+    const handleGestureEnd = useCallback(() => {
+        if (isDraggingCueRef.current) {
+            const shotPower = currentPowerRef.current;
+            if (shotPower >= 8 && onShootRef.current) {
+                onShootRef.current(shotPower);
+            }
+            currentPowerRef.current = 0;
+            onPowerChangeRef.current?.(0);
+            isDraggingCueRef.current = false;
+        }
+        draggingBallIdRef.current = null;
+        setDraggingBallId(null);
+        draggingNumberIdRef.current = null;
+    }, []);
+
     const panResponder = useRef(
         PanResponder.create({
             onStartShouldSetPanResponder: () => !isSimulatingRef.current,
             onMoveShouldSetPanResponder: () => !isSimulatingRef.current,
             onPanResponderGrant: (event: GestureResponderEvent) => {
-                if (isSimulatingRef.current) return;
-
                 const { locationX, locationY } = event.nativeEvent;
-                const size = containerSizeRef.current;
-                const lay = layoutRef.current;
-
-                if (size.width === 0 || size.height === 0) return;
-
-                const svgX = locationX * (lay.viewBox.width / size.width);
-                const svgY = locationY * (lay.viewBox.height / size.height);
-
-                if (isEditModeRef.current) {
-                    // Check if tapping on a number (when numbering is visible)
-                    if (showNumberingRef.current) {
-                        const numberId = findNumberAtSvgPoint(svgX, svgY);
-                        if (numberId) {
-                            draggingNumberIdRef.current = numberId;
-                            return;
-                        }
-                    }
-
-                    // Check if tapping on a ball
-                    const tablePos = screenToTableRef(locationX, locationY);
-                    const ballId = findBallAtPointRef(tablePos.x, tablePos.y);
-                    if (ballId) {
-                        draggingBallIdRef.current = ballId;
-                        setDraggingBallId(ballId);
-                    }
-                } else {
-                    const tablePos = screenToTableRef(locationX, locationY);
-                    const cueBall = ballsRef.current.find((b) => b.id === cueBallIdRef.current);
-                    if (!cueBall) return;
-
-                    const aimDir = vec2Normalize(aimDirectionRef.current);
-                    const toTouch = vec2Sub(tablePos, cueBall.pos);
-                    // Projection along reverse aim vector (where the cue stick body extends):
-                    const projBack = toTouch.x * (-aimDir.x) + toTouch.y * (-aimDir.y);
-                    const perpDist = Math.abs(toTouch.x * aimDir.y - toTouch.y * aimDir.x);
-
-                    // If user touches along the cue stick body:
-                    if (projBack > 4 && projBack < 280 && perpDist < 26) {
-                        isDraggingCueRef.current = true;
-                        cueDragStartProjRef.current = projBack;
-                        cueDragStartPowerRef.current = currentPowerRef.current;
-                        return;
-                    }
-
-                    // Otherwise user touched on table to aim:
-                    isDraggingCueRef.current = false;
-                    if (onAimChangeRef.current) {
-                        const direction = vec2Normalize(toTouch);
-                        onAimChangeRef.current(direction);
-                    }
-                }
+                handleGestureStart(locationX, locationY);
             },
             onPanResponderMove: (event: GestureResponderEvent) => {
-                if (isSimulatingRef.current) return;
-
                 const { locationX, locationY } = event.nativeEvent;
-                const size = containerSizeRef.current;
-                const lay = layoutRef.current;
-
-                if (size.width === 0 || size.height === 0) return;
-
-                const svgX = locationX * (lay.viewBox.width / size.width);
-                const svgY = locationY * (lay.viewBox.height / size.height);
-
-                // Handle number dragging
-                const currentDraggingNumber = draggingNumberIdRef.current;
-                if (isEditModeRef.current && currentDraggingNumber && onNumberingAnchorsChangeRef.current) {
-                    const anchors = numberingAnchorsRef.current;
-                    const updatedAnchors = anchors.map((anchor) => {
-                        if (anchor.id === currentDraggingNumber) {
-                            return { ...anchor, x: svgX, y: svgY, side: undefined, diamondIndex: undefined };
-                        }
-                        return anchor;
-                    });
-                    onNumberingAnchorsChangeRef.current(updatedAnchors);
-                    return;
-                }
-
-                // Handle ball dragging
-                const tablePos = screenToTableRef(locationX, locationY);
-                const currentDraggingBall = draggingBallIdRef.current;
-
-                if (isEditModeRef.current && currentDraggingBall && onBallMoveRef.current) {
-                    const draggingBall = ballsRef.current.find((b) => b.id === currentDraggingBall);
-                    if (!draggingBall) return;
-
-                    const ballRadius = draggingBall.radius;
-                    
-                    const otherBalls = ballsRef.current.filter((b) => b.id !== currentDraggingBall);
-                    const resolved = resolveBallDragPosition(
-                        tablePos.x,
-                        tablePos.y,
-                        ballRadius,
-                        TABLE_W,
-                        TABLE_H,
-                        otherBalls
-                    );
-
-                    onBallMoveRef.current(currentDraggingBall, vec2(resolved.x, resolved.y));
-                } else if (!isEditModeRef.current) {
-                    const cueBall = ballsRef.current.find((b) => b.id === cueBallIdRef.current);
-                    if (!cueBall) return;
-
-                    if (isDraggingCueRef.current) {
-                        const aimDir = vec2Normalize(aimDirectionRef.current);
-                        const toTouch = vec2Sub(tablePos, cueBall.pos);
-                        const currentProj = toTouch.x * (-aimDir.x) + toTouch.y * (-aimDir.y);
-                        const delta = currentProj - cueDragStartProjRef.current;
-                        // 45 units pull = 100% power
-                        const newPower = Math.max(0, Math.min(100, Math.round(cueDragStartPowerRef.current + (delta / 45) * 100)));
-                        currentPowerRef.current = newPower;
-                        onPowerChangeRef.current?.(newPower);
-                    } else if (onAimChangeRef.current) {
-                        const toTouch = vec2Sub(tablePos, cueBall.pos);
-                        const direction = vec2Normalize(toTouch);
-                        onAimChangeRef.current(direction);
-                    }
-                }
+                handleGestureMove(locationX, locationY);
             },
             onPanResponderRelease: () => {
-                if (isDraggingCueRef.current) {
-                    const shotPower = currentPowerRef.current;
-                    if (shotPower >= 8 && onShootRef.current) {
-                        onShootRef.current(shotPower);
-                    }
-                    currentPowerRef.current = 0;
-                    onPowerChangeRef.current?.(0);
-                    isDraggingCueRef.current = false;
-                }
-                draggingBallIdRef.current = null;
-                setDraggingBallId(null);
-                draggingNumberIdRef.current = null;
+                handleGestureEnd();
             },
             onPanResponderTerminate: () => {
-                if (isDraggingCueRef.current) {
-                    currentPowerRef.current = 0;
-                    onPowerChangeRef.current?.(0);
-                }
-                isDraggingCueRef.current = false;
-                draggingBallIdRef.current = null;
-                setDraggingBallId(null);
-                draggingNumberIdRef.current = null;
+                handleGestureEnd();
             },
         })
     ).current;
+
+    const gestureHandlers = useMemo(() => {
+        if (Platform.OS === 'web') {
+            return {
+                onPointerDown: (e: any) => {
+                    if (isSimulatingRef.current) return;
+                    isPointerActiveRef.current = true;
+                    const rect = e.currentTarget?.getBoundingClientRect?.();
+                    const locationX = rect ? e.clientX - rect.left : (e.nativeEvent?.offsetX ?? 0);
+                    const locationY = rect ? e.clientY - rect.top : (e.nativeEvent?.offsetY ?? 0);
+                    handleGestureStart(locationX, locationY);
+                },
+                onPointerMove: (e: any) => {
+                    if (isSimulatingRef.current || !isPointerActiveRef.current) return;
+                    const rect = e.currentTarget?.getBoundingClientRect?.();
+                    const locationX = rect ? e.clientX - rect.left : (e.nativeEvent?.offsetX ?? 0);
+                    const locationY = rect ? e.clientY - rect.top : (e.nativeEvent?.offsetY ?? 0);
+                    handleGestureMove(locationX, locationY);
+                },
+                onPointerUp: () => {
+                    isPointerActiveRef.current = false;
+                    handleGestureEnd();
+                },
+                onPointerCancel: () => {
+                    isPointerActiveRef.current = false;
+                    handleGestureEnd();
+                },
+            };
+        }
+        return panResponder.panHandlers;
+    }, [handleGestureStart, handleGestureMove, handleGestureEnd, panResponder]);
 
     const filteredAimGuide = useMemo(() => {
         // Regla 6: En modo edición el taco y las guías no se mostrarán
@@ -731,7 +769,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
         const dashArray = getGuideStrokeDashArray(guideConfig.strokeStyle);
 
         return (
-            <G pointerEvents="none">
+            <G style={styles.pointerEventsNone}>
                 {filteredAimGuide.paths.map((path) => {
                     if (path.points.length < 2) return null;
 
@@ -863,7 +901,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                 const { width, height } = event.nativeEvent.layout;
                 containerSizeRef.current = { width, height };
             }}
-            {...panResponder.panHandlers}>
+            {...gestureHandlers}>
             <Svg width="100%" height="100%" viewBox={`0 0 ${layout.viewBox.width} ${layout.viewBox.height}`} style={{ overflow: 'visible' }}>
                 <Defs>
                     {/* Gradiente del marco de madera noble */}
@@ -1326,7 +1364,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                         const opacity = (1 - age) * 0.95;
 
                         return (
-                            <G key={pulse.id} pointerEvents="none">
+                            <G key={pulse.id} style={styles.pointerEventsNone}>
                                 {/* Anillo de choque exterior cian */}
                                 <Circle
                                     cx={svgPos.x}
@@ -1404,7 +1442,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                                         const dotColor = ball.id === 'white' ? '#dc2626' : '#0f172a';
                                         const baseDotRadius = isVertical ? 0.84 : 0.42;
                                         return (
-                                            <G pointerEvents="none">
+                                            <G style={styles.pointerEventsNone}>
                                                 {SPHERE_CLASSIC_DOTS.map((pt, idx) => {
                                                     const proj = projectSpherePointToSvg(pt, quat, mapped, ballRadiusSvg, baseDotRadius, isVertical);
                                                     if (!proj) return null;
@@ -1438,7 +1476,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                                     const baseDotRadius = isVertical ? 0.84 : 0.42;
 
                                     return (
-                                        <G pointerEvents="none">
+                                        <G style={styles.pointerEventsNone}>
                                             {/* Anillos de visión orbitales que giran con la bola */}
                                             {ringSegments1.map((d, i) => (
                                                 <Path key={`pba-ring1-${i}`} d={d} fill="none" stroke={ringColor} strokeWidth={isVertical ? 0.38 : 0.22} strokeDasharray={isVertical ? "1.8 1.2" : "1.0 0.7"} />
@@ -1477,7 +1515,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                                     const baseDotRadius = isVertical ? 0.72 : 0.36;
 
                                     return (
-                                        <G pointerEvents="none">
+                                        <G style={styles.pointerEventsNone}>
                                             {ringSegments.map((d, i) => (
                                                 <Path key={`dyna-ring-${i}`} d={d} fill="none" stroke={ringColor} strokeWidth={isVertical ? 0.45 : 0.25} />
                                             ))}
@@ -1505,7 +1543,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                                 if (ball.id === 'white' || ball.id === 'yellow') {
                                     const baseDotRadius = isVertical ? 0.88 : 0.44;
                                     return (
-                                        <G pointerEvents="none">
+                                        <G style={styles.pointerEventsNone}>
                                             {SPHERE_OCTAHEDRAL_DOTS.map((pt, idx) => {
                                                 const proj = projectSpherePointToSvg(pt, quat, mapped, ballRadiusSvg, baseDotRadius, isVertical);
                                                 if (!proj) return null;
@@ -1532,7 +1570,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                             })()}
 
                             {/* Destellos especulares y reflejo de caperuza fija estilo 8 Ball Pool */}
-                            <G pointerEvents="none">
+                            <G style={styles.pointerEventsNone}>
                                 {/* Caperuza curva elíptica de brillo superior izquierdo */}
                                 <Ellipse
                                     cx={mapped.x - ballRadiusSvg * 0.33}
@@ -1562,7 +1600,7 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
 
                             {/* Anillo de selección táctil si es la bola tiradora */}
                             {isCueBall && !isSimulating && (
-                                <G pointerEvents="none">
+                                <G style={styles.pointerEventsNone}>
                                     <Circle
                                         cx={mapped.x}
                                         cy={mapped.y}
@@ -1588,24 +1626,23 @@ function InteractiveBilliardsTableBase(props: Readonly<InteractiveBilliardsTable
                 })}
 
                 {/* 14. Taco de Billar interactivo sobre la mesa estilo 8 Ball Pool (Regla 6: Oculto en modo edición) */}
-                {showCueStick && !isSimulating && !isEditMode && (
-                    (() => {
-                        const cueBall = balls.find((b) => b.id === cueBallId);
-                        if (!cueBall) return null;
-                        const mappedCue = mapPointToSvg(cueBall.pos, orientation, layout);
-                        return (
-                            <CaromCueGadget
-                                cueBallSvgPos={mappedCue}
-                                aimDirection={aimDirection}
-                                tableOrientation={orientation}
-                                powerLevel={powerLevel}
-                                isSimulating={isSimulating}
-                                visible={true}
-                                cueSkin={tablePreferences.cueSkin}
-                            />
-                        );
-                    })()
-                )}
+                {(() => {
+                    const cueBall = balls.find((b) => b.id === cueBallId);
+                    if (!cueBall) return null;
+                    const mappedCue = mapPointToSvg(cueBall.pos, orientation, layout);
+                    const isCueVisible = Boolean(showCueStick && !isSimulating && !isEditMode);
+                    return (
+                        <CaromCueGadget
+                            cueBallSvgPos={mappedCue}
+                            aimDirection={aimDirection}
+                            tableOrientation={orientation}
+                            powerLevel={powerLevel}
+                            isSimulating={isSimulating}
+                            visible={isCueVisible}
+                            cueSkin={tablePreferences.cueSkin}
+                        />
+                    );
+                })()}
             </Svg>
 
             {showRuler && (

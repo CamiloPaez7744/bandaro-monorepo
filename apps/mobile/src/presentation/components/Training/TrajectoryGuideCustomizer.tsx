@@ -3,11 +3,31 @@ import {
     View,
     Text,
     StyleSheet,
-    TouchableOpacity,
+    Pressable,
+    Platform,
     Modal,
     ScrollView,
     useWindowDimensions,
 } from 'react-native';
+
+const TouchableOpacity = ({
+    style,
+    activeOpacity = 0.7,
+    children,
+    disabled,
+    ...props
+}: any) => (
+    <Pressable
+        {...props}
+        disabled={disabled}
+        style={({ pressed }) => [
+            typeof style === 'function' ? style({ pressed }) : style,
+            pressed && !disabled && { opacity: activeOpacity },
+        ]}
+    >
+        {children}
+    </Pressable>
+);
 import {
     IconX,
     IconRoute,
@@ -411,10 +431,14 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.12)',
         overflow: 'hidden',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.5,
-        shadowRadius: 20,
+        ...(Platform.OS === 'web'
+            ? { boxShadow: '0 10px 25px rgba(0, 0, 0, 0.5)' }
+            : {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 10 },
+                shadowOpacity: 0.5,
+                shadowRadius: 20,
+            }),
         elevation: 10,
     },
     header: {

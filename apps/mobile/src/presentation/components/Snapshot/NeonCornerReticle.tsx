@@ -34,8 +34,7 @@ function NeonCornerReticleComponent({
 }: NeonCornerReticleProps) {
   return (
     <View
-      pointerEvents="none"
-      style={[styles.container, { width: size, height: size }, style]}
+      style={[styles.container, { width: size, height: size, pointerEvents: 'none' }, style]}
     >
       <Svg width={size} height={size} viewBox="0 0 100 100">
         <Defs>

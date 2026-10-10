@@ -5,10 +5,28 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
   useWindowDimensions,
 } from 'react-native';
+
+const TouchableOpacity = ({
+  style,
+  activeOpacity = 0.7,
+  children,
+  disabled,
+  ...props
+}: any) => (
+  <Pressable
+    {...props}
+    disabled={disabled}
+    style={({ pressed }) => [
+      typeof style === 'function' ? style({ pressed }) : style,
+      pressed && !disabled && { opacity: activeOpacity },
+    ]}
+  >
+    {children}
+  </Pressable>
+);
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   IconBook,
@@ -220,10 +238,14 @@ const getStyles = (palette: ReturnType<typeof getPalette>, isDesktop: boolean, b
       maxWidth: isDesktop ? 840 : undefined,
       maxHeight: isDesktop ? '90%' : '88%',
       overflow: 'hidden',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 16 },
-      shadowOpacity: 0.65,
-      shadowRadius: 30,
+      ...(Platform.OS === 'web'
+        ? { boxShadow: '0 16px 35px rgba(0, 0, 0, 0.65)' }
+        : {
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 16 },
+            shadowOpacity: 0.65,
+            shadowRadius: 30,
+          }),
       elevation: 25,
     },
     sheetHandle: {
@@ -329,10 +351,14 @@ const getStyles = (palette: ReturnType<typeof getPalette>, isDesktop: boolean, b
       padding: isDesktop ? 20 : 12,
       justifyContent: 'space-between',
       gap: isDesktop ? 14 : 8,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.25,
-      shadowRadius: 10,
+      ...(Platform.OS === 'web'
+        ? { boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)' }
+        : {
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.25,
+            shadowRadius: 10,
+          }),
       elevation: 4,
     },
     cardHeaderRow: {

@@ -1,5 +1,24 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Animated, Platform } from 'react-native';
+
+const TouchableOpacity = ({
+    style,
+    activeOpacity = 0.7,
+    children,
+    disabled,
+    ...props
+}: any) => (
+    <Pressable
+        {...props}
+        disabled={disabled}
+        style={({ pressed }) => [
+            typeof style === 'function' ? style({ pressed }) : style,
+            pressed && !disabled && { opacity: activeOpacity },
+        ]}
+    >
+        {children}
+    </Pressable>
+);
 import {
     IconTrophy,
     IconAlertTriangle,
@@ -155,7 +174,7 @@ export const CaromRefereeBanner = React.memo(function CaromRefereeBanner({
                 Animated.timing(fadeAnim, {
                     toValue: 0,
                     duration: 400,
-                    useNativeDriver: true,
+                    useNativeDriver: Platform.OS !== 'web',
                 }).start(({ finished }) => {
                     if (finished && isMountedRef.current) {
                         onDismiss?.();
@@ -204,7 +223,7 @@ export const CaromRefereeBanner = React.memo(function CaromRefereeBanner({
         Animated.timing(fadeAnim, {
             toValue: 0,
             duration: 250,
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== 'web',
         }).start(({ finished }) => {
             if (finished && isMountedRef.current) {
                 onDismiss?.();
@@ -405,11 +424,15 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
         borderWidth: 1.5,
         backgroundColor: 'rgba(15, 23, 42, 0.94)',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.45,
-        shadowRadius: 10,
-        elevation: 8,
+        ...(Platform.OS === 'web'
+            ? { boxShadow: '0 4px 10px rgba(0, 0, 0, 0.45)' }
+            : {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.45,
+                shadowRadius: 10,
+                elevation: 8,
+            }),
     },
     simulatingContainer: {
         borderColor: 'rgba(56, 189, 248, 0.4)',

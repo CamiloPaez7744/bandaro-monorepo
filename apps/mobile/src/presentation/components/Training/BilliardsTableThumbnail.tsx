@@ -1,6 +1,6 @@
 import { memo, useId } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import Svg, { Circle, Defs, G, Line, LinearGradient, Polyline, RadialGradient, Rect, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, G, Line, LinearGradient, Polyline, RadialGradient, Rect, Stop, Text as SvgText } from 'react-native-svg';
 
 import type { Point2D } from '@/src/presentation/screens/Training/trainingData';
 
@@ -29,6 +29,14 @@ type AimGuide = {
     color?: string;
 };
 
+export type DiamondLabel = {
+    x: number;
+    y: number;
+    text: string;
+    color?: string;
+    bgColor?: string;
+};
+
 interface BilliardsTableThumbnailProps {
     orientation?: Orientation;
     style?: StyleProp<ViewStyle>;
@@ -38,6 +46,7 @@ interface BilliardsTableThumbnailProps {
     aim?: AimGuide;
     showPath?: boolean;
     showZones?: boolean;
+    diamondLabels?: DiamondLabel[];
 }
 
 const TABLE_W = 284;
@@ -170,7 +179,7 @@ function linePoints(points: Point2D[], orientation: Orientation, layout: ReturnT
 }
 
 function BilliardsTableThumbnailBase(props: Readonly<BilliardsTableThumbnailProps>) {
-    const { orientation = 'horizontal', style, balls = [], path = [], paths = [], aim, showPath = true, showZones = true } = props;
+    const { orientation = 'horizontal', style, balls = [], path = [], paths = [], aim, showPath = true, showZones = true, diamondLabels = [] } = props;
     const layout = getLayout(orientation);
     const uid = useId();
     let derivedPaths: TrajectoryPath[] = paths;
@@ -342,6 +351,38 @@ function BilliardsTableThumbnailBase(props: Readonly<BilliardsTableThumbnailProp
                           );
                       })
                     : null}
+
+                {diamondLabels && diamondLabels.length > 0 && (
+                    <G opacity={0.95}>
+                        {diamondLabels.map((lbl, idx) => {
+                            const mapped = mapPoint({ x: lbl.x, y: lbl.y }, orientation, layout);
+                            const textColor = lbl.color ?? '#38bdf8';
+                            const bg = lbl.bgColor ?? 'rgba(15, 23, 42, 0.9)';
+                            return (
+                                <G key={`dl-${idx}-${lbl.x}-${lbl.y}`}>
+                                    <Circle
+                                        cx={mapped.x}
+                                        cy={mapped.y}
+                                        r={3.8}
+                                        fill={bg}
+                                        stroke={textColor}
+                                        strokeWidth={0.5}
+                                    />
+                                    <SvgText
+                                        x={mapped.x}
+                                        y={mapped.y + 1.4}
+                                        fontSize={3.2}
+                                        fontWeight="bold"
+                                        fill={textColor}
+                                        textAnchor="middle"
+                                    >
+                                        {lbl.text}
+                                    </SvgText>
+                                </G>
+                            );
+                        })}
+                    </G>
+                )}
 
                 {balls.map((ball) => {
                     const mapped = mapPoint({ x: ball.x, y: ball.y }, orientation, layout);

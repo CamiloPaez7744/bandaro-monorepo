@@ -65,8 +65,12 @@ import IconBallBowling from '@tabler/icons-react-native/IconBallBowling';
 import IconChartBar from '@tabler/icons-react-native/IconChartBar';
 import IconClipboardList from '@tabler/icons-react-native/IconClipboardList';
 import IconMenu2 from '@tabler/icons-react-native/IconMenu2';
+import IconEyeOff from '@tabler/icons-react-native/IconEyeOff';
+import IconBulb from '@tabler/icons-react-native/IconBulb';
 
 export {
+    IconEyeOff,
+    IconBulb,
     IconCircleDot,
     IconTrophy,
     IconSparkles,
