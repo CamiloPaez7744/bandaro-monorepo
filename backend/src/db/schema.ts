@@ -178,10 +178,40 @@ export const billiardSystems = pgTable(
         difficulty: integer('difficulty').notNull().default(3),
         defaultBalls: jsonb('default_balls').notNull(),
         defaultTrajectory: jsonb('default_trajectory'),
+        author: varchar('author', { length: 100 }),
+        youtubeUrl: text('youtube_url'),
+        diagramUrl: text('diagram_url'),
+        diamondNumbers: jsonb('diamond_numbers'),
+        segmentedTrajectories: jsonb('segmented_trajectories'),
+        cheatSheets: jsonb('cheat_sheets'),
         createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     },
     (t) => [index('billiard_systems_cat_idx').on(t.category)]
 );
+
+export const pedagogyModules = pgTable(
+    'pedagogy_modules',
+    {
+        id: varchar('id', { length: 80 }).primaryKey(),
+        category: varchar('category', { length: 60 }).notNull(),
+        title: varchar('title', { length: 150 }).notNull(),
+        subtitle: varchar('subtitle', { length: 255 }).notNull(),
+        author: varchar('author', { length: 100 }).notNull(),
+        summary: text('summary').notNull(),
+        contentMarkdown: text('content_markdown').notNull(),
+        imageUrl: text('image_url'),
+        youtubeUrl: text('youtube_url'),
+        keyPrinciples: jsonb('key_principles'),
+        drills: jsonb('drills'),
+        orderIndex: integer('order_index').notNull().default(0),
+        createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    },
+    (t) => [
+        index('pedagogy_modules_cat_idx').on(t.category),
+        index('pedagogy_modules_order_idx').on(t.orderIndex),
+    ]
+);
+
 
 // ---------------------------------------------------------------------------
 // 4. Session History & Snapshots

@@ -82,7 +82,7 @@ export async function runSchemaUpdates() {
         CREATE INDEX IF NOT EXISTS user_progress_node_idx ON user_node_progress(node_id);
     `);
 
-    // 6. Classical Billiard Systems
+    // 6. Classical Billiard Systems & Extensions
     await db.execute(sql`
         CREATE TABLE IF NOT EXISTS billiard_systems (
             id varchar(60) PRIMARY KEY,
@@ -93,12 +93,47 @@ export async function runSchemaUpdates() {
             difficulty integer DEFAULT 3 NOT NULL,
             default_balls jsonb NOT NULL,
             default_trajectory jsonb,
+            author varchar(100),
+            youtube_url text,
+            diagram_url text,
+            diamond_numbers jsonb,
+            segmented_trajectories jsonb,
+            cheat_sheets jsonb,
             created_at timestamptz DEFAULT now() NOT NULL
         );
         CREATE INDEX IF NOT EXISTS billiard_systems_cat_idx ON billiard_systems(category);
+
+        ALTER TABLE billiard_systems
+            ADD COLUMN IF NOT EXISTS author varchar(100),
+            ADD COLUMN IF NOT EXISTS youtube_url text,
+            ADD COLUMN IF NOT EXISTS diagram_url text,
+            ADD COLUMN IF NOT EXISTS diamond_numbers jsonb,
+            ADD COLUMN IF NOT EXISTS segmented_trajectories jsonb,
+            ADD COLUMN IF NOT EXISTS cheat_sheets jsonb;
     `);
 
-    // 7. User Favorite Shots
+    // 7. Master Pedagogy Modules (Biomechanics, Bridges, Ball Thickness, etc.)
+    await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS pedagogy_modules (
+            id varchar(80) PRIMARY KEY,
+            category varchar(60) NOT NULL,
+            title varchar(150) NOT NULL,
+            subtitle varchar(255) NOT NULL,
+            author varchar(100) NOT NULL,
+            summary text NOT NULL,
+            content_markdown text NOT NULL,
+            image_url text,
+            youtube_url text,
+            key_principles jsonb,
+            drills jsonb,
+            order_index integer DEFAULT 0 NOT NULL,
+            created_at timestamptz DEFAULT now() NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS pedagogy_modules_cat_idx ON pedagogy_modules(category);
+        CREATE INDEX IF NOT EXISTS pedagogy_modules_order_idx ON pedagogy_modules(order_index);
+    `);
+
+    // 8. User Favorite Shots
     await db.execute(sql`
         CREATE TABLE IF NOT EXISTS user_favorite_shots (
             id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

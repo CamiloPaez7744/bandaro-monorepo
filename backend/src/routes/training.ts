@@ -7,6 +7,7 @@ import {
     trainingNodePositions,
     userNodeProgress,
     billiardSystems,
+    pedagogyModules,
     users,
 } from '../db/schema.js';
 import { verifyAccessToken } from './auth.js';
@@ -244,6 +245,53 @@ trainingRouter.get('/systems', async (_req: Request, res: Response) => {
         res.status(500).json({ error: 'Error al consultar sistemas.' });
     }
 });
+
+// ---------------------------------------------------------------------------
+// 3b. GET /training/systems/:id — Get specific system with complete cheat sheet & diamonds
+// ---------------------------------------------------------------------------
+trainingRouter.get('/systems/:id', async (req: Request, res: Response) => {
+    try {
+        const systemId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+        const [system] = await db
+            .select()
+            .from(billiardSystems)
+            .where(eq(billiardSystems.id, systemId))
+            .limit(1);
+
+        if (!system) {
+            return res.status(404).json({ error: 'Sistema no encontrado.' });
+        }
+
+        res.json({
+            success: true,
+            system,
+        });
+    } catch (error) {
+        console.error('[training] Error fetching system by id:', error);
+        res.status(500).json({ error: 'Error al consultar el sistema.' });
+    }
+});
+
+// ---------------------------------------------------------------------------
+// 3c. GET /training/pedagogy — Master Billiard Pedagogy Modules
+// ---------------------------------------------------------------------------
+trainingRouter.get('/pedagogy', async (_req: Request, res: Response) => {
+    try {
+        const modules = await db
+            .select()
+            .from(pedagogyModules)
+            .orderBy(asc(pedagogyModules.orderIndex));
+
+        res.json({
+            success: true,
+            modules,
+        });
+    } catch (error) {
+        console.error('[training] Error fetching pedagogy modules:', error);
+        res.status(500).json({ error: 'Error al consultar módulos pedagógicos.' });
+    }
+});
+
 
 // ---------------------------------------------------------------------------
 // 4. POST /training/session — Save a completed training session (Legacy)
