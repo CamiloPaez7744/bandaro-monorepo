@@ -71,30 +71,36 @@ function RootLayoutNav() {
         <View style={styles.webShell}>
           <WebSidebar collapsed={sidebarCollapsed} onToggleCollapsed={() => setSidebarCollapsed((value) => !value)} />
           <View style={styles.webContent}>
-            <Stack>
+            <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
               <Stack.Screen name="training/simulate" options={{ headerShown: false }} />
-              <Stack.Screen name="auth/login" options={{ title: t('stack.login') }} />
-              <Stack.Screen name="auth/register" options={{ title: t('stack.register') }} />
-              <Stack.Screen name="training/index" options={{ title: t('stack.training') }} />
-              <Stack.Screen name="training/[systemId]" options={{ title: t('stack.trainingSystem') }} />
-              <Stack.Screen name="match/new" options={{ title: t('stack.newMatch') }} />
-              <Stack.Screen name="match/live" options={{ title: t('stack.liveMatch') }} />
-              <Stack.Screen name="match/summary" options={{ title: t('stack.summary') }} />
+              <Stack.Screen name="training/session" options={{ headerShown: false }} />
+              <Stack.Screen name="training/index" options={{ headerShown: false }} />
+              <Stack.Screen name="training/[systemId]" options={{ headerShown: false }} />
+              <Stack.Screen name="catalog/index" options={{ headerShown: false }} />
+              <Stack.Screen name="catalog/[shotId]" options={{ headerShown: false }} />
+              <Stack.Screen name="match/new" options={{ headerShown: false }} />
+              <Stack.Screen name="match/live" options={{ headerShown: false }} />
+              <Stack.Screen name="match/summary" options={{ headerShown: false }} />
+              <Stack.Screen name="auth/login" options={{ headerShown: false }} />
+              <Stack.Screen name="auth/register" options={{ headerShown: false }} />
             </Stack>
           </View>
         </View>
       ) : (
-        <Stack>
+        <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="training/simulate" options={{ headerShown: false }} />
-          <Stack.Screen name="auth/login" options={{ title: t('stack.login') }} />
-          <Stack.Screen name="auth/register" options={{ title: t('stack.register') }} />
-          <Stack.Screen name="training/index" options={{ title: t('stack.training') }} />
-          <Stack.Screen name="training/[systemId]" options={{ title: t('stack.trainingSystem') }} />
-          <Stack.Screen name="match/new" options={{ title: t('stack.newMatch') }} />
-          <Stack.Screen name="match/live" options={{ title: t('stack.liveMatch') }} />
-          <Stack.Screen name="match/summary" options={{ title: t('stack.summary') }} />
+          <Stack.Screen name="training/session" options={{ headerShown: false }} />
+          <Stack.Screen name="training/index" options={{ headerShown: false }} />
+          <Stack.Screen name="training/[systemId]" options={{ headerShown: false }} />
+          <Stack.Screen name="catalog/index" options={{ headerShown: false }} />
+          <Stack.Screen name="catalog/[shotId]" options={{ headerShown: false }} />
+          <Stack.Screen name="match/new" options={{ headerShown: false }} />
+          <Stack.Screen name="match/live" options={{ headerShown: false }} />
+          <Stack.Screen name="match/summary" options={{ headerShown: false }} />
+          <Stack.Screen name="auth/login" options={{ headerShown: false }} />
+          <Stack.Screen name="auth/register" options={{ headerShown: false }} />
         </Stack>
       )}
     </ThemeProvider>

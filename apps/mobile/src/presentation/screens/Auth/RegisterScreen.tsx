@@ -9,6 +9,7 @@ import { FLAG_OPTIONS, getFlagByCode } from '@/src/constants/flags';
 import { useColorScheme } from '@/components/useColorScheme';
 import { useI18n } from '@/components/useLanguage';
 import { getPalette, theme } from '@/constants/theme';
+import { IconArrowLeft } from '@/src/presentation/components/icons';
 
 export function RegisterScreen() {
   const router = useRouter();
@@ -57,6 +58,17 @@ export function RegisterScreen() {
           paddingBottom: theme.spacing.md + insets.bottom + 24,
         },
       ]}>
+      {router.canGoBack() && (
+        <View style={styles.topBar}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => router.back()}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.back')}>
+            <IconArrowLeft size={20} color={palette.text} />
+          </TouchableOpacity>
+        </View>
+      )}
       <Text style={styles.title}>{t('auth.register.title')}</Text>
       <Text style={styles.subtitle}>{t('auth.register.subtitle')}</Text>
 
@@ -151,6 +163,21 @@ const getStyles = (palette: ReturnType<typeof getPalette>) =>
       backgroundColor: palette.background,
       padding: theme.spacing.md,
       gap: 8,
+    },
+    topBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 4,
+    },
+    backBtn: {
+      width: 38,
+      height: 38,
+      borderRadius: theme.radius.md,
+      backgroundColor: palette.surfaceLow,
+      borderWidth: 1,
+      borderColor: palette.border,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     title: {
       color: palette.text,

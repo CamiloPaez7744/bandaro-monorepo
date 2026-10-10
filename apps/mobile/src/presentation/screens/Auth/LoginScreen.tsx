@@ -15,7 +15,7 @@ import { useAuth } from '@/components/useAuth';
 import { useColorScheme } from '@/components/useColorScheme';
 import { useI18n } from '@/components/useLanguage';
 import { getPalette, theme } from '@/constants/theme';
-import { IconSparkles } from '@/src/presentation/components/icons';
+import { IconArrowLeft, IconSparkles } from '@/src/presentation/components/icons';
 
 export function LoginScreen() {
   const router = useRouter();
@@ -100,6 +100,17 @@ export function LoginScreen() {
         },
       ]}>
       <View style={styles.contentWrap}>
+        {router.canGoBack() && (
+          <View style={styles.topBar}>
+            <TouchableOpacity
+              style={styles.backBtn}
+              onPress={() => router.back()}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.back')}>
+              <IconArrowLeft size={20} color={palette.text} />
+            </TouchableOpacity>
+          </View>
+        )}
         <View style={styles.headerCol}>
           <Text style={styles.title}>{t('auth.login.title')}</Text>
           <Text style={styles.subtitle}>{t('auth.login.subtitle')}</Text>
@@ -215,6 +226,20 @@ const getStyles = (palette: ReturnType<typeof getPalette>) =>
       width: '100%',
       maxWidth: 480,
       gap: 12,
+    },
+    topBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    backBtn: {
+      width: 38,
+      height: 38,
+      borderRadius: theme.radius.md,
+      backgroundColor: palette.surfaceLow,
+      borderWidth: 1,
+      borderColor: palette.border,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     headerCol: {
       gap: 4,

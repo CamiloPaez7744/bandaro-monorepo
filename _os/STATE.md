@@ -27,19 +27,65 @@ Enforce, validate, and permanently encode the 10 Mandatory System Rules across B
 - Phase: In Progress / Verification Completed for Power Meter Redesign
 - Recent Changes:
   - Refined `CaromPowerMeter.tsx`:
-    - Adjusted track to wider beveled frame (`trackWidth: 22..26px`, `outer: 28..32px`) with technical squared corners (`borderRadius: 4.5px`).
-    - Positioned the Venom WS cue stick centered horizontally in the middle of the channel (`left: (trackWidth - cueWidth) / 2`).
-    - Applied 3D depth shadow to the cue stick so it floats crisply over the channel.
-    - Integrated rich multi-stop chromatic power gradient (yellow -> amber -> orange -> red) with subtle 45° diagonal hazard stripes revealed above the cue as it pulls down.
-    - Added full-width horizontal divider lines at 25%, 50%, 75% power levels.
-    - Set `overflow: 'hidden'` strictly on the inner channel and frame so the cue stick is neatly contained inside when retracted.
-    - Preserved top arrow only ([IconArrowUp](file:///c:/Projects/React/Billard-app/bandaro-monorepo/apps/mobile/src/presentation/components/icons/index.ts)).
-    - Preserved single-line bottom speed readout (`V1..V5` / `VEL 1..5`).
-    - Verified 0 TypeScript errors and 61/61 passing unit tests.
-- Verification Results:
+    - Inverted power colors so Level 1 (top, low speed) starts in Cyan, transitioning smoothly to Emerald Green (Level 2), Amber/Gold (Level 3), Orange (Level 4), and fiery Red (Level 5) at maximum speed/potencia at the bottom.
+    - Added full internal speed graduation numbers from 1 to 5 (1, 2, 3, 4, 5) with matching colored tick marks and micro-ticks.
+    - Preserved deep cue travel so that at 100% power, only the tip/ferrule remains visible at the bottom, showcasing the full column of colored diagonal bars.
+  - Fixed Aim Guide Stability & Geometry in `useTrainingSimulation.ts` and `trajectoryGuide.ts`:
+    - Decoupled `trajectory` pre-shot prediction from `powerPercentage` by utilizing a canonical reference power (`CANONICAL_AIM_POWER = 55`), completely eliminating aim guide trembling, erratic recalculation, stretching, or shrinking when charging power.
+  - Fixed Cue Stick Transparency Bug after Shot Execution:
+    - Root cause: In React Native Web / SVG, conditional unmounting of `<CaromCueGadget>` during `isSimulating === true` caused its `<Defs>` to detach from the DOM. When remounting after shot completion, references like `fill="url(#buttBodyGrad)"` or `fill="url(#shaftBodyGrad)"` failed to resolve, falling back to transparent fills (`fill: none`). Furthermore, static gradient IDs in both `CaromCueGadget.tsx` and `CaromPowerMeter.tsx` clashed between table and meter instances.
+    - Resolution:
+      1. Kept `<CaromCueGadget>` permanently mounted in `InteractiveBilliardsTable.tsx` and controlled visibility via SVG group opacity (`opacity={isCueVisible ? 1 : 0}`), guaranteeing `<Defs>` are never destroyed on shot transitions.
+      2. Generated unique stable instance IDs (`cueUid` and `meterUid`) for all SVG linear/radial gradients.
+      3. Added solid fallback fill layers beneath every gradient-filled shape (`#0f172a`, `#1e293b`, `#0284c7`, `#cbd5e1`, `#cfa875`) so cues are physically immune to any SVG paint detachment or frame delays.
+## Recent Milestones & Pedagogy Expansion
+- **Didactic 3-Cushion Billiard Mastery System & Database Persistence**:
+  1. **Research Treatise & Master Notebook**:
+     - Created `docs/theory/cuaderno_maestro_billar_tres_bandas.md` synthesizing world champions: Marco Zanetti, José María Quetglas, Raymond Ceulemans, Frédéric Caudron, Torbjörn Blomdahl, and AM Billiard Academy.
+  2. **High-Fidelity Educational Infographics**:
+     - `billiard_bridges_guide.jpg`: Closed loop bridge (anilla), open V-bridge, rail bridges.
+     - `billiard_posture_stance.jpg`: Biomechanical stance, 45° triangle feet anchor, flat spine, 10 cm chin, 90° pendulum forearm, 60/40 balance.
+     - `billiard_ball_thickness.jpg`: Geometric ball contact cuts (1/8, 1/4, 1/2, 3/4, full ball).
+     - Deployed in both `docs/theory/images/` and `apps/mobile/assets/images/theory/`.
+  3. **PostgreSQL Database Storage**:
+     - Extended `billiard_systems` schema with `author`, `youtube_url`, `diagram_url`, `diamond_numbers`, `segmented_trajectories`, `cheat_sheets`.
+     - Created `pedagogy_modules` table with complete instructional content, video references, and drills.
+     - Seeded 4 master pedagogy modules and enriched `base-50` with interactive Cheat Sheet data (Origins 50, 40, 30, 60).
+  4. **Frontend Canonical Cheat Sheet & Diamond Numbering**:
+     - Enriched `BilliardsTableThumbnail.tsx` with dynamic `diamondLabels` on table rails.
+     - Created `MasterPedagogyModal.tsx` for structured visual theory exploration.
+     - Added Mode Switcher in `TrainingSystemScreen.tsx` with canonical cheat sheet origins, shot selection, multi-cushion segmented colored trajectories (1st-3rd cushion: Cyan `#06b6d4`, 3rd-4th cushion: Amber `#f59e0b`, 4th-5th cushion: Emerald `#10b981`), and interactive calculation cards.
+- **Learning Roadmap (Ruta de Aprendizaje Funcional & Didáctica)**:
+  1. **Curriculum Completo de 20 Estaciones y 4 Niveles**:
+     - Cada una de las 20 estaciones de los 4 niveles cuenta con posiciones de billar reales, bolas, trayectorias vectoriales, consejos de maestros (Zanetti, Quetglas, Ceulemans, AM Billiard) y recompensas de XP.
+     - Persistido y sincronizado en PostgreSQL (`training_levels`, `training_nodes`, `training_node_positions`).
+  2. **Modal Interactivo de Estación (`RouteNodeDetailModal.tsx`)**:
+     - Previsualización táctica de la mesa con `BilliardsTableThumbnail`, selector de tiro interactivo, badge de estado, puntos clave del entrenador y accesos directos al entrenamiento guiado, teoría biomecánica y cheat sheet.
+  3. **Sesión Guiada Conectada End-to-End (`TrainingActiveSessionScreen.tsx`)**:
+     - Carga automática de posiciones y título de la estación (`/training/session?nodeId=...`).
+     - Al completar la práctica, sincroniza con `POST /training/node-progress`, calcula estrellas (1-3 ⭐), otorga XP y desbloquea en la base de datos la siguiente estación en la secuencia.
+  4. **Refresco Reactivo en el Catálogo (`TrainingCatalogScreen.tsx`)**:
+     - `useFocusEffect` recarga automáticamente el progreso desde el backend al regresar al catálogo, mostrando inmediatamente las estaciones desbloqueadas y estrellas obtenidas.
+- **Tactical Solver & Colombian Carom Systems (Entrenador y Solucionador Táctico)**:
+  1. **Solucionador Táctico de Carambolas (`billiardsPlaySolver.ts`)**:
+     - Analizador geométrico que detecta la configuración espacial de las 3 bolas y propone la carambola canónica más óptima y alternativas de posicionamiento/defensa.
+     - Identificación rigurosa de familias del billar colombiano: **Rodadas**, **Cajones**, **Pase Bola**, **Sistema LLK Willie Hoppe**, **Renversé**, **Serrucho**, **Zigzag**, **Retroceso/Jale**, **Tiki (Banda y Bola)** y **Bricoles**.
+     - Recomendación precisa de parámetros técnicos: Tipo de golpe, tome de bola (1/8 a lleno), fuerza (1 a 5), y efecto según el reloj de Willie Hoppe.
+  2. **Reloj de Efectos Willie Hoppe (`WillieHoppeClock.tsx`)**:
+     - Componente visual interactivo fiel a la escala Hoppe: efecto 0 (12:00), cuadrante derecho (+1 a +4 ecuador y +5 a +7 jale), cuadrante izquierdo (-1 a -3 y -4 a -5).
+  3. **Sistema LLK Willie Hoppe & Diamantes en Mesa (`TrainingPlayTable.tsx`)**:
+     - Soporte para visualización de diamantes de Willie Hoppe (Ep. 130 El Flaco Billarista): Banda larga superior con rótulo "Suma" (diamantes 2, 4, 6, 8 en rojo), banda corta izquierda "Resta" (-1, -2, -3), cabecera derecha (-4, -5, -6), banda inferior (-1, -2, -3).
+     - Fórmula matemática interactiva: `Llegada = Suma - Resta`.
+  4. **Panel Solucionador en Sesión (`TacticalSolverPanel.tsx` & `TrainingActiveSessionScreen.tsx`)**:
+     - Panel reactivo en `http://localhost:8081/training/session` que muestra la jugada óptima, consejos del maestro, dial de Hoppe y botón para simular la trayectoria en la mesa en tiempo real.
+  5. **Compendio Teórico y Pedagógico (MasterPedagogyModal & PostgreSQL)**:
+     - Infografías de alta fidelidad `billiard_shot_types.jpg` y `billiard_hoppe_system.jpg`.
+     - 3 nuevas lecciones maestras en frontend y backend: Tipos de Golpes (Corrido, Semicorrido, Mate, Retroceso, Masé, Piqué, Penetración), Nomenclatura Colombiana y Sistema LLK Willie Hoppe.
+- **Verification Results**:
   - `@bandaro/mobile`: `tsc --noEmit` passing with 0 errors.
-  - `@bandaro/core`: 61/61 tests passing.
+  - `@bandaro/backend`: `tsc --noEmit` passing with 0 errors.
+  - `@bandaro/backend`: 18/18 tests passing (100%).
+  - `@bandaro/core`: 61/61 tests passing (100%).
+  - Live API: `GET /training/pedagogy` (7 módulos) y `GET /training/systems/llk-hoppe` retornan 200 OK.
   - No Git commit executed (per Rule 10).
 
-## Next Step
-Validate new centered-cue and wider beveled layout with user.

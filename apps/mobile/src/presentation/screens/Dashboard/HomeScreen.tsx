@@ -3,6 +3,7 @@ import {
   Animated,
   Dimensions,
   Image,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -42,14 +43,14 @@ function HubCard({
 
   const handlePressIn = () =>
     Animated.parallel([
-      Animated.spring(scale, { toValue: 0.96, useNativeDriver: true, tension: 200, friction: 10 }),
-      Animated.timing(opacity, { toValue: 0.82, duration: 80, useNativeDriver: true }),
+      Animated.spring(scale, { toValue: 0.96, useNativeDriver: Platform.OS !== 'web', tension: 200, friction: 10 }),
+      Animated.timing(opacity, { toValue: 0.82, duration: 80, useNativeDriver: Platform.OS !== 'web' }),
     ]).start();
 
   const handlePressOut = () =>
     Animated.parallel([
-      Animated.spring(scale, { toValue: 1, useNativeDriver: true, tension: 180, friction: 8 }),
-      Animated.timing(opacity, { toValue: 1, duration: 120, useNativeDriver: true }),
+      Animated.spring(scale, { toValue: 1, useNativeDriver: Platform.OS !== 'web', tension: 180, friction: 8 }),
+      Animated.timing(opacity, { toValue: 1, duration: 120, useNativeDriver: Platform.OS !== 'web' }),
     ]).start();
 
   const Icon = card.icon;

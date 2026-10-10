@@ -1,6 +1,6 @@
-import { useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useColorScheme } from '@/components/useColorScheme';
@@ -10,6 +10,7 @@ import { Average } from '@/src/domain/value-objects/Average';
 import { HighestRun } from '@/src/domain/value-objects/HighestRun';
 import type { SummaryMatch } from '@/types';
 import { StatChip } from '@/src/presentation/components/StatChip';
+import { IconArrowLeft } from '@/src/presentation/components/icons';
 import { container } from '@/src/presentation/container';
 
 const initialSummary: SummaryMatch = {
@@ -22,6 +23,7 @@ const initialSummary: SummaryMatch = {
 };
 
 export function SummaryScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const palette = getPalette(useColorScheme());
@@ -71,7 +73,16 @@ export function SummaryScreen() {
           paddingBottom: theme.spacing.md + insets.bottom + 24,
         },
       ]}>
-      <Text style={styles.title}>{t('summary.title')}</Text>
+      <View style={styles.topBar}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/history'))}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.back')}>
+          <IconArrowLeft size={20} color={palette.text} />
+        </TouchableOpacity>
+        <Text style={styles.title}>{t('summary.title')}</Text>
+      </View>
       <Text style={styles.subtitle}>
         {t('summary.winner', { winner: resumen.ganador === 'EMPATE' ? t('summary.winner.draw') : resumen.ganador })}
       </Text>
@@ -105,6 +116,21 @@ const getStyles = (palette: ReturnType<typeof getPalette>) =>
       backgroundColor: palette.background,
       padding: theme.spacing.md,
       gap: theme.spacing.sm,
+    },
+    topBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    backBtn: {
+      width: 38,
+      height: 38,
+      borderRadius: theme.radius.md,
+      backgroundColor: palette.surfaceLow,
+      borderWidth: 1,
+      borderColor: palette.border,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     title: {
       fontSize: 28,

@@ -7,6 +7,7 @@ import { useAuth } from '@/components/useAuth';
 import { useColorScheme } from '@/components/useColorScheme';
 import { useI18n } from '@/components/useLanguage';
 import { getPalette, theme } from '@/constants/theme';
+import { IconArrowLeft } from '@/src/presentation/components/icons';
 import { container } from '@/src/presentation/container';
 
 export function NewMatchScreen() {
@@ -65,6 +66,16 @@ export function NewMatchScreen() {
           paddingBottom: theme.spacing.md + insets.bottom + 24,
         },
       ]}>
+      <View style={styles.topBar}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)')}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.back')}>
+          <IconArrowLeft size={20} color={palette.text} />
+        </TouchableOpacity>
+      </View>
+
       <View style={styles.hero}>
         <Text style={styles.heroTag}>{t('newMatch.heroTag')}</Text>
         <Text style={styles.title}>{t('newMatch.title')}</Text>
@@ -221,6 +232,20 @@ const getStyles = (palette: ReturnType<typeof getPalette>) =>
       backgroundColor: palette.background,
       padding: theme.spacing.md,
       gap: theme.spacing.md,
+    },
+    topBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    backBtn: {
+      width: 38,
+      height: 38,
+      borderRadius: theme.radius.md,
+      backgroundColor: palette.surfaceLow,
+      borderWidth: 1,
+      borderColor: palette.border,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     hero: {
       borderRadius: theme.radius.lg,

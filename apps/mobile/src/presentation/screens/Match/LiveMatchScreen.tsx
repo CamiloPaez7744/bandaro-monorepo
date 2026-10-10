@@ -20,6 +20,7 @@ import Svg, { Circle } from 'react-native-svg';
 import { useColorScheme } from '@/components/useColorScheme';
 import { useI18n } from '@/components/useLanguage';
 import { getPalette, theme } from '@/constants/theme';
+import { IconArrowLeft } from '@/src/presentation/components/icons';
 import { container } from '@/src/presentation/container';
 import { useMatchLiveMatch } from '@/src/presentation/hooks/useMatchLiveMatch';
 
@@ -89,13 +90,13 @@ export function LiveMatchScreen() {
         toValue: partida.turnoActual === 'A' ? 1.04 : 0.96,
         friction: 4,
         tension: 60,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.spring(animatedScaleB, {
         toValue: partida.turnoActual === 'B' ? 1.04 : 0.96,
         friction: 4,
         tension: 60,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start();
   }, [animatedScaleA, animatedScaleB, partida]);
@@ -106,13 +107,13 @@ export function LiveMatchScreen() {
         toValue: 1.07,
         duration: 160,
         easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.timing(pulseClock, {
         toValue: 1,
         duration: 280,
         easing: Easing.inOut(Easing.quad),
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start();
   }, [pulseClock, shotClock]);
@@ -174,9 +175,34 @@ export function LiveMatchScreen() {
           paddingBottom: theme.spacing.md + insets.bottom + 24,
         },
       ]}>
-      <View style={styles.entryWrap}>
-        <Text style={styles.entryChip}>{t('live.entry')}</Text>
-        <Text style={styles.entryNumber}>{entradaActual}</Text>
+      <View style={styles.topBar}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => {
+            Alert.alert(
+              t('live.exitTitle'),
+              t('live.exitConfirm'),
+              [
+                { text: t('common.cancel'), style: 'cancel' },
+                {
+                  text: t('live.exit'),
+                  style: 'destructive',
+                  onPress: () => (router.canGoBack() ? router.back() : router.replace('/(tabs)')),
+                },
+              ]
+            );
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.back')}>
+          <IconArrowLeft size={20} color={palette.text} />
+        </TouchableOpacity>
+
+        <View style={styles.entryWrap}>
+          <Text style={styles.entryChip}>{t('live.entry')}</Text>
+          <Text style={styles.entryNumber}>{entradaActual}</Text>
+        </View>
+
+        <View style={{ width: 38 }} />
       </View>
 
       <View style={styles.scoreRow}>
@@ -357,6 +383,23 @@ const getStyles = (palette: ReturnType<typeof getPalette>) =>
       fontSize: 28,
       fontWeight: '800',
       color: palette.text,
+    },
+    topBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 4,
+      marginBottom: 4,
+    },
+    backBtn: {
+      width: 38,
+      height: 38,
+      borderRadius: theme.radius.md,
+      backgroundColor: palette.surfaceLow,
+      borderWidth: 1,
+      borderColor: palette.border,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     entryWrap: {
       alignItems: 'center',

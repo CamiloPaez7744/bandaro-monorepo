@@ -4,7 +4,7 @@ import {
     useWindowDimensions, Modal, StyleSheet, type ViewStyle, type TextStyle,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { IconX, IconPlayerPlay, IconBookmark, IconTarget } from '@tabler/icons-react-native';
+import { IconX, IconPlayerPlay, IconBookmark, IconTarget, IconArrowLeft } from '@tabler/icons-react-native';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { useAuth } from '@/components/useAuth';
@@ -280,8 +280,18 @@ export function ShotDetailScreen({ shotId: propShotId, onClose, onSimulate }: Sh
             style={{ flex: 1, backgroundColor: palette.background } as any}
             contentContainerStyle={{ padding: isWide ? 28 : 16, maxWidth: 1060, alignSelf: 'center', width: '100%' }}
         >
-            {/* Header: Save button on Left, Close button on Right */}
+            {/* Header: Back & Save button on Left, Close button on Right */}
             <View style={styles.headerRow}>
+                <Pressable
+                    onPress={handleClose}
+                    hitSlop={8}
+                    style={styles.backBtn}
+                    accessibilityRole="button"
+                    accessibilityLabel={labels.close}
+                >
+                    <IconArrowLeft size={19} color={palette.text} />
+                </Pressable>
+
                 <Pressable
                     onPress={handleToggleFavorite}
                     hitSlop={8}
@@ -562,6 +572,7 @@ function Tag({ label, color }: { label: string; color: string }) {
 const styles = StyleSheet.create({
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' } as ViewStyle,
     headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 } as ViewStyle,
+    backBtn: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(128,128,128,0.1)', marginRight: 8 } as ViewStyle,
     closeBtn: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(128,128,128,0.1)' } as ViewStyle,
     favoriteBtn: {
         flexDirection: 'row',

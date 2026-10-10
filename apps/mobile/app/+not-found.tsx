@@ -9,7 +9,7 @@ export default function NotFoundScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: t('notFound.title') }} />
+      <Stack.Screen options={{ title: t('notFound.title'), headerShown: false }} />
       <View style={styles.container}>
         <Text style={styles.title}>{t('notFound.message')}</Text>
 

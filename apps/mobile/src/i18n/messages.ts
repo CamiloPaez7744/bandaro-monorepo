@@ -159,6 +159,10 @@ const es = {
     'live.finishMatch': 'FINALIZAR PARTIDA',
     'live.errorRegister': 'No se pudo registrar la entrada.',
     'live.errorUndo': 'No se pudo deshacer la entrada.',
+    'live.exitTitle': 'Salir de la partida',
+    'live.exitConfirm': '¿Deseas salir de la partida en curso?',
+    'live.exit': 'Salir',
+
 
     'summary.title': 'Resumen de Partida',
     'summary.winner': 'Ganador: {winner}',
@@ -533,6 +537,10 @@ const en: Record<TranslationKey, string> = {
     'live.finishMatch': 'FINISH MATCH',
     'live.errorRegister': 'Could not register inning.',
     'live.errorUndo': 'Could not undo inning.',
+    'live.exitTitle': 'Exit Match',
+    'live.exitConfirm': 'Do you want to exit the current match?',
+    'live.exit': 'Exit',
+
 
     'summary.title': 'Match Summary',
     'summary.winner': 'Winner: {winner}',
