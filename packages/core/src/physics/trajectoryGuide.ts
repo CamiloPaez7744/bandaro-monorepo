@@ -226,7 +226,21 @@ export function filterAimTrajectory(
 
             const cueResultPoints = [...approachPoints];
             if (postPoints.length > 0) {
-                cueResultPoints.push(postPoints[postPoints.length - 1]);
+                const lastPt = postPoints[postPoints.length - 1];
+                const dx = lastPt.pos.x - impactPos.x;
+                const dy = lastPt.pos.y - impactPos.y;
+                const len = Math.hypot(dx, dy);
+                if (len > 0.001 && len < SHORT_EXIT_DISTANCE) {
+                    cueResultPoints.push({
+                        ...lastPt,
+                        pos: {
+                            x: impactPos.x + (dx / len) * SHORT_EXIT_DISTANCE,
+                            y: impactPos.y + (dy / len) * SHORT_EXIT_DISTANCE,
+                        },
+                    });
+                } else {
+                    cueResultPoints.push(lastPt);
+                }
             }
 
             const paths: TrajectoryPath[] = [{
@@ -271,7 +285,21 @@ export function filterAimTrajectory(
                         if (pt.type === 'collision' || pt.type === 'cushion') break;
                     }
 
-                    const objStraight = [objStart, objPoints[objPoints.length - 1]];
+                    const lastObjPt = objPoints[objPoints.length - 1];
+                    const dx = lastObjPt.pos.x - objStart.pos.x;
+                    const dy = lastObjPt.pos.y - objStart.pos.y;
+                    const len = Math.hypot(dx, dy);
+                    const finalObjPt = len > 0.001 && len < SHORT_EXIT_DISTANCE
+                        ? {
+                            ...lastObjPt,
+                            pos: {
+                                x: objStart.pos.x + (dx / len) * SHORT_EXIT_DISTANCE,
+                                y: objStart.pos.y + (dy / len) * SHORT_EXIT_DISTANCE,
+                            },
+                        }
+                        : lastObjPt;
+
+                    const objStraight = [objStart, finalObjPt];
                     paths.push({
                         ballId: targetBallId,
                         points: objStraight,
@@ -312,8 +340,22 @@ export function filterAimTrajectory(
             if (straightPoints.length < 2 && cuePath.points.length >= 2) {
                 straightPoints.push(cuePath.points[1]);
             }
+            const lastNoImpactPt = straightPoints[straightPoints.length - 1];
+            const dx = lastNoImpactPt.pos.x - startPt.pos.x;
+            const dy = lastNoImpactPt.pos.y - startPt.pos.y;
+            const len = Math.hypot(dx, dy);
+            const finalNoImpactPt = len > 0.001 && len < STUB_DISTANCE
+                ? {
+                    ...lastNoImpactPt,
+                    pos: {
+                        x: startPt.pos.x + (dx / len) * STUB_DISTANCE,
+                        y: startPt.pos.y + (dy / len) * STUB_DISTANCE,
+                    },
+                }
+                : lastNoImpactPt;
+
             return {
-                paths: [{ ballId: cueBallId, points: [startPt, straightPoints[straightPoints.length - 1]] }],
+                paths: [{ ballId: cueBallId, points: [startPt, finalNoImpactPt] }],
                 ghostBallPos: null,
                 firstImpactType: null,
             };
