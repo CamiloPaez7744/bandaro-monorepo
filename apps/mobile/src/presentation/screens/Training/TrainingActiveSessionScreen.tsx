@@ -19,6 +19,9 @@ import {
   IconPlus,
   IconSparkles,
   IconTrophy,
+  IconBulb,
+  IconEye,
+  IconEyeOff,
 } from '@tabler/icons-react-native';
 
 import { useColorScheme } from '@/components/useColorScheme';
@@ -47,6 +50,17 @@ import {
   type CongratulationQuote,
 } from '@/src/presentation/screens/Training/congratulationQuotes';
 import { saveTrainingSessionToBackend } from '@/src/infrastructure/training/trainingApi';
+import { apiFetch } from '@/src/infrastructure/security/cryptoClient';
+import {
+  TRAINING_ROUTE_LEVELS,
+  type RouteNode,
+} from '@/src/presentation/screens/Training/trainingRouteData';
+import {
+  TacticalSolverPanel,
+  solveBilliardPosition,
+  type TacticalSolution,
+  type HoppeSpinEffect,
+} from '@/src/presentation/components/Training';
 
 export interface PositionData {
   id: string;
@@ -62,60 +76,60 @@ export interface PositionData {
 
 const TRAINING_STORAGE_KEY = '@billar/training_sessions';
 
-// Built-in foundational 3-cushion practice positions
+// Built-in foundational 3-cushion tournament practice positions (canonical forward carom physics)
 const DEFAULT_POSITIONS: PositionData[] = [
   {
-    id: 'bricole-50',
-    name: 'Bricole Clásico de Banda Corta',
+    id: 'rodada-1',
+    name: 'Rodada Canónica a 3 Bandas (L-C-L)',
+    category: 'Rodadas',
+    hint: 'Grosor 1/2 bola, efecto a favor a las 2:00. Corrido natural alrededor de la mesa tocando 3 bandas.',
+    difficulty: 3,
+    white: { x: 50.0, y: 110.0 },
+    yellow: { x: 100.0, y: 65.0 },
+    red: { x: 230.0, y: 105.0 },
+    trajectory: [
+      { x: 50.0, y: 110.0 },
+      { x: 96.0, y: 68.0 },
+      { x: 160.0, y: 4.0 },
+      { x: 280.0, y: 55.0 },
+      { x: 210.0, y: 138.0 },
+      { x: 230.0, y: 105.0 },
+    ],
+  },
+  {
+    id: 'cajon-8',
+    name: 'Cajón Clásico con Retroceso (C-L-C)',
+    category: 'Cajones',
+    hint: 'Grosor 1/2 bola con efecto ecuatorial. Salida a banda corta cerrando el cuadro pequeño hacia la bola roja.',
+    difficulty: 3,
+    white: { x: 95.0, y: 80.0 },
+    yellow: { x: 50.0, y: 50.0 },
+    red: { x: 75.0, y: 115.0 },
+    trajectory: [
+      { x: 95.0, y: 80.0 },
+      { x: 54.0, y: 52.0 },
+      { x: 4.0, y: 35.0 },
+      { x: 55.0, y: 4.0 },
+      { x: 4.0, y: 95.0 },
+      { x: 75.0, y: 115.0 },
+    ],
+  },
+  {
+    id: 'bricole-4',
+    name: 'Banda Previa a 3 Bandas (Bank Shot)',
     category: 'Banda Previa',
-    hint: 'Ataque al diamante 2.5 de banda larga con 2 puntas de efecto.',
-    difficulty: 3,
-    white: { x: 71, y: 105 },
-    yellow: { x: 213, y: 35 },
-    red: { x: 248, y: 105 },
-    trajectory: [
-      { x: 71, y: 105 },
-      { x: 142, y: 138 },
-      { x: 279, y: 70 },
-      { x: 213, y: 6 },
-      { x: 213, y: 35 },
-      { x: 248, y: 105 },
-    ],
-  },
-  {
-    id: 'pase-bola-caudron',
-    name: 'Pase Bola a 3 Bandas Larga-Corta-Larga',
-    category: 'Pase Bola',
-    hint: 'Grosor 1/2 bola, efecto corrido a las 1:30.',
+    hint: 'Ataque directo a banda antes de tocar bola. Entrar a la esquina con efecto 2:00 hacia la bola 2 y 3.',
     difficulty: 4,
-    white: { x: 50, y: 70 },
-    yellow: { x: 100, y: 70 },
-    red: { x: 230, y: 110 },
+    white: { x: 130.0, y: 110.0 },
+    yellow: { x: 220.0, y: 40.0 },
+    red: { x: 245.0, y: 85.0 },
     trajectory: [
-      { x: 50, y: 70 },
-      { x: 100, y: 70 },
-      { x: 180, y: 6 },
-      { x: 278, y: 55 },
-      { x: 210, y: 138 },
-      { x: 230, y: 110 },
-    ],
-  },
-  {
-    id: 'cabaña-tuzul',
-    name: 'Cabaña Sistema Tuzul',
-    category: 'Cabañas & Rodadas',
-    hint: 'Ángulo cerrado con retención de efecto horario.',
-    difficulty: 3,
-    white: { x: 80, y: 30 },
-    yellow: { x: 140, y: 30 },
-    red: { x: 60, y: 110 },
-    trajectory: [
-      { x: 80, y: 30 },
-      { x: 140, y: 30 },
-      { x: 278, y: 30 },
-      { x: 190, y: 138 },
-      { x: 6, y: 80 },
-      { x: 60, y: 110 },
+      { x: 130.0, y: 110.0 },
+      { x: 185.0, y: 4.0 },
+      { x: 280.0, y: 32.0 },
+      { x: 220.0, y: 40.0 },
+      { x: 210.0, y: 138.0 },
+      { x: 245.0, y: 85.0 },
     ],
   },
 ];
@@ -123,23 +137,23 @@ const DEFAULT_POSITIONS: PositionData[] = [
 const getLocalizedPos = (pos: PositionData, lang: string): { name: string; category: string; hint?: string } => {
   if (lang === 'en') {
     switch (pos.id) {
-      case 'bricole-50':
+      case 'rodada-1':
         return {
-          name: 'Classic Short Rail Cushion-First (Bricole)',
+          name: 'Canonical 3-Cushion Round-the-Table (L-S-L)',
+          category: 'Side Spin',
+          hint: '6/8 thickness, mid-low contact with 3 tips of spin. Natural curve around 3 cushions.',
+        };
+      case 'cajon-8':
+        return {
+          name: 'Classic Short-Box with Draw (S-L-S)',
+          category: 'Draw Shots',
+          hint: '1/4 thickness with mid-high spin. Quick exit to short rail closing the small box.',
+        };
+      case 'bricole-4':
+        return {
+          name: 'Authentic 3-Cushion Bank Shot (Cushion First)',
           category: 'Cushion First',
-          hint: 'Attack diamond 2.5 on long rail with 2 tips of spin.',
-        };
-      case 'pase-bola-caudron':
-        return {
-          name: 'Around The Table 3-Cushion Long-Short-Long',
-          category: 'Around The Table',
-          hint: '1/2 ball thickness, follow spin at 1:30.',
-        };
-      case 'cabaña-tuzul':
-        return {
-          name: 'Tuzul System Short-Angle',
-          category: 'Side Spin & Angles',
-          hint: 'Closed angle with running clockwise spin.',
+          hint: 'Direct cushion attack before contact. Corner angle with 2:00 spin to sweep into red.',
         };
       default:
         return {
@@ -155,6 +169,20 @@ const getLocalizedPos = (pos: PositionData, lang: string): { name: string; categ
     hint: pos.hint,
   };
 };
+
+function adaptRoutePositionsToSessionPositions(node: RouteNode): PositionData[] {
+  return node.positions.map((p, idx) => ({
+    id: p.id || `${node.id}-pos-${idx + 1}`,
+    name: `${node.title} (${idx + 1}/${node.positions.length})`,
+    category: node.category,
+    hint: node.coachTip,
+    difficulty: 3,
+    white: p.white,
+    yellow: p.yellow,
+    red: p.red,
+    trajectory: p.trajectory || [],
+  }));
+}
 
 export function TrainingActiveSessionScreen() {
   const router = useRouter();
@@ -174,10 +202,12 @@ export function TrainingActiveSessionScreen() {
     yellowY?: string;
     redX?: string;
     redY?: string;
+    nodeId?: string;
   }>();
 
   // Session State
   const [positions, setPositions] = useState<PositionData[]>(DEFAULT_POSITIONS);
+  const [activeRouteNode, setActiveRouteNode] = useState<RouteNode | null>(null);
   const [currentPosIndex, setCurrentPosIndex] = useState(0);
   const [targetReps, setTargetReps] = useState(10);
   const [madeHits, setMadeHits] = useState(0);
@@ -312,18 +342,81 @@ export function TrainingActiveSessionScreen() {
       });
       setCurrentPosIndex(0);
       setMadeHits(0);
+    } else if (params.nodeId) {
+      let foundNode: RouteNode | null = null;
+      for (const lvl of TRAINING_ROUTE_LEVELS) {
+        const n = lvl.nodes.find((item) => item.id === params.nodeId);
+        if (n) {
+          foundNode = n;
+          break;
+        }
+      }
+      if (foundNode && foundNode.positions.length > 0) {
+        setPositions(adaptRoutePositionsToSessionPositions(foundNode));
+        setCurrentPosIndex(0);
+        setMadeHits(0);
+        setActiveRouteNode(foundNode);
+      }
     }
-  }, [params.shotId, params.whiteX, params.whiteY, params.yellowX, params.yellowY, params.redX, params.redY, params.customName]);
+  }, [params.shotId, params.whiteX, params.whiteY, params.yellowX, params.yellowY, params.redX, params.redY, params.customName, params.nodeId]);
 
   const currentPos = positions[currentPosIndex] || DEFAULT_POSITIONS[0];
   const localizedCurrentPos = getLocalizedPos(currentPos, language);
 
+  const [systemDiamondMode, setSystemDiamondMode] = useState<'none' | 'llk_hoppe' | 'base_50'>('none');
+  const [customSolutionTrajectory, setCustomSolutionTrajectory] = useState<TablePoint[] | null>(null);
+  const [showSolution, setShowSolution] = useState(false);
+
+  // Reset solution visibility, animation, and custom trajectory when switching position
+  useEffect(() => {
+    setIsSimulating(false);
+    setCustomSolutionTrajectory(null);
+    setShowSolution(false);
+  }, [currentPosIndex]);
+
+  // Compute tactical solutions for current ball positions
+  const tacticalSolutions = useMemo(() => {
+    return solveBilliardPosition(
+      currentPos.white,
+      currentPos.yellow,
+      currentPos.red,
+      currentPos.trajectory
+    );
+  }, [currentPos]);
+
+  const [activeSolution, setActiveSolution] = useState<TacticalSolution | null>(null);
+
+  useEffect(() => {
+    if (tacticalSolutions.length > 0) {
+      setActiveSolution(tacticalSolutions[0]);
+      if (tacticalSolutions[0].figureId === 'llk_hoppe') {
+        setSystemDiamondMode('llk_hoppe');
+      }
+    }
+  }, [tacticalSolutions]);
+
+  const handleSimulateSolution = (sol: TacticalSolution) => {
+    setCustomSolutionTrajectory(sol.trajectory);
+    setShowSolution(true);
+    setIsSimulating(true);
+  };
+
+  const handleSelectSpin = (spin: HoppeSpinEffect) => {
+    setActiveSolution((prev) => (prev ? { ...prev, hoppeSpin: spin } : null));
+  };
+
   const handleToggleSolution = () => {
-    setIsSimulating((prev) => !prev);
+    if (activeSolution) {
+      handleSimulateSolution(activeSolution);
+    } else {
+      setIsSimulating((prev) => !prev);
+    }
   };
 
   const handleResetPosition = () => {
     setIsSimulating(false);
+    setCustomSolutionTrajectory(null);
+    setShowSolution(false);
   };
 
   const handleNextPosition = () => {
@@ -407,6 +500,23 @@ export function TrainingActiveSessionScreen() {
         positions: sessionRecord.positions,
       });
       backendSaved = backendRes.success;
+
+      // If this session is part of the guided Learning Roadmap (nodeId is present)
+      if (params.nodeId) {
+        const calculatedStars = finalPct >= 80 ? 3 : finalPct >= 60 ? 2 : 1;
+        const xpGained = activeRouteNode?.xp || 150;
+        await apiFetch('/training/node-progress', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            nodeId: params.nodeId,
+            stars: calculatedStars,
+            completedCount: totalHits,
+            accuracy: finalPct,
+            xpGained,
+          }),
+        });
+      }
     } catch (e) {
       console.warn('Could not sync training session to backend:', e);
     }
@@ -437,16 +547,24 @@ export function TrainingActiveSessionScreen() {
           <View style={styles.headerTopRow}>
             <TouchableOpacity
               style={styles.backBtn}
-              onPress={() => router.back()}
+              onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/training'))}
               accessibilityLabel={t('common.back')}
             >
               <IconArrowLeft size={20} color={palette.text} />
             </TouchableOpacity>
 
             <View style={styles.sessionTitleCol}>
-              <Text style={styles.sessionTitle}>{t('training.session.title')}</Text>
+              <Text style={styles.sessionTitle}>
+                {activeRouteNode
+                  ? (language === 'en'
+                      ? `Day ${activeRouteNode.dayNumber}: ${activeRouteNode.title}`
+                      : `Día ${activeRouteNode.dayNumber}: ${activeRouteNode.title}`)
+                  : t('training.session.title')}
+              </Text>
               <Text style={styles.sessionSubtitle}>
-                {t('training.session.shotProgress', { current: currentPosIndex + 1, total: positions.length })}
+                {activeRouteNode
+                  ? activeRouteNode.subtitle
+                  : t('training.session.shotProgress', { current: currentPosIndex + 1, total: positions.length })}
               </Text>
             </View>
 
@@ -488,6 +606,8 @@ export function TrainingActiveSessionScreen() {
                     setCurrentPosIndex(idx);
                     setMadeHits(hasRecorded ? hasRecorded.hits : 0);
                     setIsSimulating(false);
+                    setCustomSolutionTrajectory(null);
+                    setShowSolution(false);
                   }}
                 >
                   <Text
@@ -527,6 +647,34 @@ export function TrainingActiveSessionScreen() {
                   <Text style={styles.categoryText}>{localizedCurrentPos.category}</Text>
                 </View>
                 <Text style={styles.positionName}>{localizedCurrentPos.name}</Text>
+
+                <TouchableOpacity
+                  style={[
+                    styles.showSolutionBtn,
+                    showSolution && styles.showSolutionBtnActive,
+                  ]}
+                  onPress={() => {
+                    setShowSolution((prev) => !prev);
+                    if (!showSolution && activeSolution) {
+                      setCustomSolutionTrajectory(activeSolution.trajectory);
+                    }
+                  }}
+                  activeOpacity={0.8}
+                >
+                  {showSolution ? (
+                    <IconEyeOff size={15} color="#ffffff" />
+                  ) : (
+                    <IconBulb size={15} color={palette.primary} />
+                  )}
+                  <Text
+                    style={[
+                      styles.showSolutionBtnText,
+                      showSolution ? styles.showSolutionBtnTextActive : { color: palette.text },
+                    ]}
+                  >
+                    {showSolution ? 'Ocultar Solución' : 'Mostrar Solución'}
+                  </Text>
+                </TouchableOpacity>
               </View>
               {localizedCurrentPos.hint && (
                 <Text style={styles.positionHint}>{localizedCurrentPos.hint}</Text>
@@ -539,11 +687,45 @@ export function TrainingActiveSessionScreen() {
                 whiteBall={currentPos.white}
                 yellowBall={currentPos.yellow}
                 redBall={currentPos.red}
-                trajectory={currentPos.trajectory}
+                trajectory={
+                  (showSolution || isSimulating)
+                    ? (customSolutionTrajectory || activeSolution?.trajectory || currentPos.trajectory || [])
+                    : []
+                }
                 isSimulating={isSimulating}
-                onSimulationEnd={() => setIsSimulating(false)}
+                onSimulationEnd={() => {
+                  setIsSimulating(false);
+                }}
+                systemMode={systemDiamondMode}
               />
             </View>
+
+            {/* AI Tactical Play Solver & Willie Hoppe System */}
+            {activeSolution && (
+              <TacticalSolverPanel
+                solution={activeSolution}
+                solutions={tacticalSolutions}
+                onSelectSolution={(sol) => {
+                  setActiveSolution(sol);
+                  setCustomSolutionTrajectory(sol.trajectory);
+                  if (sol.figureId === 'llk_hoppe') {
+                    setSystemDiamondMode('llk_hoppe');
+                  }
+                }}
+                onSimulateSolution={handleSimulateSolution}
+                isSimulating={isSimulating}
+                systemDiamondMode={systemDiamondMode}
+                onToggleDiamondMode={setSystemDiamondMode}
+                onSelectSpin={handleSelectSpin}
+                showSolution={showSolution}
+                onToggleShowSolution={() => {
+                  setShowSolution((prev) => !prev);
+                  if (!showSolution && activeSolution) {
+                    setCustomSolutionTrajectory(activeSolution.trajectory);
+                  }
+                }}
+              />
+            )}
 
             {/* Motivational Coaching Quote Card */}
             <View style={styles.quoteCard}>
@@ -650,7 +832,7 @@ export function TrainingActiveSessionScreen() {
         }}
         onNewSession={() => {
           setCelebrationModalVisible(false);
-          setPositions(DEFAULT_POSITIONS);
+          setPositions(activeRouteNode && activeRouteNode.positions.length > 0 ? adaptRoutePositionsToSessionPositions(activeRouteNode) : DEFAULT_POSITIONS);
           setCurrentPosIndex(0);
           setMadeHits(0);
           setSessionResults({});
@@ -854,6 +1036,30 @@ const getStyles = (palette: ReturnType<typeof getPalette>, isWideScreen: boolean
       alignItems: 'center',
       flexWrap: 'wrap',
       gap: 8,
+    },
+    showSolutionBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: theme.radius.full,
+      borderWidth: 1,
+      borderColor: palette.primary,
+      backgroundColor: `${palette.primary}15`,
+      marginLeft: 'auto',
+    },
+    showSolutionBtnActive: {
+      backgroundColor: palette.primary,
+      borderColor: palette.primary,
+    },
+    showSolutionBtnText: {
+      fontSize: 11.5,
+      fontWeight: '700',
+      color: palette.primary,
+    },
+    showSolutionBtnTextActive: {
+      color: '#ffffff',
     },
     categoryBadge: {
       backgroundColor: `${palette.primary}18`,

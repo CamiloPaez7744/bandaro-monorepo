@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect } from 'react';
-import { useRouter } from 'expo-router';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
 import {
   Modal,
   Platform,
@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
+  IconArrowLeft,
   IconPlayerPlay,
   IconSparkles,
   IconArrowRight,
@@ -37,6 +38,8 @@ import { getPalette, theme } from '@/constants/theme';
 import { TrainingPlayTable } from '@/src/presentation/components/Training/TrainingPlayTable';
 import { CameraCaptureModal } from '@/src/presentation/components/Snapshot/CameraCaptureModal';
 import { TrainingPositionSelectorModal } from '@/src/presentation/components/Training/TrainingPositionSelectorModal';
+import { MasterPedagogyModal } from '@/src/presentation/components/Training/MasterPedagogyModal';
+import { RouteNodeDetailModal } from '@/src/presentation/components/Training/RouteNodeDetailModal';
 import { getRandomTrainingQuote } from '@/src/presentation/screens/Training/trainingQuotes';
 import { TRAINING_SYSTEMS, type TrainingSystem } from '@/src/presentation/screens/Training/trainingData';
 import {
@@ -58,34 +61,38 @@ export function TrainingCatalogScreen() {
   const [showCameraModal, setShowCameraModal] = useState(false);
   const [showSelectorModal, setShowSelectorModal] = useState(false);
   const [showTheoryModal, setShowTheoryModal] = useState(false);
+  const [inspectingNode, setInspectingNode] = useState<RouteNode | null>(null);
   const [selectedLevelId, setSelectedLevelId] = useState<string>('level-1');
   const [routeLevels, setRouteLevels] = useState<RouteLevel[]>(TRAINING_ROUTE_LEVELS);
   const [userStats, setUserStats] = useState({ currentStreak: 14, totalXp: 1450, accuracyAvg: 68 });
   const quote = useMemo(() => getRandomTrainingQuote(), []);
 
-  useEffect(() => {
-    let isMounted = true;
-    async function loadDbRoute() {
-      try {
-        const res = await apiFetch('/training/route');
-        if (res.ok) {
-          const data = await res.json();
-          if (isMounted && data.levels && data.levels.length > 0) {
-            setRouteLevels(data.levels);
-            if (data.userStats) {
-              setUserStats(data.userStats);
+  // Reload route progress automatically every time this screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      let isMounted = true;
+      async function loadDbRoute() {
+        try {
+          const res = await apiFetch('/training/route');
+          if (res.ok) {
+            const data = await res.json();
+            if (isMounted && data.levels && data.levels.length > 0) {
+              setRouteLevels(data.levels);
+              if (data.userStats) {
+                setUserStats(data.userStats);
+              }
             }
           }
+        } catch (err) {
+          console.warn('[TrainingCatalog] Offline fallback to local levels:', err);
         }
-      } catch (err) {
-        console.warn('[TrainingCatalog] Offline fallback to local levels:', err);
       }
-    }
-    loadDbRoute();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+      loadDbRoute();
+      return () => {
+        isMounted = false;
+      };
+    }, [])
+  );
 
   const activeLevel = useMemo(() => {
     return (
@@ -99,8 +106,7 @@ export function TrainingCatalogScreen() {
   };
 
   const onStartNodePractice = (node: RouteNode) => {
-    if (node.status === 'locked') return;
-    router.push('/training/session');
+    setInspectingNode(node);
   };
 
   const completedModulesCount = activeLevel.nodes.filter(
@@ -127,6 +133,16 @@ export function TrainingCatalogScreen() {
         <View style={styles.heroCard}>
           <View style={styles.heroGlowCircle} />
           <View style={styles.heroTopRow}>
+            {router.canGoBack() && (
+              <TouchableOpacity
+                style={styles.backBtn}
+                onPress={() => router.back()}
+                accessibilityRole="button"
+                accessibilityLabel={t('common.back')}
+              >
+                <IconArrowLeft size={18} color={palette.text} />
+              </TouchableOpacity>
+            )}
             <View style={styles.heroStatsRow}>
               <View style={styles.heroStatChip}>
                 <IconFlame size={14} color="#f59e0b" strokeWidth={2.5} />
@@ -488,65 +504,36 @@ export function TrainingCatalogScreen() {
         }}
       />
 
-      {/* Biomechanical Theory Modal (José María Quetglas) */}
-      <Modal
+      {/* Master Pedagogy & Biomechanics Academy Modal (Zanetti, Quetglas, Ceulemans, AM Billiard) */}
+      <MasterPedagogyModal
         visible={showTheoryModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowTheoryModal(false)}
-      >
-        <Pressable style={styles.theoryOverlay} onPress={() => setShowTheoryModal(false)}>
-          <Pressable style={styles.theoryDialog} onPress={(e) => e.stopPropagation()}>
-            <View style={styles.theoryHeader}>
-              <View style={styles.theoryHeaderLeft}>
-                <View style={styles.theoryIconCircle}>
-                  <IconSchool size={22} color={palette.primary} strokeWidth={2} />
-                </View>
-                <View>
-                  <Text style={styles.theoryTag}>{t('training.theory.tag')}</Text>
-                  <Text style={styles.theoryTitle}>{t('training.theory.title')}</Text>
-                </View>
-              </View>
-              <TouchableOpacity
-                style={styles.closeBtn}
-                onPress={() => setShowTheoryModal(false)}
-              >
-                <IconX size={20} color={palette.muted} />
-              </TouchableOpacity>
-            </View>
+        onClose={() => setShowTheoryModal(false)}
+      />
 
-            <ScrollView style={styles.theoryBody}>
-              <View style={styles.theorySection}>
-                <Text style={styles.theorySectionHeading}>{t('training.theory.sec1Title')}</Text>
-                <Text style={styles.theoryParagraph}>
-                  {t('training.theory.sec1Desc')}
-                </Text>
-              </View>
-
-              <View style={styles.theorySection}>
-                <Text style={styles.theorySectionHeading}>{t('training.theory.sec2Title')}</Text>
-                <Text style={styles.theoryParagraph}>
-                  {t('training.theory.sec2Desc')}
-                </Text>
-              </View>
-
-              <View style={styles.theorySection}>
-                <Text style={styles.theorySectionHeading}>{t('training.theory.sec3Title')}</Text>
-                <Text style={styles.theoryParagraph}>
-                  {t('training.theory.sec3Desc')}
-                </Text>
-              </View>
-            </ScrollView>
-
-            <TouchableOpacity
-              style={styles.theoryCloseActionBtn}
-              onPress={() => setShowTheoryModal(false)}
-            >
-              <Text style={styles.theoryCloseActionBtnText}>{t('training.theory.dismiss')}</Text>
-            </TouchableOpacity>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      {/* Interactive Daily Station Roadmap Node Inspection Modal */}
+      <RouteNodeDetailModal
+        visible={!!inspectingNode}
+        node={inspectingNode}
+        onClose={() => setInspectingNode(null)}
+        onStartSession={(node) => {
+          setInspectingNode(null);
+          router.push({
+            pathname: '/training/session',
+            params: { nodeId: node.id },
+          });
+        }}
+        onOpenTheory={() => {
+          setInspectingNode(null);
+          setShowTheoryModal(true);
+        }}
+        onOpenSystem={(systemId) => {
+          setInspectingNode(null);
+          router.push({
+            pathname: '/training/[systemId]',
+            params: { systemId },
+          });
+        }}
+      />
     </ScrollView>
   );
 }
@@ -587,6 +574,16 @@ const getStyles = (palette: ReturnType<typeof getPalette>, isWideScreen: boolean
       height: 180,
       borderRadius: 90,
       backgroundColor: `${palette.primary}12`,
+    },
+    backBtn: {
+      width: 36,
+      height: 36,
+      borderRadius: theme.radius.md,
+      backgroundColor: palette.surfaceLow,
+      borderWidth: 1,
+      borderColor: palette.border,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     heroTopRow: {
       flexDirection: 'row',

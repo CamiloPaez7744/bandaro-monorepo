@@ -20,22 +20,68 @@ export interface Point2D {
 
 export interface TrainingPosition {
     id: string;
+    name?: string;
+    category?: string;
+    hint?: string;
     white: Point2D;
     yellow: Point2D;
     red: Point2D;
     trajectory: Point2D[];
 }
 
+export interface SystemDiamondNumber {
+    diamond: number;
+    x: number;
+    y: number;
+    value: string;
+}
+
+export interface SegmentedTrajectoryDefinition {
+    id: string;
+    label: string;
+    color: string;
+    description: string;
+}
+
+export interface CheatSheetShot {
+    attack: number;
+    arrival: number;
+    departure?: number;
+    arrival3rd?: number;
+    arrival4th?: number;
+    points1to3: Point2D[];
+    points3to4: Point2D[];
+    points4to5: Point2D[];
+}
+
+export interface CheatSheetOrigin {
+    origin: number;
+    name: string;
+    shots: CheatSheetShot[];
+}
+
 export interface TrainingSystem {
     id: string;
     name: string;
     subtitle: string;
+    description?: string;
     difficulty: 'basic' | 'intermediate' | 'advanced';
     focus: string;
     recommendedPower: number;
     recommendedEffect: EffectKey;
     rules: string[];
     positions: TrainingPosition[];
+    author?: string;
+    youtubeUrl?: string;
+    diagramUrl?: string;
+    diamondNumbers?: {
+        attack: SystemDiamondNumber[];
+        departure: SystemDiamondNumber[];
+        arrival3rd: SystemDiamondNumber[];
+        arrival4th: SystemDiamondNumber[];
+    };
+    segmentedTrajectories?: SegmentedTrajectoryDefinition[];
+    cheatSheets?: CheatSheetOrigin[];
 }
 
 export const EFFECT_PRESETS: Record<
@@ -98,10 +144,156 @@ export const TRAINING_SYSTEMS: TrainingSystem[] = [
         name: 'Sistema Conti / Base 50',
         subtitle: 'Fórmula clásica de 3 bandas (Llegada = Salida - Ataque)',
         difficulty: 'basic',
+        author: 'Sistema Conti / AM Billiard Academy',
+        youtubeUrl: 'https://www.youtube.com/watch?v=HGfTj9vQTpY',
+        diagramUrl: '/assets/images/theory/billiard_bridges_guide.jpg',
         focus: 'Memoria de salidas y lectura de diamantes',
         recommendedPower: 60,
         recommendedEffect: 'center',
         rules: ['Llegada = Salida - Ataque', 'Efecto a favor (rotación natural)', 'Potencia media 55%-65%'],
+        diamondNumbers: {
+            attack: [
+                { diamond: 1, x: 35.5, y: 0, value: '10' },
+                { diamond: 2, x: 71, y: 0, value: '20' },
+                { diamond: 3, x: 106.5, y: 0, value: '30' },
+                { diamond: 4, x: 142, y: 0, value: '40' },
+                { diamond: 5, x: 177.5, y: 0, value: '50' },
+                { diamond: 6, x: 213, y: 0, value: '60' },
+                { diamond: 7, x: 248.5, y: 0, value: '70' },
+                { diamond: 8, x: 284, y: 0, value: '80' },
+            ],
+            departure: [
+                { diamond: 0, x: 0, y: 142, value: '50' },
+                { diamond: 1, x: 35.5, y: 142, value: '45' },
+                { diamond: 2, x: 71, y: 142, value: '40' },
+                { diamond: 3, x: 106.5, y: 142, value: '35' },
+                { diamond: 4, x: 142, y: 142, value: '30' },
+                { diamond: 5, x: 177.5, y: 142, value: '25' },
+                { diamond: 6, x: 213, y: 142, value: '20' },
+            ],
+            arrival3rd: [
+                { diamond: 0, x: 0, y: 0, value: '0' },
+                { diamond: 1, x: 0, y: 35.5, value: '10' },
+                { diamond: 2, x: 0, y: 71, value: '20' },
+                { diamond: 3, x: 0, y: 106.5, value: '30' },
+                { diamond: 4, x: 0, y: 142, value: '40' },
+            ],
+            arrival4th: [
+                { diamond: 1, x: 35.5, y: 142, value: '10' },
+                { diamond: 2, x: 71, y: 142, value: '20' },
+                { diamond: 3, x: 106.5, y: 142, value: '30' },
+                { diamond: 4, x: 142, y: 142, value: '40' },
+                { diamond: 5, x: 177.5, y: 142, value: '50' },
+            ],
+        },
+        segmentedTrajectories: [
+            { id: 'seg-1-3', label: '1ª a 3ª Banda', color: '#06b6d4', description: 'Trayectoria inicial de la fórmula matemática' },
+            { id: 'seg-3-4', label: '3ª a 4ª Banda', color: '#f59e0b', description: 'Rebote con rotación a favor hacia banda larga' },
+            { id: 'seg-4-5', label: '4ª a 5ª Banda', color: '#10b981', description: 'Recorrido final de llegada hacia la carambola' },
+        ],
+        cheatSheets: [
+            {
+                origin: 50,
+                name: 'Partiendo de Salida 50 (Esquina)',
+                shots: [
+                    {
+                        attack: 10,
+                        arrival: 40,
+                        points1to3: [{ x: 12, y: 135 }, { x: 35.5, y: 0 }, { x: 284, y: 24 }, { x: 12, y: 138 }],
+                        points3to4: [{ x: 12, y: 138 }, { x: 142, y: 142 }],
+                        points4to5: [{ x: 142, y: 142 }, { x: 278, y: 10 }],
+                    },
+                    {
+                        attack: 20,
+                        arrival: 30,
+                        points1to3: [{ x: 12, y: 135 }, { x: 71, y: 0 }, { x: 284, y: 45 }, { x: 0, y: 106.5 }],
+                        points3to4: [{ x: 0, y: 106.5 }, { x: 106.5, y: 142 }],
+                        points4to5: [{ x: 106.5, y: 142 }, { x: 260, y: 25 }],
+                    },
+                    {
+                        attack: 30,
+                        arrival: 20,
+                        points1to3: [{ x: 12, y: 135 }, { x: 106.5, y: 0 }, { x: 284, y: 71 }, { x: 0, y: 71 }],
+                        points3to4: [{ x: 0, y: 71 }, { x: 71, y: 142 }],
+                        points4to5: [{ x: 71, y: 142 }, { x: 230, y: 40 }],
+                    },
+                    {
+                        attack: 40,
+                        arrival: 10,
+                        points1to3: [{ x: 12, y: 135 }, { x: 142, y: 0 }, { x: 284, y: 100 }, { x: 0, y: 35.5 }],
+                        points3to4: [{ x: 0, y: 35.5 }, { x: 35.5, y: 142 }],
+                        points4to5: [{ x: 35.5, y: 142 }, { x: 200, y: 55 }],
+                    },
+                ],
+            },
+            {
+                origin: 40,
+                name: 'Partiendo de Salida 40 (Diamante 2)',
+                shots: [
+                    {
+                        attack: 10,
+                        arrival: 30,
+                        points1to3: [{ x: 71, y: 135 }, { x: 35.5, y: 0 }, { x: 284, y: 40 }, { x: 0, y: 106.5 }],
+                        points3to4: [{ x: 0, y: 106.5 }, { x: 106.5, y: 142 }],
+                        points4to5: [{ x: 106.5, y: 142 }, { x: 260, y: 30 }],
+                    },
+                    {
+                        attack: 20,
+                        arrival: 20,
+                        points1to3: [{ x: 71, y: 135 }, { x: 71, y: 0 }, { x: 284, y: 68 }, { x: 0, y: 71 }],
+                        points3to4: [{ x: 0, y: 71 }, { x: 71, y: 142 }],
+                        points4to5: [{ x: 71, y: 142 }, { x: 230, y: 45 }],
+                    },
+                    {
+                        attack: 30,
+                        arrival: 10,
+                        points1to3: [{ x: 71, y: 135 }, { x: 106.5, y: 0 }, { x: 284, y: 95 }, { x: 0, y: 35.5 }],
+                        points3to4: [{ x: 0, y: 35.5 }, { x: 35.5, y: 142 }],
+                        points4to5: [{ x: 35.5, y: 142 }, { x: 200, y: 60 }],
+                    },
+                ],
+            },
+            {
+                origin: 30,
+                name: 'Partiendo de Salida 30 (Diamante 4)',
+                shots: [
+                    {
+                        attack: 10,
+                        arrival: 20,
+                        points1to3: [{ x: 142, y: 135 }, { x: 35.5, y: 0 }, { x: 284, y: 60 }, { x: 0, y: 71 }],
+                        points3to4: [{ x: 0, y: 71 }, { x: 71, y: 142 }],
+                        points4to5: [{ x: 71, y: 142 }, { x: 230, y: 50 }],
+                    },
+                    {
+                        attack: 20,
+                        arrival: 10,
+                        points1to3: [{ x: 142, y: 135 }, { x: 71, y: 0 }, { x: 284, y: 90 }, { x: 0, y: 35.5 }],
+                        points3to4: [{ x: 0, y: 35.5 }, { x: 35.5, y: 142 }],
+                        points4to5: [{ x: 35.5, y: 142 }, { x: 200, y: 65 }],
+                    },
+                ],
+            },
+            {
+                origin: 60,
+                name: 'Partiendo de Salida 60 (Banda Corta)',
+                shots: [
+                    {
+                        attack: 20,
+                        arrival: 40,
+                        points1to3: [{ x: 0, y: 106.5 }, { x: 71, y: 0 }, { x: 284, y: 25 }, { x: 12, y: 138 }],
+                        points3to4: [{ x: 12, y: 138 }, { x: 142, y: 142 }],
+                        points4to5: [{ x: 142, y: 142 }, { x: 278, y: 15 }],
+                    },
+                    {
+                        attack: 30,
+                        arrival: 30,
+                        points1to3: [{ x: 0, y: 106.5 }, { x: 106.5, y: 0 }, { x: 284, y: 50 }, { x: 0, y: 106.5 }],
+                        points3to4: [{ x: 0, y: 106.5 }, { x: 106.5, y: 142 }],
+                        points4to5: [{ x: 106.5, y: 142 }, { x: 260, y: 35 }],
+                    },
+                ],
+            },
+        ],
         positions: [
             {
                 id: 'b50-1',

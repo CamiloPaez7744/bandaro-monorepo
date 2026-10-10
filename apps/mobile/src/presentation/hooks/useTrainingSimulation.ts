@@ -165,10 +165,13 @@ export function useTrainingSimulation(
 
     const trajectory = useMemo<TrajectoryPrediction | null>(() => {
         if (isSimulating) return null;
-        // Si hay potencia activa seleccionada (> 0), usarla; si está en 0 (apuntando sin jalar aún),
-        // previsualizar con potencia de referencia 50% para ver la línea canónica de la jugada.
-        const effectivePower = powerPercentage > 0 ? powerPercentage : 50;
-        const velocity = calculateShotVelocity(effectivePower);
+        // La guía de apunte (línea de tiro hacia la bola objetivo, bola fantasma y desvíos)
+        // se calcula con una potencia canónica fija y estable (55%). Esto garantiza que
+        // al ajustar o aumentar la potencia en el selector, la línea de tiro NO tiemble,
+        // no se recalcule erráticamente, ni se encoja/estire.
+        // La potencia real seleccionada se aplica fielmente al momento del tiro en executeShot.
+        const CANONICAL_AIM_POWER = 55;
+        const velocity = calculateShotVelocity(CANONICAL_AIM_POWER);
         return predictTrajectory(
             balls,
             cueBallId,
@@ -178,7 +181,7 @@ export function useTrainingSimulation(
             750,
             DEFAULT_TABLE
         );
-    }, [balls, cueBallId, aimDirection, powerPercentage, spin, isSimulating]);
+    }, [balls, cueBallId, aimDirection, spin, isSimulating]);
 
     const updateTrajectory = useCallback(() => {
         // Trajectory is reactively computed during render via useMemo

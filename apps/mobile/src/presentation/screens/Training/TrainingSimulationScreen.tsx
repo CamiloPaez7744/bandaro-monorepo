@@ -1,6 +1,25 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, useWindowDimensions, Platform } from 'react-native';
+import { StyleSheet, Text, Pressable, View, useWindowDimensions, Platform } from 'react-native';
+
+const TouchableOpacity = ({
+    style,
+    activeOpacity = 0.7,
+    children,
+    disabled,
+    ...props
+}: any) => (
+    <Pressable
+        {...props}
+        disabled={disabled}
+        style={({ pressed }) => [
+            typeof style === 'function' ? style({ pressed }) : style,
+            pressed && !disabled && { opacity: activeOpacity },
+        ]}
+    >
+        {children}
+    </Pressable>
+);
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -685,7 +704,7 @@ export function TrainingSimulationScreen() {
                         <View style={styles.leftToolsDock}>
                             <TouchableOpacity
                                 style={styles.circleIconBtn}
-                                onPress={() => router.back()}
+                                onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/training'))}
                                 accessibilityRole="button"
                                 accessibilityLabel={t('common.back')}>
                                 <IconArrowLeft size={16} color={isDark ? '#f8fafc' : palette.text} strokeWidth={2.2} />
@@ -741,7 +760,7 @@ export function TrainingSimulationScreen() {
                         {/* ESCENARIO CENTRAL: MESA CON MÁXIMO PROTAGONISMO */}
                         <View style={styles.panoramicCenterStage}>
                             {/* Banner de Árbitro: FLOATING OVERLAY */}
-                            <View style={styles.floatingRefereeBannerWrap} pointerEvents="box-none">
+                            <View style={[styles.floatingRefereeBannerWrap, { pointerEvents: 'box-none' }]}>
                                 <CaromRefereeBanner
                                     validation={state.validation}
                                     isSimulating={state.isSimulating}
@@ -833,7 +852,7 @@ export function TrainingSimulationScreen() {
                             <View style={styles.headerLeft}>
                                 <TouchableOpacity
                                     style={styles.circleIconBtn}
-                                    onPress={() => router.back()}
+                                    onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/training'))}
                                     accessibilityRole="button"
                                     accessibilityLabel={t('common.back')}>
                                     <IconArrowLeft size={isMobile ? 16 : 18} color={isDark ? '#f8fafc' : palette.text} strokeWidth={2.2} />
@@ -900,7 +919,7 @@ export function TrainingSimulationScreen() {
 
                         {/* ESCENARIO PRINCIPAL */}
                         <View style={styles.arenaContainer}>
-                            <View style={styles.floatingRefereeBannerWrap} pointerEvents="box-none">
+                            <View style={[styles.floatingRefereeBannerWrap, { pointerEvents: 'box-none' }]}>
                                 <CaromRefereeBanner
                                     validation={state.validation}
                                     isSimulating={state.isSimulating}

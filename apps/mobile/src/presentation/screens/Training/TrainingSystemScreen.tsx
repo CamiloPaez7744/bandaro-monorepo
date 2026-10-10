@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { GestureResponderEvent, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { GestureResponderEvent, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useColorScheme } from '@/components/useColorScheme';
@@ -9,6 +9,18 @@ import { useI18n } from '@/components/useLanguage';
 import { getPalette, theme } from '@/constants/theme';
 import { BilliardsTableThumbnail } from '@/src/presentation/components/Training/BilliardsTableThumbnail';
 import { EffectBallSelector } from '@/src/presentation/components/Training/EffectBallSelector';
+import { MasterPedagogyModal } from '@/src/presentation/components/Training/MasterPedagogyModal';
+import {
+    IconArrowLeft,
+    IconArrowRight,
+    IconBook,
+    IconBrain,
+    IconPlayerPlay,
+    IconRoute,
+    IconSchool,
+    IconSparkles,
+    IconTarget,
+} from '@/src/presentation/components/icons';
 import {
     CONTACT_PRESETS,
     EFFECT_PRESETS,
@@ -195,6 +207,10 @@ function TrainingSystemWorkspace() {
         yellow: true,
         red: true,
     });
+    const [viewMode, setViewMode] = useState<'practice' | 'cheatsheet'>('practice');
+    const [selectedOrigin, setSelectedOrigin] = useState<number>(50);
+    const [selectedShotIndex, setSelectedShotIndex] = useState<number | 'all'>('all');
+    const [showMasterTheoryModal, setShowMasterTheoryModal] = useState(false);
     const [tableOrientation, setTableOrientation] = useState<Orientation>(defaultOrientation);
     const stageLayoutRef = useRef({ width: 0, height: 0 });
     const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -267,7 +283,10 @@ function TrainingSystemWorkspace() {
         return (
             <View style={[styles.notFound, { paddingTop: insets.top + theme.spacing.lg }]}>
                 <Text style={styles.notFoundTitle}>{t('training.system.notFound')}</Text>
-                <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+                <TouchableOpacity
+                    style={styles.backButton}
+                    onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/training'))}
+                >
                     <Text style={styles.backButtonText}>{t('training.system.back')}</Text>
                 </TouchableOpacity>
             </View>
@@ -321,6 +340,127 @@ function TrainingSystemWorkspace() {
               color: '#fbbf24',
           }
         : undefined;
+
+    const activeOriginCheat = useMemo(() => {
+        if (!system?.cheatSheets || system.cheatSheets.length === 0) return null;
+        return system.cheatSheets.find((c) => c.origin === selectedOrigin) ?? system.cheatSheets[0];
+    }, [system, selectedOrigin]);
+
+    const cheatPaths = useMemo(() => {
+        if (!activeOriginCheat) return [];
+        const shotsToRender = typeof selectedShotIndex === 'number'
+            ? [activeOriginCheat.shots[selectedShotIndex]].filter(Boolean)
+            : activeOriginCheat.shots;
+
+        const paths: Array<{ id: string; points: Point2D[]; color: string; width: number; dash?: number[]; opacity?: number }> = [];
+
+        shotsToRender.forEach((shot, sIdx) => {
+            const isSingle = typeof selectedShotIndex === 'number';
+            const strokeWidth = isSingle ? 2.8 : 2.0;
+            const opacity = isSingle ? 1 : 0.92;
+
+            // Tramo 1: 1ª a 3ª Banda (Cian eléctrico #06b6d4)
+            paths.push({
+                id: `cheat-${activeOriginCheat.origin}-${sIdx}-tramo1`,
+                points: shot.points1to3,
+                color: '#06b6d4',
+                width: strokeWidth,
+                opacity,
+            });
+
+            // Tramo 2: 3ª a 4ª Banda (Ámbar dorado #f59e0b)
+            paths.push({
+                id: `cheat-${activeOriginCheat.origin}-${sIdx}-tramo2`,
+                points: shot.points3to4,
+                color: '#f59e0b',
+                width: strokeWidth,
+                opacity,
+            });
+
+            // Tramo 3: 4ª a 5ª Banda (Verde esmeralda #10b981)
+            paths.push({
+                id: `cheat-${activeOriginCheat.origin}-${sIdx}-tramo3`,
+                points: shot.points4to5,
+                color: '#10b981',
+                width: strokeWidth,
+                opacity,
+            });
+        });
+
+        return paths;
+    }, [activeOriginCheat, selectedShotIndex]);
+
+    const cheatDiamondLabels = useMemo(() => {
+        if (!system?.diamondNumbers) return [];
+        const labels: Array<{ x: number; y: number; text: string; color: string; bgColor: string }> = [];
+
+        // Banda de ataque (superior)
+        system.diamondNumbers.attack.forEach((d) => {
+            labels.push({
+                x: d.x,
+                y: 10,
+                text: d.value,
+                color: '#38bdf8',
+                bgColor: 'rgba(8, 47, 73, 0.95)',
+            });
+        });
+
+        // Banda de salida (inferior)
+        system.diamondNumbers.departure.forEach((d) => {
+            labels.push({
+                x: d.x,
+                y: 132,
+                text: d.value,
+                color: '#34d399',
+                bgColor: 'rgba(6, 78, 59, 0.95)',
+            });
+        });
+
+        // Banda de llegada 3ª (corta izquierda)
+        system.diamondNumbers.arrival3rd.forEach((d) => {
+            labels.push({
+                x: 12,
+                y: d.y,
+                text: d.value,
+                color: '#fbbf24',
+                bgColor: 'rgba(120, 53, 15, 0.95)',
+            });
+        });
+
+        // Banda de llegada 4ª (larga retorno)
+        system.diamondNumbers.arrival4th.forEach((d) => {
+            labels.push({
+                x: d.x,
+                y: 132,
+                text: d.value,
+                color: '#ec4899',
+                bgColor: 'rgba(131, 24, 67, 0.95)',
+            });
+        });
+
+        return labels;
+    }, [system]);
+
+    const effectiveBalls = useMemo(() => {
+        if (viewMode === 'practice') {
+            return stageBalls;
+        }
+        if (activeOriginCheat && typeof selectedShotIndex === 'number') {
+            const shot = activeOriginCheat.shots[selectedShotIndex];
+            if (shot) {
+                return [
+                    { id: 'white' as const, x: shot.points1to3[0].x, y: shot.points1to3[0].y, color: '#f8fafc', border: '#cbd5e1' },
+                    { id: 'yellow' as const, x: shot.points1to3[1].x, y: shot.points1to3[1].y, color: '#facc15', border: '#ca8a04' },
+                    { id: 'red' as const, x: shot.points1to3.at(-1)?.x ?? 40, y: shot.points1to3.at(-1)?.y ?? 40, color: '#dc2626', border: '#991b1b' },
+                ];
+            }
+        }
+        return [
+            { id: 'white' as const, x: 20, y: 130, color: '#f8fafc', border: '#cbd5e1' },
+            { id: 'yellow' as const, x: 142, y: 71, color: '#facc15', border: '#ca8a04' },
+            { id: 'red' as const, x: 260, y: 20, color: '#dc2626', border: '#991b1b' },
+        ];
+    }, [viewMode, stageBalls, activeOriginCheat, selectedShotIndex]);
 
     const storageKey = `${GUIDE_STORAGE_PREFIX}/${system.id}/${currentPosition.id}`;
 
@@ -429,6 +569,41 @@ function TrainingSystemWorkspace() {
         gestureModeRef.current = { mode: null, ballId: null };
     };
 
+    const responderProps = useMemo(() => {
+        if (viewMode !== 'practice') return {};
+        if (Platform.OS === 'web') {
+            return {
+                onPointerDown: (e: any) => {
+                    const rect = e.currentTarget?.getBoundingClientRect?.();
+                    const x = rect ? e.clientX - rect.left : (e.nativeEvent?.offsetX ?? 0);
+                    const y = rect ? e.clientY - rect.top : (e.nativeEvent?.offsetY ?? 0);
+                    const stagePoint = { x, y };
+                    const ballId = findBallAtStagePoint(stagePoint);
+                    gestureModeRef.current = ballId ? { mode: 'drag', ballId } : { mode: 'aim', ballId: null };
+                    updateByStagePoint(stagePoint);
+                },
+                onPointerMove: (e: any) => {
+                    if (!gestureModeRef.current.mode) return;
+                    const rect = e.currentTarget?.getBoundingClientRect?.();
+                    const x = rect ? e.clientX - rect.left : (e.nativeEvent?.offsetX ?? 0);
+                    const y = rect ? e.clientY - rect.top : (e.nativeEvent?.offsetY ?? 0);
+                    updateByStagePoint({ x, y });
+                },
+                onPointerUp: () => {
+                    gestureModeRef.current = { mode: null, ballId: null };
+                },
+            };
+        }
+        return {
+            onStartShouldSetResponder: () => true,
+            onMoveShouldSetResponder: () => true,
+            onResponderGrant: handleStageResponderGrant,
+            onResponderMove: handleStageResponderMove,
+            onResponderRelease: handleStageResponderRelease,
+            onResponderTerminate: handleStageResponderRelease,
+        };
+    }, [viewMode, tableOrientation, ballPositions]);
+
     return (
         <ScrollView
             contentContainerStyle={[
@@ -439,13 +614,18 @@ function TrainingSystemWorkspace() {
                 },
             ]}>
             <View style={styles.headerRow}>
+                <TouchableOpacity
+                    style={styles.backBtn}
+                    onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/training'))}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('common.back')}
+                >
+                    <IconArrowLeft size={20} color={palette.text} />
+                </TouchableOpacity>
                 <View style={styles.headerTextWrap}>
                     <Text style={styles.title}>{system.name}</Text>
                     <Text style={styles.subtitle}>{system.subtitle}</Text>
                 </View>
-                <TouchableOpacity style={styles.headerButton} onPress={() => router.back()}>
-                    <Text style={styles.headerButtonText}>{t('training.system.back')}</Text>
-                </TouchableOpacity>
             </View>
 
             <View style={styles.focusCard}>
@@ -453,193 +633,399 @@ function TrainingSystemWorkspace() {
                 <Text style={styles.focusText}>{system.focus}</Text>
             </View>
 
-            <TouchableOpacity
-                style={[styles.simulationButton, { backgroundColor: palette.primary }]}
-                onPress={() => router.push({ pathname: '/training/simulate', params: { systemId: system.id } })}>
-                <Text style={styles.simulationButtonText}>{language === 'en' ? 'Open Interactive Simulator' : 'Abrir simulador interactivo'}</Text>
-            </TouchableOpacity>
+            {/* Botones de acción superior */}
+            <View style={styles.actionsHeaderRow}>
+                <TouchableOpacity
+                    style={[styles.theoryMasterButton, { borderColor: palette.primary }]}
+                    onPress={() => setShowMasterTheoryModal(true)}>
+                    <IconSchool size={18} color={palette.primary} />
+                    <Text style={[styles.theoryMasterButtonText, { color: palette.primary }]}>
+                        {language === 'en' ? 'Theory & Biomechanics' : 'Teoría & Biomecánica'}
+                    </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    style={[styles.simulationButton, { backgroundColor: palette.primary }]}
+                    onPress={() => router.push({ pathname: '/training/simulate', params: { systemId: system.id } })}>
+                    <IconPlayerPlay size={16} color="#fff" />
+                    <Text style={styles.simulationButtonText}>
+                        {language === 'en' ? 'Simulator' : 'Simulador'}
+                    </Text>
+                </TouchableOpacity>
+            </View>
+
+            {/* Selector de Modo: Práctica Libre vs Cheat Sheet Canónico */}
+            {system.cheatSheets && system.cheatSheets.length > 0 && (
+                <View style={styles.viewModeTabs}>
+                    <TouchableOpacity
+                        style={[styles.viewModeTab, viewMode === 'practice' && styles.viewModeTabActive]}
+                        onPress={() => setViewMode('practice')}>
+                        <IconTarget size={16} color={viewMode === 'practice' ? '#fff' : palette.muted} />
+                        <Text style={[styles.viewModeTabText, viewMode === 'practice' && styles.viewModeTabTextActive]}>
+                            {language === 'en' ? 'Practice Positions' : 'Posiciones de Práctica'}
+                        </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.viewModeTab, viewMode === 'cheatsheet' && styles.viewModeTabActive]}
+                        onPress={() => setViewMode('cheatsheet')}>
+                        <IconRoute size={16} color={viewMode === 'cheatsheet' ? '#fff' : palette.muted} />
+                        <Text style={[styles.viewModeTabText, viewMode === 'cheatsheet' && styles.viewModeTabTextActive]}>
+                            {language === 'en' ? 'Canonical Cheat Sheet' : 'Cheat Sheet Canónico'}
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            )}
 
             <View style={[styles.simulationFrame, isSimulationWide && styles.simulationFrameWide]}>
                 <View style={styles.simulationMainPane}>
                     <View style={styles.tableCard}>
-                <View style={styles.tableHeaderRow}>
-                    <Text style={styles.cardTitle}>{t('training.system.table')}</Text>
-                    <TouchableOpacity style={styles.orientationButton} onPress={() => setTableOrientation((prev) => (prev === 'horizontal' ? 'vertical' : 'horizontal'))}>
-                        <Text style={styles.orientationButtonLabel}>{language === 'en' ? 'Table' : 'Mesa'}</Text>
-                        <Text style={styles.orientationButtonValue}>{tableOrientation === 'horizontal' ? 'Horizontal' : 'Vertical'}</Text>
-                    </TouchableOpacity>
-                </View>
+                        <View style={styles.tableHeaderRow}>
+                            <View style={styles.tableTitleWrap}>
+                                <Text style={styles.cardTitle}>
+                                    {viewMode === 'cheatsheet'
+                                        ? (language === 'en' ? 'Canonical Diamond Geometry' : 'Geometría Canónica de Diamantes')
+                                        : t('training.system.table')}
+                                </Text>
+                                {viewMode === 'cheatsheet' && (
+                                    <Text style={styles.cardSubBadge}>
+                                        {language === 'en' ? 'System Base 50' : 'Sistema Base 50'}
+                                    </Text>
+                                )}
+                            </View>
+                            <TouchableOpacity style={styles.orientationButton} onPress={() => setTableOrientation((prev) => (prev === 'horizontal' ? 'vertical' : 'horizontal'))}>
+                                <Text style={styles.orientationButtonLabel}>{language === 'en' ? 'Table' : 'Mesa'}</Text>
+                                <Text style={styles.orientationButtonValue}>{tableOrientation === 'horizontal' ? 'Horizontal' : 'Vertical'}</Text>
+                            </TouchableOpacity>
+                        </View>
 
-                <View
-                    style={styles.tableWrap}
-                    onLayout={(event) => {
-                        stageLayoutRef.current = {
-                            width: event.nativeEvent.layout.width,
-                            height: event.nativeEvent.layout.height,
-                        };
-                    }}
-                    onStartShouldSetResponder={() => true}
-                    onMoveShouldSetResponder={() => true}
-                    onResponderGrant={handleStageResponderGrant}
-                    onResponderMove={handleStageResponderMove}
-                    onResponderRelease={handleStageResponderRelease}
-                    onResponderTerminate={handleStageResponderRelease}>
-                    <BilliardsTableThumbnail
-                        orientation={tableOrientation}
-                        style={styles.tableStage}
-                        balls={stageBalls as unknown as Array<{ id: 'white' | 'yellow' | 'red'; x: number; y: number; color: string; border: string }>}
-                        aim={aimGuide}
-                        paths={guidePaths}
-                        showZones
-                    />
-                    <View style={styles.tableGestureLayer} />
-                </View>
-
-                <View style={styles.legendRow}>
-                    <View style={styles.legendChip}>
-                        <Text style={styles.legendLabel}>{t('training.sim.route')}</Text>
-                        <Text style={styles.legendValue}>{t('training.sim.segments', { count: currentPosition.trajectory.length - 1 })}</Text>
-                    </View>
-                    <View style={styles.legendChip}>
-                        <Text style={styles.legendLabel}>{t('training.sim.solution')}</Text>
-                        <Text style={styles.legendValue}>{showSolution ? t('common.visible') : t('common.hidden')}</Text>
-                    </View>
-                    <View style={styles.legendChip}>
-                        <Text style={styles.legendLabel}>{t('training.sim.guides')}</Text>
-                        <Text style={styles.legendValue}>{guideVisibility.white || guideVisibility.yellow || guideVisibility.red ? t('training.sim.active') : t('training.sim.off')}</Text>
-                    </View>
-                    <View style={styles.legendChip}>
-                        <Text style={styles.legendLabel}>{t('training.system.effect')}</Text>
-                        <Text style={styles.legendValue}>{effect.label}</Text>
-                    </View>
-                </View>
-
-                <View style={styles.guideToggleRow}>
-                    {BALL_ORDER.map((ballId) => {
-                        const active = guideVisibility[ballId];
-                        let label = t('common.red');
-                        if (ballId === 'white') {
-                            label = t('common.white');
-                        } else if (ballId === 'yellow') {
-                            label = t('common.yellow');
-                        }
-                        return (
-                            <Pressable
-                                key={ballId}
-                                style={[styles.guideChip, active && styles.guideChipActive]}
-                                onPress={() =>
-                                    setGuideVisibility((prev) => ({
-                                        ...prev,
-                                        [ballId]: !prev[ballId],
-                                    }))
-                                }>
-                                <Text style={[styles.guideChipText, active && styles.guideChipTextActive]}>{label}</Text>
-                            </Pressable>
-                        );
-                    })}
-                </View>
-
-                <View style={styles.positionControls}>
-                    <TouchableOpacity
-                        style={[styles.smallButton, positionIndex === 0 && styles.smallButtonDisabled]}
-                        disabled={positionIndex === 0}
-                        onPress={() => setPositionIndex((prev) => Math.max(0, prev - 1))}>
-                        <Text style={styles.smallButtonText}>{t('training.system.prev')}</Text>
-                    </TouchableOpacity>
-
-                    <Text style={styles.positionCounter}>
-                        {t('training.system.position', { current: positionIndex + 1, total: system.positions.length })}
-                    </Text>
-
-                    <TouchableOpacity
-                        style={[styles.smallButton, positionIndex >= system.positions.length - 1 && styles.smallButtonDisabled]}
-                        disabled={positionIndex >= system.positions.length - 1}
-                        onPress={() => setPositionIndex((prev) => Math.min(system.positions.length - 1, prev + 1))}>
-                        <Text style={styles.smallButtonText}>{t('training.system.next')}</Text>
-                    </TouchableOpacity>
-                </View>
-
-                <View style={styles.quickActionRow}>
-                    <TouchableOpacity style={styles.quickActionButton} onPress={saveStage}>
-                        <Text style={styles.quickActionText}>{t('training.sim.savePositions')}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.quickActionButton} onPress={loadStage}>
-                        <Text style={styles.quickActionText}>{t('training.sim.loadTable')}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.quickActionButton} onPress={resetStage}>
-                        <Text style={styles.quickActionText}>{t('common.reset')}</Text>
-                    </TouchableOpacity>
-                </View>
-
-                <TouchableOpacity style={styles.solutionButton} onPress={() => setShowSolution((prev) => !prev)}>
-                    <Text style={styles.solutionButtonText}>
-                        {showSolution ? t('training.system.hideSolution') : t('training.system.showSolution')}
-                    </Text>
-                </TouchableOpacity>
-
-                {statusMessage ? <Text style={styles.statusMessage}>{statusMessage}</Text> : null}
-                    </View>
-                </View>
-
-                <View style={[styles.simulationSidePane, isSimulationWide && styles.simulationFrameWidePane]}>
-                    <View style={styles.dualSection}>
-                        <View style={styles.cardHalf}>
-                            <Text style={styles.cardTitle}>{t('training.system.effect')}</Text>
-                            <EffectBallSelector
-                                spin={effectSpin}
-                                onSpinChange={(nextSpin) => {
-                                    setEffectSpin(nextSpin);
-                                    setSelectedEffect(spinToEffectKey(nextSpin));
-                                }}
-                                size={340}
-                                initialGuidesVisible
+                        <View
+                            style={styles.tableWrap}
+                            onLayout={(event) => {
+                                stageLayoutRef.current = {
+                                    width: event.nativeEvent.layout.width,
+                                    height: event.nativeEvent.layout.height,
+                                };
+                            }}
+                            {...responderProps}>
+                            <BilliardsTableThumbnail
+                                orientation={tableOrientation}
+                                style={styles.tableStage}
+                                balls={effectiveBalls as unknown as Array<{ id: 'white' | 'yellow' | 'red'; x: number; y: number; color: string; border: string }>}
+                                aim={viewMode === 'practice' ? aimGuide : undefined}
+                                paths={viewMode === 'practice' ? guidePaths : cheatPaths}
+                                diamondLabels={viewMode === 'cheatsheet' ? cheatDiamondLabels : undefined}
+                                showZones
                             />
-                            <Text style={styles.selectorTitle}>{effect.label}</Text>
-                            <Text style={styles.selectorSubtitle}>{effect.description}</Text>
-                            <View style={styles.effectMetaRow}>
-                                <View style={styles.effectMetaChip}>
-                                    <Text style={styles.effectMetaLabel}>{language === 'en' ? 'Power' : 'Potencia'}</Text>
-                                    <Text style={styles.effectMetaValue}>{effect.power}%</Text>
-                                </View>
-                                <View style={styles.effectMetaChip}>
-                                    <Text style={styles.effectMetaLabel}>{language === 'en' ? 'Contact' : 'Contacto'}</Text>
-                                    <Text style={styles.effectMetaValue}>{selectedContact}</Text>
-                                </View>
-                            </View>
+                            {viewMode === 'practice' && <View style={styles.tableGestureLayer} />}
                         </View>
 
-                        <View style={styles.cardHalf}>
-                            <Text style={styles.cardTitle}>{t('training.system.contact')}</Text>
-                            <View style={styles.contactWrap}>
-                                {(Object.keys(CONTACT_PRESETS) as ContactKey[]).map((key) => {
-                                    const selected = selectedContact === key;
-                                    return (
-                                        <Pressable
-                                            key={key}
-                                            style={[styles.contactButton, selected && styles.contactButtonSelected]}
-                                            onPress={() => setSelectedContact(key)}>
-                                            <Text style={[styles.contactButtonText, selected && styles.contactButtonTextSelected]}>{key}</Text>
-                                        </Pressable>
-                                    );
-                                })}
+                        {/* Controles para MODO CHEAT SHEET */}
+                        {viewMode === 'cheatsheet' && activeOriginCheat && (
+                            <View style={styles.cheatControlsContainer}>
+                                {/* 1. Selector de Salida */}
+                                <View style={styles.cheatSection}>
+                                    <Text style={styles.cheatSectionTitle}>
+                                        {language === 'en' ? '1. Departure Rail (Origin Point)' : '1. Salida Canónica (Punto de Partida)'}
+                                    </Text>
+                                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cheatOriginScroll}>
+                                        {system.cheatSheets?.map((cheat) => {
+                                            const isSelected = cheat.origin === selectedOrigin;
+                                            return (
+                                                <TouchableOpacity
+                                                    key={`origin-${cheat.origin}`}
+                                                    style={[styles.cheatOriginPill, isSelected && styles.cheatOriginPillActive]}
+                                                    onPress={() => {
+                                                        setSelectedOrigin(cheat.origin);
+                                                        setSelectedShotIndex('all');
+                                                    }}>
+                                                    <Text style={[styles.cheatOriginPillText, isSelected && styles.cheatOriginPillTextActive]}>
+                                                        Salida {cheat.origin} {cheat.origin === 50 ? '★ (Esquina)' : ''}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            );
+                                        })}
+                                    </ScrollView>
+                                </View>
+
+                                {/* 2. Selector de Trayectorias */}
+                                <View style={styles.cheatSection}>
+                                    <Text style={styles.cheatSectionTitle}>
+                                        {language === 'en' ? '2. Trajectory / Arrival' : '2. Trayectoria / Ataque y Llegada'}
+                                    </Text>
+                                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cheatOriginScroll}>
+                                        <TouchableOpacity
+                                            style={[styles.cheatShotPill, selectedShotIndex === 'all' && styles.cheatShotPillActive]}
+                                            onPress={() => setSelectedShotIndex('all')}>
+                                            <IconSparkles size={14} color={selectedShotIndex === 'all' ? '#fff' : palette.primary} />
+                                            <Text style={[styles.cheatShotPillText, selectedShotIndex === 'all' && styles.cheatShotPillTextActive]}>
+                                                {language === 'en' ? 'Full Fan (All Paths)' : '✨ Abanico Completo'}
+                                            </Text>
+                                        </TouchableOpacity>
+
+                                        {activeOriginCheat.shots.map((shot, idx) => {
+                                            const isSelected = selectedShotIndex === idx;
+                                            const dep = shot.departure ?? activeOriginCheat.origin;
+                                            const arr3 = shot.arrival3rd ?? shot.arrival;
+                                            return (
+                                                <TouchableOpacity
+                                                    key={`shot-${idx}`}
+                                                    style={[styles.cheatShotPill, isSelected && styles.cheatShotPillActive]}
+                                                    onPress={() => setSelectedShotIndex(idx)}>
+                                                    <Text style={[styles.cheatShotPillText, isSelected && styles.cheatShotPillTextActive]}>
+                                                        {dep} - {arr3} = {shot.attack}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            );
+                                        })}
+                                    </ScrollView>
+                                </View>
+
+                                {/* 3. Leyenda de Colores Multibanda */}
+                                <View style={styles.multiCushionLegend}>
+                                    <View style={styles.legendColorItem}>
+                                        <View style={[styles.legendColorDot, { backgroundColor: '#06b6d4' }]} />
+                                        <Text style={styles.legendColorText}>1ª a 3ª Banda</Text>
+                                    </View>
+                                    <View style={styles.legendColorItem}>
+                                        <View style={[styles.legendColorDot, { backgroundColor: '#f59e0b' }]} />
+                                        <Text style={styles.legendColorText}>3ª a 4ª Banda</Text>
+                                    </View>
+                                    <View style={styles.legendColorItem}>
+                                        <View style={[styles.legendColorDot, { backgroundColor: '#10b981' }]} />
+                                        <Text style={styles.legendColorText}>4ª a 5ª Banda</Text>
+                                    </View>
+                                </View>
+
+                                {/* 4. Tarjeta Didáctica de Cálculo y Teoría */}
+                                <View style={styles.cheatFormulaCard}>
+                                    <View style={styles.formulaHeaderRow}>
+                                        <Text style={styles.formulaBadge}>FÓRMULA CANÓNICA</Text>
+                                        <Text style={styles.formulaMath}>Salida - Llegada (3ª) = Ataque (1ª)</Text>
+                                    </View>
+                                    {typeof selectedShotIndex === 'number' && activeOriginCheat.shots[selectedShotIndex] ? (
+                                        <View style={styles.shotDetailBox}>
+                                            <Text style={styles.shotDetailMath}>
+                                                {activeOriginCheat.shots[selectedShotIndex].departure ?? activeOriginCheat.origin} (Salida) - {activeOriginCheat.shots[selectedShotIndex].arrival3rd ?? activeOriginCheat.shots[selectedShotIndex].arrival} (3ª Banda) = {activeOriginCheat.shots[selectedShotIndex].attack} (Ataque)
+                                            </Text>
+                                            <Text style={styles.shotDetailArrival4th}>
+                                                🎯 Retorno a 4ª Banda: Diamante {activeOriginCheat.shots[selectedShotIndex].arrival4th ?? activeOriginCheat.shots[selectedShotIndex].arrival}
+                                            </Text>
+                                        </View>
+                                    ) : (
+                                        <Text style={styles.formulaNote}>
+                                            Mostrando el abanico completo desde la salida {activeOriginCheat.origin}. Selecciona una trayectoria individual arriba para aislar el recorrido.
+                                        </Text>
+                                    )}
+                                    <Text style={styles.formulaExecution}>
+                                        ⚡ Ejecución: Efecto 3 a favor (hora 3 / hora 9), golpe penetrado sin brusquedad, velocidad media-viva (2.5 a 3 bandas de recorrido residual).
+                                    </Text>
+                                </View>
                             </View>
-                            <Text style={styles.selectorTitle}>{contact.label}</Text>
-                            <Text style={styles.selectorSubtitle}>{contact.description}</Text>
-                        </View>
+                        )}
+
+                        {/* Controles para MODO PRÁCTICA */}
+                        {viewMode === 'practice' && (
+                            <>
+                                <View style={styles.legendRow}>
+                                    <View style={styles.legendChip}>
+                                        <Text style={styles.legendLabel}>{t('training.sim.route')}</Text>
+                                        <Text style={styles.legendValue}>{t('training.sim.segments', { count: currentPosition.trajectory.length - 1 })}</Text>
+                                    </View>
+                                    <View style={styles.legendChip}>
+                                        <Text style={styles.legendLabel}>{t('training.sim.solution')}</Text>
+                                        <Text style={styles.legendValue}>{showSolution ? t('common.visible') : t('common.hidden')}</Text>
+                                    </View>
+                                    <View style={styles.legendChip}>
+                                        <Text style={styles.legendLabel}>{t('training.sim.guides')}</Text>
+                                        <Text style={styles.legendValue}>{guideVisibility.white || guideVisibility.yellow || guideVisibility.red ? t('training.sim.active') : t('training.sim.off')}</Text>
+                                    </View>
+                                    <View style={styles.legendChip}>
+                                        <Text style={styles.legendLabel}>{t('training.system.effect')}</Text>
+                                        <Text style={styles.legendValue}>{effect.label}</Text>
+                                    </View>
+                                </View>
+
+                                <View style={styles.guideToggleRow}>
+                                    {BALL_ORDER.map((ballId) => {
+                                        const active = guideVisibility[ballId];
+                                        let label = t('common.red');
+                                        if (ballId === 'white') {
+                                            label = t('common.white');
+                                        } else if (ballId === 'yellow') {
+                                            label = t('common.yellow');
+                                        }
+                                        return (
+                                            <Pressable
+                                                key={ballId}
+                                                style={[styles.guideChip, active && styles.guideChipActive]}
+                                                onPress={() =>
+                                                    setGuideVisibility((prev) => ({
+                                                        ...prev,
+                                                        [ballId]: !prev[ballId],
+                                                    }))
+                                                }>
+                                                <Text style={[styles.guideChipText, active && styles.guideChipTextActive]}>{label}</Text>
+                                            </Pressable>
+                                        );
+                                    })}
+                                </View>
+
+                                <View style={styles.positionControls}>
+                                    <TouchableOpacity
+                                        style={[styles.smallButton, positionIndex === 0 && styles.smallButtonDisabled]}
+                                        disabled={positionIndex === 0}
+                                        onPress={() => setPositionIndex((prev) => Math.max(0, prev - 1))}>
+                                        <Text style={styles.smallButtonText}>{t('training.system.prev')}</Text>
+                                    </TouchableOpacity>
+
+                                    <Text style={styles.positionCounter}>
+                                        {t('training.system.position', { current: positionIndex + 1, total: system.positions.length })}
+                                    </Text>
+
+                                    <TouchableOpacity
+                                        style={[styles.smallButton, positionIndex >= system.positions.length - 1 && styles.smallButtonDisabled]}
+                                        disabled={positionIndex >= system.positions.length - 1}
+                                        onPress={() => setPositionIndex((prev) => Math.min(system.positions.length - 1, prev + 1))}>
+                                        <Text style={styles.smallButtonText}>{t('training.system.next')}</Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                <View style={styles.quickActionRow}>
+                                    <TouchableOpacity style={styles.quickActionButton} onPress={saveStage}>
+                                        <Text style={styles.quickActionText}>{t('training.sim.savePositions')}</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={styles.quickActionButton} onPress={loadStage}>
+                                        <Text style={styles.quickActionText}>{t('training.sim.loadTable')}</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={styles.quickActionButton} onPress={resetStage}>
+                                        <Text style={styles.quickActionText}>{t('common.reset')}</Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                <TouchableOpacity style={styles.solutionButton} onPress={() => setShowSolution((prev) => !prev)}>
+                                    <Text style={styles.solutionButtonText}>
+                                        {showSolution ? t('training.system.hideSolution') : t('training.system.showSolution')}
+                                    </Text>
+                                </TouchableOpacity>
+
+                                {statusMessage ? <Text style={styles.statusMessage}>{statusMessage}</Text> : null}
+                            </>
+                        )}
                     </View>
+                </View>
 
-                    <View style={styles.recommendationCard}>
-                        <Text style={styles.cardTitle}>{t('training.system.recommendation')}</Text>
-                        <Text style={styles.recommendationText}>{t('training.system.recommendedPower', { power: suggestedPower })}</Text>
-                        <Text style={styles.recommendationSub}>{t('training.system.rules')}</Text>
-                        {system.rules.map((rule) => (
-                            <Text key={`${system.id}-rule-${rule}`} style={styles.ruleText}>
-                                • {rule}
+                {/* Panel lateral derecho / inferior */}
+                <View style={[styles.simulationSidePane, isSimulationWide && styles.simulationFrameWidePane]}>
+                    {viewMode === 'cheatsheet' ? (
+                        <View style={styles.cheatReferenceSideCard}>
+                            <View style={styles.authorBadgeRow}>
+                                <IconBrain size={18} color={palette.primary} />
+                                <Text style={styles.authorBadgeText}>
+                                    {system.author ?? 'Escuela Tradicional Canónica'}
+                                </Text>
+                            </View>
+                            <Text style={styles.cheatSideTitle}>
+                                {language === 'en' ? 'System Theory & Reference' : 'Teoría y Geometría del Sistema'}
                             </Text>
-                        ))}
-                    </View>
+                            <Text style={styles.cheatSideDescription}>
+                                {system.description ?? system.focus}
+                            </Text>
+                            {system.youtubeUrl ? (
+                                <TouchableOpacity
+                                    style={styles.youtubeLinkButton}
+                                    onPress={() => Linking.openURL(system.youtubeUrl!)}>
+                                    <IconPlayerPlay size={16} color="#ef4444" />
+                                    <Text style={styles.youtubeLinkText}>
+                                        {language === 'en' ? 'Watch AM Billiard Academy Lesson' : 'Ver Video AM Billiard Academy'}
+                                    </Text>
+                                </TouchableOpacity>
+                            ) : null}
+                            <View style={styles.sidePrinciplesBox}>
+                                <Text style={styles.sidePrinciplesTitle}>
+                                    {language === 'en' ? 'Key Geometrical Constants' : 'Constantes Geométricas Clave'}
+                                </Text>
+                                <Text style={styles.sidePrincipleItem}>• Salida 50: Vértice exacto de la mesa, proyección de esquina.</Text>
+                                <Text style={styles.sidePrincipleItem}>• Llegada a 20 en 3ª banda retorna a la esquina opuesta (20 en 4ª banda).</Text>
+                                <Text style={styles.sidePrincipleItem}>• Compensación de taco: para salidas &gt; 50 sumar 2.5 pts; para &lt; 50 restar compensación.</Text>
+                            </View>
+                            <TouchableOpacity
+                                style={[styles.simulationButton, { backgroundColor: palette.primary, marginTop: 12 }]}
+                                onPress={() => router.push({ pathname: '/training/simulate', params: { systemId: system.id } })}>
+                                <IconPlayerPlay size={16} color="#fff" />
+                                <Text style={styles.simulationButtonText}>
+                                    {language === 'en' ? 'Simulate this System' : 'Entrenar en Simulador Interactivo'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    ) : (
+                        <>
+                            <View style={styles.dualSection}>
+                                <View style={styles.cardHalf}>
+                                    <Text style={styles.cardTitle}>{t('training.system.effect')}</Text>
+                                    <EffectBallSelector
+                                        spin={effectSpin}
+                                        onSpinChange={(nextSpin) => {
+                                            setEffectSpin(nextSpin);
+                                            setSelectedEffect(spinToEffectKey(nextSpin));
+                                        }}
+                                        size={340}
+                                        initialGuidesVisible
+                                    />
+                                    <Text style={styles.selectorTitle}>{effect.label}</Text>
+                                    <Text style={styles.selectorSubtitle}>{effect.description}</Text>
+                                    <View style={styles.effectMetaRow}>
+                                        <View style={styles.effectMetaChip}>
+                                            <Text style={styles.effectMetaLabel}>{language === 'en' ? 'Power' : 'Potencia'}</Text>
+                                            <Text style={styles.effectMetaValue}>{effect.power}%</Text>
+                                        </View>
+                                        <View style={styles.effectMetaChip}>
+                                            <Text style={styles.effectMetaLabel}>{language === 'en' ? 'Contact' : 'Contacto'}</Text>
+                                            <Text style={styles.effectMetaValue}>{selectedContact}</Text>
+                                        </View>
+                                    </View>
+                                </View>
+
+                                <View style={styles.cardHalf}>
+                                    <Text style={styles.cardTitle}>{t('training.system.contact')}</Text>
+                                    <View style={styles.contactWrap}>
+                                        {(Object.keys(CONTACT_PRESETS) as ContactKey[]).map((key) => {
+                                            const selected = selectedContact === key;
+                                            return (
+                                                <Pressable
+                                                    key={key}
+                                                    style={[styles.contactButton, selected && styles.contactButtonSelected]}
+                                                    onPress={() => setSelectedContact(key)}>
+                                                    <Text style={[styles.contactButtonText, selected && styles.contactButtonTextSelected]}>{key}</Text>
+                                                </Pressable>
+                                            );
+                                        })}
+                                    </View>
+                                    <Text style={styles.selectorTitle}>{contact.label}</Text>
+                                    <Text style={styles.selectorSubtitle}>{contact.description}</Text>
+                                </View>
+                            </View>
+
+                            <View style={styles.recommendationCard}>
+                                <Text style={styles.cardTitle}>{t('training.system.recommendation')}</Text>
+                                <Text style={styles.recommendationText}>{t('training.system.recommendedPower', { power: suggestedPower })}</Text>
+                                <Text style={styles.recommendationSub}>{t('training.system.rules')}</Text>
+                                {system.rules.map((rule) => (
+                                    <Text key={`${system.id}-rule-${rule}`} style={styles.ruleText}>
+                                        • {rule}
+                                    </Text>
+                                ))}
+                            </View>
+                        </>
+                    )}
                 </View>
             </View>
+
+            {/* Modal Maestro de Pedagogía y Biomecánica */}
+            <MasterPedagogyModal
+                visible={showMasterTheoryModal}
+                onClose={() => setShowMasterTheoryModal(false)}
+            />
         </ScrollView>
     );
 }
@@ -678,9 +1064,18 @@ const getStyles = (palette: ReturnType<typeof getPalette>) =>
             color: '#fff',
             fontWeight: '800',
         },
+        backBtn: {
+            width: 38,
+            height: 38,
+            borderRadius: theme.radius.md,
+            backgroundColor: palette.surfaceLow,
+            borderWidth: 1,
+            borderColor: palette.border,
+            alignItems: 'center',
+            justifyContent: 'center',
+        },
         headerRow: {
             flexDirection: 'row',
-            justifyContent: 'space-between',
             alignItems: 'center',
             gap: 12,
         },
@@ -1178,5 +1573,286 @@ const getStyles = (palette: ReturnType<typeof getPalette>) =>
             color: palette.muted,
             fontSize: 13,
             lineHeight: 18,
+        },
+        actionsHeaderRow: {
+            flexDirection: 'row',
+            gap: 10,
+            alignItems: 'center',
+        },
+        theoryMasterButton: {
+            flex: 1,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            paddingVertical: 13,
+            paddingHorizontal: 14,
+            borderRadius: theme.radius.md,
+            borderWidth: 1.5,
+            backgroundColor: `${palette.primary}12`,
+        },
+        theoryMasterButtonText: {
+            fontSize: 14,
+            fontWeight: '800',
+        },
+        viewModeTabs: {
+            flexDirection: 'row',
+            gap: 8,
+            backgroundColor: palette.card,
+            padding: 4,
+            borderRadius: 14,
+            borderWidth: 1,
+            borderColor: palette.border,
+        },
+        viewModeTab: {
+            flex: 1,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            paddingVertical: 10,
+            borderRadius: 10,
+        },
+        viewModeTabActive: {
+            backgroundColor: palette.primary,
+        },
+        viewModeTabText: {
+            color: palette.muted,
+            fontSize: 13,
+            fontWeight: '700',
+        },
+        viewModeTabTextActive: {
+            color: '#fff',
+            fontWeight: '900',
+        },
+        tableTitleWrap: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+            flexShrink: 1,
+        },
+        cardSubBadge: {
+            color: palette.primary,
+            fontSize: 10,
+            fontWeight: '800',
+            backgroundColor: `${palette.primary}18`,
+            paddingHorizontal: 8,
+            paddingVertical: 3,
+            borderRadius: 6,
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+        },
+        cheatControlsContainer: {
+            marginTop: 12,
+            gap: 12,
+        },
+        cheatSection: {
+            gap: 6,
+        },
+        cheatSectionTitle: {
+            color: palette.muted,
+            fontSize: 11,
+            fontWeight: '800',
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+        },
+        cheatOriginScroll: {
+            flexDirection: 'row',
+            gap: 8,
+            paddingVertical: 2,
+        },
+        cheatOriginPill: {
+            paddingHorizontal: 14,
+            paddingVertical: 8,
+            borderRadius: 999,
+            backgroundColor: palette.background,
+            borderWidth: 1,
+            borderColor: palette.border,
+        },
+        cheatOriginPillActive: {
+            backgroundColor: palette.primary,
+            borderColor: palette.primary,
+        },
+        cheatOriginPillText: {
+            color: palette.text,
+            fontSize: 12,
+            fontWeight: '700',
+        },
+        cheatOriginPillTextActive: {
+            color: '#fff',
+            fontWeight: '900',
+        },
+        cheatShotPill: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+            paddingHorizontal: 12,
+            paddingVertical: 7,
+            borderRadius: 8,
+            backgroundColor: palette.background,
+            borderWidth: 1,
+            borderColor: palette.border,
+        },
+        cheatShotPillActive: {
+            backgroundColor: palette.primary,
+            borderColor: palette.primary,
+        },
+        cheatShotPillText: {
+            color: palette.text,
+            fontSize: 12,
+            fontWeight: '700',
+        },
+        cheatShotPillTextActive: {
+            color: '#fff',
+            fontWeight: '900',
+        },
+        multiCushionLegend: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            backgroundColor: `${palette.card}88`,
+            borderRadius: 10,
+            borderWidth: 1,
+            borderColor: palette.border,
+        },
+        legendColorItem: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+        },
+        legendColorDot: {
+            width: 10,
+            height: 10,
+            borderRadius: 5,
+        },
+        legendColorText: {
+            color: palette.text,
+            fontSize: 11,
+            fontWeight: '700',
+        },
+        cheatFormulaCard: {
+            borderRadius: 12,
+            backgroundColor: `${palette.primary}0c`,
+            borderWidth: 1,
+            borderColor: `${palette.primary}25`,
+            padding: 12,
+            gap: 8,
+        },
+        formulaHeaderRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 6,
+        },
+        formulaBadge: {
+            color: palette.primary,
+            fontSize: 10,
+            fontWeight: '900',
+            letterSpacing: 0.5,
+        },
+        formulaMath: {
+            color: palette.text,
+            fontSize: 13,
+            fontWeight: '800',
+            fontFamily: 'monospace',
+        },
+        shotDetailBox: {
+            backgroundColor: palette.card,
+            padding: 10,
+            borderRadius: 8,
+            borderLeftWidth: 3,
+            borderLeftColor: palette.primary,
+            gap: 4,
+        },
+        shotDetailMath: {
+            color: palette.text,
+            fontSize: 14,
+            fontWeight: '800',
+        },
+        shotDetailArrival4th: {
+            color: '#10b981',
+            fontSize: 12,
+            fontWeight: '700',
+        },
+        formulaNote: {
+            color: palette.muted,
+            fontSize: 12,
+            lineHeight: 17,
+        },
+        formulaExecution: {
+            color: palette.muted,
+            fontSize: 11,
+            lineHeight: 16,
+            fontStyle: 'italic',
+        },
+        cheatReferenceSideCard: {
+            borderRadius: theme.radius.lg,
+            backgroundColor: palette.card,
+            borderWidth: 1,
+            borderColor: palette.border,
+            padding: theme.spacing.md,
+            gap: 10,
+        },
+        authorBadgeRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+        },
+        authorBadgeText: {
+            color: palette.primary,
+            fontSize: 12,
+            fontWeight: '800',
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+        },
+        cheatSideTitle: {
+            color: palette.text,
+            fontSize: 16,
+            fontWeight: '900',
+        },
+        cheatSideDescription: {
+            color: palette.muted,
+            fontSize: 13,
+            lineHeight: 19,
+        },
+        youtubeLinkButton: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+            paddingVertical: 10,
+            paddingHorizontal: 12,
+            borderRadius: 10,
+            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+            borderWidth: 1,
+            borderColor: 'rgba(239, 68, 68, 0.25)',
+        },
+        youtubeLinkText: {
+            color: '#ef4444',
+            fontSize: 12,
+            fontWeight: '800',
+        },
+        sidePrinciplesBox: {
+            marginTop: 4,
+            padding: 10,
+            borderRadius: 10,
+            backgroundColor: `${palette.primary}08`,
+            borderWidth: 1,
+            borderColor: `${palette.primary}18`,
+            gap: 6,
+        },
+        sidePrinciplesTitle: {
+            color: palette.text,
+            fontSize: 11,
+            fontWeight: '800',
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+        },
+        sidePrincipleItem: {
+            color: palette.muted,
+            fontSize: 12,
+            lineHeight: 17,
         },
     });
