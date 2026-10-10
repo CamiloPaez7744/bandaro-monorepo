@@ -24,6 +24,8 @@ import {
   HairlineMatchFigure,
   HairlineDashboardFigure,
 } from '@/src/presentation/components/HairlineIcons';
+import { HairlineBilliardRiffle } from '@/src/presentation/components/Catalog/HairlineBilliardRiffle';
+
 
 const { width: W } = Dimensions.get('window');
 const CARD_GAP = 12;
@@ -326,6 +328,15 @@ export function HomeScreen() {
           {t('home.greeting')}
         </Text>
 
+        {/* ── Hairline Billiard Riffle: Catálogo de Mesas Interactivo ── */}
+        <View style={styles.riffleSection}>
+          <HairlineBilliardRiffle
+            onSelectShot={(shot) => {
+              navigate('/(tabs)/catalog');
+            }}
+          />
+        </View>
+
         {/* ── Grid 2-1-2 ───────────────────────────────────── */}
         <View style={styles.grid}>
           <View style={styles.rowFlex}>
@@ -392,8 +403,15 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
 
+  // Riffle
+  riffleSection: {
+    width: '100%',
+    maxWidth: 620,
+    marginBottom: 16,
+  },
+
   // Grid
-  grid: { width: '100%', gap: CARD_GAP },
+  grid: { width: '100%', maxWidth: 620, gap: CARD_GAP },
   rowFlex: { flexDirection: 'row', gap: CARD_GAP },
   halfCard: { flex: 1, height: 162 },
   wideCard: { flex: 1, height: 132 },
