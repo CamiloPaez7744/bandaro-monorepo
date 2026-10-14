@@ -14,35 +14,40 @@ class BilliardAudioManager {
 
     constructor() {
         if (Platform.OS === 'web' && typeof window !== 'undefined') {
-            const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-            if (AudioCtx) {
-                this.ctx = new AudioCtx();
-                this.setupUnlockListeners();
-            }
+            this.setupUnlockListeners();
         }
     }
 
     private setupUnlockListeners() {
         if (typeof window === 'undefined') return;
         const unlock = () => {
-            if (this.ctx && this.ctx.state === 'suspended') {
-                this.ctx.resume().then(() => {
-                    this.isUnlocked = true;
-                }).catch(() => {});
+            if (!this.ctx) {
+                const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+                if (AudioCtx) {
+                    try {
+                        this.ctx = new AudioCtx();
+                    } catch {}
+                }
+            } else if (this.ctx.state === 'suspended') {
+                this.ctx.resume().catch(() => {});
             }
+            this.isUnlocked = true;
             window.removeEventListener('pointerdown', unlock);
             window.removeEventListener('keydown', unlock);
+            window.removeEventListener('touchstart', unlock);
         };
-        window.addEventListener('pointerdown', unlock, { once: true });
-        window.addEventListener('keydown', unlock, { once: true });
+        window.addEventListener('pointerdown', unlock, { once: true, passive: true });
+        window.addEventListener('keydown', unlock, { once: true, passive: true });
+        window.addEventListener('touchstart', unlock, { once: true, passive: true });
     }
 
     private getContext(): AudioContext | null {
         if (!this.ctx && Platform.OS === 'web' && typeof window !== 'undefined') {
             const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
             if (AudioCtx) {
-                this.ctx = new AudioCtx();
-                this.setupUnlockListeners();
+                try {
+                    this.ctx = new AudioCtx();
+                } catch {}
             }
         }
         if (this.ctx && this.ctx.state === 'suspended') {

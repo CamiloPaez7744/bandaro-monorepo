@@ -122,11 +122,15 @@ const styles = StyleSheet.create({
         borderColor: 'rgba(255, 109, 0, 0.45)',
         borderWidth: 1,
         borderRadius: 6,
-        shadowColor: '#FF3D00',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.5,
-        shadowRadius: 5,
-        elevation: 3,
+        ...(Platform.OS === 'web'
+            ? { boxShadow: '0 1px 6px rgba(255, 61, 0, 0.45)' }
+            : {
+                shadowColor: '#FF3D00',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.5,
+                shadowRadius: 5,
+                elevation: 3,
+            }),
     },
     badgeIconOnly: {
         paddingHorizontal: 5,

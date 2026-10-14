@@ -24,7 +24,6 @@ import {
   HairlineMatchFigure,
   HairlineDashboardFigure,
 } from '@/src/presentation/components/HairlineIcons';
-import { HairlineBilliardRiffle } from '@/src/presentation/components/Catalog/HairlineBilliardRiffle';
 
 
 const { width: W } = Dimensions.get('window');
@@ -54,20 +53,7 @@ function HubCard({
 }) {
   const scale = useRef(new Animated.Value(1)).current;
   const opacity = useRef(new Animated.Value(1)).current;
-  const [pointer, setPointer] = useState({ x: 0, y: 0 });
-  const [isHovered, setIsHovered] = useState(false);
-  const cardSize = useRef({ width: 1, height: 1 });
-
-  const updatePointer = (clientX: number, clientY: number) => {
-    const w = cardSize.current.width || 1;
-    const h = cardSize.current.height || 1;
-    const nx = (clientX / w - 0.5) * 2;
-    const ny = (clientY / h - 0.5) * 2;
-    setPointer({
-      x: Math.max(-1, Math.min(1, nx)),
-      y: Math.max(-1, Math.min(1, ny)),
-    });
-  };
+  const [isCardHovered, setIsCardHovered] = useState(false);
 
   const handlePressIn = () =>
     Animated.parallel([
@@ -106,29 +92,9 @@ function HubCard({
       onPress={onPress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
-      onLayout={(e) => {
-        cardSize.current = {
-          width: e.nativeEvent.layout.width,
-          height: e.nativeEvent.layout.height,
-        };
-      }}
-      onPointerMove={(e: any) => {
-        const locX = e.nativeEvent.offsetX ?? e.nativeEvent.locationX;
-        const locY = e.nativeEvent.offsetY ?? e.nativeEvent.locationY;
-        if (typeof locX === 'number' && typeof locY === 'number') {
-          updatePointer(locX, locY);
-        }
-      }}
-      onPointerEnter={() => setIsHovered(true)}
-      onPointerLeave={() => {
-        setIsHovered(false);
-        setPointer({ x: 0, y: 0 });
-      }}
-      onTouchMove={(e) => {
-        if (e.nativeEvent.locationX && e.nativeEvent.locationY) {
-          updatePointer(e.nativeEvent.locationX, e.nativeEvent.locationY);
-        }
-      }}
+      // @ts-ignore - Web pointer events for card border affordance only
+      onPointerEnter={() => setIsCardHovered(true)}
+      onPointerLeave={() => setIsCardHovered(false)}
       style={style}
     >
       <Animated.View
@@ -149,7 +115,7 @@ function HubCard({
               <Stop
                 offset="0%"
                 stopColor={card.accent}
-                stopOpacity={isHovered ? 0.35 : 0.22}
+                stopOpacity={isCardHovered ? 0.35 : 0.22}
               />
               <Stop offset="100%" stopColor={card.accent} stopOpacity="0" />
             </RadialGradient>
@@ -169,7 +135,7 @@ function HubCard({
             StyleSheet.absoluteFill,
             styles.cardBorder,
             {
-              borderColor: isHovered
+              borderColor: isCardHovered
                 ? `${card.accent}77`
                 : `${card.accent}33`,
             },
@@ -195,11 +161,8 @@ function HubCard({
             </View>
             <View style={styles.wideFigureWrap}>
               <Figure
-                size={82}
+                size={142}
                 accent={card.accent}
-                pointerX={pointer.x}
-                pointerY={pointer.y}
-                isHovered={isHovered}
                 autoPlay={true}
               />
             </View>
@@ -208,11 +171,14 @@ function HubCard({
           <View style={styles.cardContent}>
             <View style={styles.figureWrap}>
               <Figure
-                size={66}
+                size={
+                  card.id === 'training'
+                    ? 162
+                    : card.id === 'dashboard'
+                    ? 136
+                    : 146
+                }
                 accent={card.accent}
-                pointerX={pointer.x}
-                pointerY={pointer.y}
-                isHovered={isHovered}
                 autoPlay={true}
               />
             </View>
@@ -328,15 +294,6 @@ export function HomeScreen() {
           {t('home.greeting')}
         </Text>
 
-        {/* ── Hairline Billiard Riffle: Catálogo de Mesas Interactivo ── */}
-        <View style={styles.riffleSection}>
-          <HairlineBilliardRiffle
-            onSelectShot={(shot) => {
-              navigate('/(tabs)/catalog');
-            }}
-          />
-        </View>
-
         {/* ── Grid 2-1-2 ───────────────────────────────────── */}
         <View style={styles.grid}>
           <View style={styles.rowFlex}>
@@ -403,18 +360,11 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
 
-  // Riffle
-  riffleSection: {
-    width: '100%',
-    maxWidth: 620,
-    marginBottom: 16,
-  },
-
   // Grid
   grid: { width: '100%', maxWidth: 620, gap: CARD_GAP },
   rowFlex: { flexDirection: 'row', gap: CARD_GAP },
-  halfCard: { flex: 1, height: 162 },
-  wideCard: { flex: 1, height: 132 },
+  halfCard: { flex: 1, height: 184 },
+  wideCard: { flex: 1, height: 162 },
 
   // Card
   card: {
@@ -429,15 +379,17 @@ const styles = StyleSheet.create({
   },
   cardContent: {
     flex: 1,
-    padding: 12,
+    paddingTop: 6,
+    paddingBottom: 8,
+    paddingHorizontal: 8,
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   figureWrap: {
     flex: 1,
+    width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 2,
   },
   labelRow: {
     flexDirection: 'row',
@@ -505,8 +457,8 @@ const styles = StyleSheet.create({
     maxWidth: 190,
   },
   wideFigureWrap: {
-    width: 100,
-    height: 85,
+    width: 206,
+    height: 138,
     alignItems: 'center',
     justifyContent: 'center',
   },

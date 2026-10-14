@@ -1158,7 +1158,133 @@ function TableVisionStudioModalBase({
     };
   }, []);
 
-  // CamScanner Gesture PanResponder (Drag corners or Drag balls on photo)
+  // CamScanner Gesture Handlers (Drag corners or Drag balls on photo)
+  const handleDragStart = useCallback((locX: number, locY: number) => {
+    const rect = imageRectRef.current;
+    if (rect.width === 0 || rect.height === 0) return;
+
+    // 1. Check balls first with tighter 20px threshold and MINIMUM distance
+    let closestBall: any = null;
+    let minBallDist = Infinity;
+    screenBallsRef.current.forEach((b) => {
+      const dist = Math.hypot(locX - b.x, locY - b.y);
+      if (dist < minBallDist) {
+        minBallDist = dist;
+        closestBall = b;
+      }
+    });
+
+    if (closestBall && minBallDist <= 20) {
+      const ballId = closestBall.id;
+      dragTargetRef.current = ballId;
+      setSelectedTargetType(ballId);
+      const bPos =
+        ballId === 'white'
+          ? whiteImagePosRef.current
+          : ballId === 'yellow'
+          ? yellowImagePosRef.current
+          : redImagePosRef.current;
+      startNormPosRef.current = { ...bPos };
+      setLoupeCenter({ x: bPos.x, y: bPos.y });
+      setIsDragging(true);
+      setDragTarget(ballId);
+      return;
+    }
+
+    // 2. Check corners with 55px threshold and MINIMUM distance
+    let closestIdx = 0;
+    let minCornerDist = Infinity;
+    screenCornersRef.current.forEach((p, idx) => {
+      const dist = Math.hypot(locX - p.x, locY - p.y);
+      if (dist < minCornerDist) {
+        minCornerDist = dist;
+        closestIdx = idx;
+      }
+    });
+
+    if (minCornerDist <= 55) {
+      activeCornerIdxRef.current = closestIdx;
+      setActiveCornerIdx(closestIdx);
+      dragTargetRef.current = 'corner';
+      setSelectedTargetType('corner');
+      const cPos = cornersRef.current[closestIdx];
+      startNormPosRef.current = { ...cPos };
+      setLoupeCenter({
+        x: Math.max(-0.5, Math.min(1.5, cPos.x)),
+        y: Math.max(-0.5, Math.min(1.5, cPos.y)),
+      });
+      setIsDragging(true);
+      setDragTarget('corner');
+      return;
+    }
+
+    // 3. Fallback: If user tapped canvas, drag the currently selected target
+    const currentTargetType = selectedTargetTypeRef.current;
+    if (currentTargetType === 'white') {
+      dragTargetRef.current = 'white';
+      startNormPosRef.current = { ...whiteImagePosRef.current };
+      setLoupeCenter({ x: whiteImagePosRef.current.x, y: whiteImagePosRef.current.y });
+      setIsDragging(true);
+      setDragTarget('white');
+    } else if (currentTargetType === 'yellow') {
+      dragTargetRef.current = 'yellow';
+      startNormPosRef.current = { ...yellowImagePosRef.current };
+      setLoupeCenter({ x: yellowImagePosRef.current.x, y: yellowImagePosRef.current.y });
+      setIsDragging(true);
+      setDragTarget('yellow');
+    } else if (currentTargetType === 'red') {
+      dragTargetRef.current = 'red';
+      startNormPosRef.current = { ...redImagePosRef.current };
+      setLoupeCenter({ x: redImagePosRef.current.x, y: redImagePosRef.current.y });
+      setIsDragging(true);
+      setDragTarget('red');
+    } else {
+      dragTargetRef.current = 'corner';
+      const cPos = cornersRef.current[activeCornerIdxRef.current];
+      startNormPosRef.current = { ...cPos };
+      setLoupeCenter({
+        x: Math.max(-0.5, Math.min(1.5, cPos.x)),
+        y: Math.max(-0.5, Math.min(1.5, cPos.y)),
+      });
+      setIsDragging(true);
+      setDragTarget('corner');
+    }
+  }, []);
+
+  const handleDragMove = useCallback((dx: number, dy: number) => {
+    const rect = imageRectRef.current;
+    if (rect.width === 0 || rect.height === 0) return;
+    if (!startNormPosRef.current) return;
+
+    const target = dragTargetRef.current;
+    if (!target) return;
+
+    pendingMoveRef.current = {
+      target,
+      start: startNormPosRef.current,
+      dx,
+      dy,
+      cIdx: activeCornerIdxRef.current,
+      rect,
+    };
+
+    if (moveRafRef.current === null) {
+      moveRafRef.current = requestAnimationFrame(applyPendingMove);
+    }
+  }, [applyPendingMove]);
+
+  const handleDragEnd = useCallback(() => {
+    if (moveRafRef.current !== null) {
+      cancelAnimationFrame(moveRafRef.current);
+      moveRafRef.current = null;
+      applyPendingMove();
+    }
+    setIsDragging(false);
+    setDragTarget(null);
+    dragTargetRef.current = null;
+    startNormPosRef.current = null;
+  }, [applyPendingMove]);
+
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -1171,18 +1297,7 @@ function TableVisionStudioModalBase({
         let locX = ne.locationX;
         let locY = ne.locationY;
 
-        if (isWeb && canvasRef.current) {
-          const rect = (canvasRef.current as any).getBoundingClientRect?.();
-          if (rect) {
-            const touch = ne.touches?.[0] || ne.changedTouches?.[0];
-            const clientX = touch ? touch.clientX : (ne.clientX ?? (evt as any).clientX);
-            const clientY = touch ? touch.clientY : (ne.clientY ?? (evt as any).clientY);
-            if (clientX !== undefined && clientY !== undefined) {
-              locX = clientX - rect.left;
-              locY = clientY - rect.top;
-            }
-          }
-        } else if (canvasLayoutRef.current) {
+        if (canvasLayoutRef.current) {
           const touch = ne.touches?.[0] || ne.changedTouches?.[0];
           const pageX = touch ? touch.pageX : (ne.pageX ?? gestureState.x0);
           const pageY = touch ? touch.pageY : (ne.pageY ?? gestureState.y0);
@@ -1195,173 +1310,62 @@ function TableVisionStudioModalBase({
         if (locX === undefined || locX === null) locX = ne.offsetX ?? 0;
         if (locY === undefined || locY === null) locY = ne.offsetY ?? 0;
 
-        const rect = imageRectRef.current;
-        if (rect.width === 0 || rect.height === 0) return;
-
-        // 1. Check balls first with tighter 20px threshold and MINIMUM distance
-        let closestBall: any = null;
-        let minBallDist = Infinity;
-        screenBallsRef.current.forEach((b) => {
-          const dist = Math.hypot(locX - b.x, locY - b.y);
-          if (dist < minBallDist) {
-            minBallDist = dist;
-            closestBall = b;
-          }
-        });
-
-        if (closestBall && minBallDist <= 20) {
-          const ballId = closestBall.id;
-          dragTargetRef.current = ballId;
-          setSelectedTargetType(ballId);
-          const bPos =
-            ballId === 'white'
-              ? whiteImagePosRef.current
-              : ballId === 'yellow'
-              ? yellowImagePosRef.current
-              : redImagePosRef.current;
-          startNormPosRef.current = { ...bPos };
-          setLoupeCenter({ x: bPos.x, y: bPos.y });
-          setIsDragging(true);
-          setDragTarget(ballId);
-          return;
-        }
-
-        // 2. Check corners with 55px threshold and MINIMUM distance
-        let closestIdx = 0;
-        let minCornerDist = Infinity;
-        screenCornersRef.current.forEach((p, idx) => {
-          const dist = Math.hypot(locX - p.x, locY - p.y);
-          if (dist < minCornerDist) {
-            minCornerDist = dist;
-            closestIdx = idx;
-          }
-        });
-
-        if (minCornerDist <= 55) {
-          activeCornerIdxRef.current = closestIdx;
-          setActiveCornerIdx(closestIdx);
-          dragTargetRef.current = 'corner';
-          setSelectedTargetType('corner');
-          const cPos = cornersRef.current[closestIdx];
-          startNormPosRef.current = { ...cPos };
-          setLoupeCenter({
-            x: Math.max(-0.5, Math.min(1.5, cPos.x)),
-            y: Math.max(-0.5, Math.min(1.5, cPos.y)),
-          });
-          setIsDragging(true);
-          setDragTarget('corner');
-          return;
-        }
-
-        // 3. Fallback: If user tapped canvas, drag the currently selected target
-        const currentTargetType = selectedTargetTypeRef.current;
-        if (currentTargetType === 'white') {
-          dragTargetRef.current = 'white';
-          startNormPosRef.current = { ...whiteImagePosRef.current };
-          setLoupeCenter({ x: whiteImagePosRef.current.x, y: whiteImagePosRef.current.y });
-          setIsDragging(true);
-          setDragTarget('white');
-        } else if (currentTargetType === 'yellow') {
-          dragTargetRef.current = 'yellow';
-          startNormPosRef.current = { ...yellowImagePosRef.current };
-          setLoupeCenter({ x: yellowImagePosRef.current.x, y: yellowImagePosRef.current.y });
-          setIsDragging(true);
-          setDragTarget('yellow');
-        } else if (currentTargetType === 'red') {
-          dragTargetRef.current = 'red';
-          startNormPosRef.current = { ...redImagePosRef.current };
-          setLoupeCenter({ x: redImagePosRef.current.x, y: redImagePosRef.current.y });
-          setIsDragging(true);
-          setDragTarget('red');
-        } else {
-          dragTargetRef.current = 'corner';
-          const cPos = cornersRef.current[activeCornerIdxRef.current];
-          startNormPosRef.current = { ...cPos };
-          setLoupeCenter({
-            x: Math.max(-0.5, Math.min(1.5, cPos.x)),
-            y: Math.max(-0.5, Math.min(1.5, cPos.y)),
-          });
-          setIsDragging(true);
-          setDragTarget('corner');
-        }
+        handleDragStart(locX, locY);
       },
-      onPanResponderMove: (evt, gestureState) => {
-        const rect = imageRectRef.current;
-        if (rect.width === 0 || rect.height === 0) return;
-        if (!startNormPosRef.current) return;
-
-        const target = dragTargetRef.current;
-        if (!target) return;
-
-        pendingMoveRef.current = {
-          target,
-          start: startNormPosRef.current,
-          dx: gestureState.dx,
-          dy: gestureState.dy,
-          cIdx: activeCornerIdxRef.current,
-          rect,
-        };
-
-        if (moveRafRef.current === null) {
-          moveRafRef.current = requestAnimationFrame(applyPendingMove);
-        }
+      onPanResponderMove: (_evt, gestureState) => {
+        handleDragMove(gestureState.dx, gestureState.dy);
       },
       onPanResponderRelease: () => {
-        if (moveRafRef.current !== null) {
-          cancelAnimationFrame(moveRafRef.current);
-          moveRafRef.current = null;
-          applyPendingMove();
-        }
-        setIsDragging(false);
-        setDragTarget(null);
-        dragTargetRef.current = null;
-        startNormPosRef.current = null;
+        handleDragEnd();
       },
       onPanResponderTerminate: () => {
-        if (moveRafRef.current !== null) {
-          cancelAnimationFrame(moveRafRef.current);
-          moveRafRef.current = null;
-          applyPendingMove();
-        }
-        setIsDragging(false);
-        setDragTarget(null);
-        dragTargetRef.current = null;
-        startNormPosRef.current = null;
+        handleDragEnd();
       },
     })
   );
 
+  const pointerDownRef = useRef(false);
+  const pointerStartRef = useRef({ x: 0, y: 0 });
+
   const webGestureHandlers = useMemo(() => {
     if (Platform.OS !== 'web') return panResponder.current.panHandlers;
-    let isDown = false;
-    let startX = 0;
-    let startY = 0;
     return {
       onPointerDown: (e: any) => {
-        isDown = true;
-        startX = e.clientX;
-        startY = e.clientY;
-        e.currentTarget?.setPointerCapture?.(e.pointerId);
-        panResponder.current.panHandlers.onResponderGrant?.({
-          nativeEvent: { locationX: e.nativeEvent?.offsetX ?? 0, locationY: e.nativeEvent?.offsetY ?? 0, clientX: e.clientX, clientY: e.clientY },
-        } as any);
+        pointerDownRef.current = true;
+        pointerStartRef.current = { x: e.clientX, y: e.clientY };
+        try {
+          e.currentTarget?.setPointerCapture?.(e.pointerId);
+        } catch {}
+
+        const rect = e.currentTarget?.getBoundingClientRect?.();
+        let locX = rect ? e.clientX - rect.left : (e.nativeEvent?.offsetX ?? e.clientX);
+        let locY = rect ? e.clientY - rect.top : (e.nativeEvent?.offsetY ?? e.clientY);
+        handleDragStart(locX, locY);
       },
       onPointerMove: (e: any) => {
-        if (!isDown && e.buttons !== 1) return;
-        panResponder.current.panHandlers.onResponderMove?.({
-          nativeEvent: { locationX: e.nativeEvent?.offsetX ?? 0, locationY: e.nativeEvent?.offsetY ?? 0, clientX: e.clientX, clientY: e.clientY },
-          dx: e.clientX - startX,
-          dy: e.clientY - startY,
-        } as any);
+        if (!pointerDownRef.current && e.buttons !== 1) return;
+        const dx = e.clientX - pointerStartRef.current.x;
+        const dy = e.clientY - pointerStartRef.current.y;
+        handleDragMove(dx, dy);
       },
       onPointerUp: (e: any) => {
-        if (!isDown) return;
-        isDown = false;
-        try { e.currentTarget?.releasePointerCapture?.(e.pointerId); } catch {}
-        panResponder.current.panHandlers.onResponderRelease?.({} as any);
+        if (!pointerDownRef.current) return;
+        pointerDownRef.current = false;
+        try {
+          e.currentTarget?.releasePointerCapture?.(e.pointerId);
+        } catch {}
+        handleDragEnd();
+      },
+      onPointerCancel: (e: any) => {
+        if (!pointerDownRef.current) return;
+        pointerDownRef.current = false;
+        try {
+          e.currentTarget?.releasePointerCapture?.(e.pointerId);
+        } catch {}
+        handleDragEnd();
       },
     };
-  }, []);
+  }, [handleDragStart, handleDragMove, handleDragEnd]);
 
   // Precision Nudge for Active Target (Corner or Ball) with D-Pad
   const nudgeActiveTarget = useCallback(
@@ -1820,6 +1824,9 @@ function TableVisionStudioModalBase({
                         style={[
                           StyleSheet.absoluteFill,
                           { width: containerSize.width, height: containerSize.height },
+                          Platform.OS === 'web'
+                            ? ({ touchAction: 'none', userSelect: 'none', cursor: isDragging ? 'grabbing' : 'crosshair' } as any)
+                            : undefined,
                         ]}
                         {...webGestureHandlers}
                       >

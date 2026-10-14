@@ -1,24 +1,5 @@
 import React, { memo } from 'react';
-import { StyleSheet, View, Text, Pressable } from 'react-native';
-
-const TouchableOpacity = ({
-    style,
-    activeOpacity = 0.7,
-    children,
-    disabled,
-    ...props
-}: any) => (
-    <Pressable
-        {...props}
-        disabled={disabled}
-        style={({ pressed }) => [
-            typeof style === 'function' ? style({ pressed }) : style,
-            pressed && !disabled && { opacity: activeOpacity },
-        ]}
-    >
-        {children}
-    </Pressable>
-);
+import { StyleSheet, View, Text, Platform } from 'react-native';
 import Svg, { Circle, Line, Text as SvgText, G } from 'react-native-svg';
 
 import { useColorScheme } from '@/components/useColorScheme';
@@ -139,7 +120,14 @@ export const WillieHoppeClock = memo(function WillieHoppeClock({
             return (
               <G
                 key={`hoppe-item-${item.spinCode}`}
-                onPress={() => !readOnly && onSelectSpin?.(WILLIE_HOPPE_SPINS[item.spinCode])}
+                {...(Platform.OS === 'web'
+                  ? ({
+                      onClick: () => !readOnly && onSelectSpin?.(WILLIE_HOPPE_SPINS[item.spinCode]),
+                      style: { cursor: readOnly ? 'default' : 'pointer' },
+                    } as any)
+                  : ({
+                      onPress: () => !readOnly && onSelectSpin?.(WILLIE_HOPPE_SPINS[item.spinCode]),
+                    } as any))}
               >
                 {/* Chalk tip spot target */}
                 <Circle

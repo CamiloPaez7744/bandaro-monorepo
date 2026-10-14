@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import {
     Platform, Pressable, ScrollView, Text, View,
-    useWindowDimensions, Modal, StyleSheet, type ViewStyle, type TextStyle,
+    useWindowDimensions, StyleSheet, type ViewStyle, type TextStyle,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { IconX, IconPlayerPlay, IconBookmark, IconTarget, IconArrowLeft } from '@tabler/icons-react-native';
@@ -350,9 +350,13 @@ export function ShotDetailScreen({ shotId: propShotId, onClose, onSimulate }: Sh
                                     styles.langButton,
                                     isSelected && {
                                         backgroundColor: color,
-                                        shadowColor: color,
-                                        shadowOpacity: 0.35,
-                                        shadowRadius: 5,
+                                        ...(Platform.OS === 'web'
+                                            ? { boxShadow: `0 2px 8px ${color}55` }
+                                            : {
+                                                shadowColor: color,
+                                                shadowOpacity: 0.35,
+                                                shadowRadius: 5,
+                                            }),
                                     },
                                 ]}
                             >
@@ -535,17 +539,16 @@ export function ShotDetailScreen({ shotId: propShotId, onClose, onSimulate }: Sh
         </ScrollView>
     );
 
-    // On web, render as a modal overlay
+    // On web, render as a modal overlay directly (avoids legacy RNW Modal with TouchableMixin / pointerEvents warnings)
     if (Platform.OS === 'web' && !propShotId) {
         if (!modalVisible) return null;
         return (
-            <Modal transparent animationType="fade" visible={modalVisible} onRequestClose={handleClose}>
-                <Pressable style={styles.webOverlay} onPress={handleClose}>
-                    <Pressable style={styles.webModal} onPress={(e) => e.stopPropagation()}>
-                        {content}
-                    </Pressable>
-                </Pressable>
-            </Modal>
+            <View style={styles.webOverlay} {...({ role: 'dialog', 'aria-modal': 'true' } as any)}>
+                <Pressable style={styles.webBackdrop} onPress={handleClose} accessibilityLabel={labels.close} />
+                <View style={styles.webModal}>
+                    {content}
+                </View>
+            </View>
         );
     }
 
@@ -629,10 +632,14 @@ const styles = StyleSheet.create({
         paddingVertical: 5,
         borderRadius: 16,
         borderWidth: 1,
-        shadowColor: '#000',
-        shadowOpacity: 0.45,
-        shadowRadius: 5,
-        elevation: 4,
+        ...(Platform.OS === 'web'
+            ? { boxShadow: '0 2px 6px rgba(0, 0, 0, 0.45)' }
+            : {
+                shadowColor: '#000',
+                shadowOpacity: 0.45,
+                shadowRadius: 5,
+                elevation: 4,
+            }),
     } as ViewStyle,
     tableSimulateBadgeText: {
         color: '#FFFFFF',
@@ -661,6 +668,24 @@ const styles = StyleSheet.create({
     bodyText: { fontSize: 14, lineHeight: 21 },
     simulateBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 12, marginTop: 8 } as ViewStyle,
     simulateBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
-    webOverlay: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, backdropFilter: 'blur(4px)', padding: 12 } as ViewStyle,
-    webModal: { width: '95vw', maxWidth: 1100, maxHeight: '92vh', borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 24, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)' } as any,
+    webOverlay: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, backdropFilter: 'blur(4px)', padding: 12 } as any,
+    webBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 } as ViewStyle,
+    webModal: {
+        width: '95vw',
+        maxWidth: 1100,
+        maxHeight: '92vh',
+        borderRadius: 16,
+        overflow: 'hidden',
+        ...(Platform.OS === 'web'
+            ? { boxShadow: '0 12px 36px rgba(0, 0, 0, 0.45)' }
+            : {
+                shadowColor: '#000',
+                shadowOpacity: 0.35,
+                shadowRadius: 24,
+            }),
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.1)',
+        position: 'relative',
+        zIndex: 1001,
+    } as any,
 });

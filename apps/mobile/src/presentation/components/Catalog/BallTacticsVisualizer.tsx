@@ -1,5 +1,5 @@
 import React, { memo } from 'react';
-import { View, Text, StyleSheet, type ViewStyle, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, type ViewStyle, useWindowDimensions, Platform } from 'react-native';
 import type { CatalogLanguage } from '@/src/infrastructure/catalog/shotAdapter';
 import { BallThicknessDiagram } from './BallThicknessDiagram';
 import { RailSpeedGauge } from './RailSpeedGauge';
@@ -154,10 +154,14 @@ const styles = StyleSheet.create({
         padding: 12,
         marginVertical: 8,
         gap: 10,
-        shadowColor: '#000',
-        shadowOpacity: 0.25,
-        shadowRadius: 10,
-        elevation: 3,
+        ...(Platform.OS === 'web'
+            ? { boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)' }
+            : {
+                shadowColor: '#000',
+                shadowOpacity: 0.25,
+                shadowRadius: 10,
+                elevation: 3,
+            }),
     },
     containerCompact: {
         padding: 8,

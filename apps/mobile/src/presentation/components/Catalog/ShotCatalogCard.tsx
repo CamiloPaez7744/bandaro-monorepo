@@ -102,9 +102,17 @@ export const ShotCatalogCard = memo(function ShotCatalogCard({
                 {
                     backgroundColor: palette.card,
                     borderColor: isHovered ? color : `${color}25`,
-                    shadowColor: isHovered ? color : '#000',
-                    shadowOpacity: isHovered ? 0.35 : 0.08,
-                    shadowRadius: isHovered ? 14 : 8,
+                    ...(Platform.OS === 'web'
+                        ? {
+                              boxShadow: isHovered
+                                  ? `0 8px 24px ${color}45`
+                                  : '0 2px 8px rgba(0, 0, 0, 0.1)',
+                          }
+                        : {
+                              shadowColor: isHovered ? color : '#000',
+                              shadowOpacity: isHovered ? 0.35 : 0.08,
+                              shadowRadius: isHovered ? 14 : 8,
+                          }),
                 },
             ]}
             {...(Platform.OS === 'web'
@@ -364,10 +372,14 @@ const styles = StyleSheet.create({
         paddingVertical: 3.5,
         borderRadius: 12,
         borderWidth: 1,
-        shadowColor: '#000',
-        shadowOpacity: 0.35,
-        shadowRadius: 3,
-        elevation: 3,
+        ...(Platform.OS === 'web'
+            ? { boxShadow: '0 2px 6px rgba(0, 0, 0, 0.35)' }
+            : {
+                shadowColor: '#000',
+                shadowOpacity: 0.35,
+                shadowRadius: 3,
+                elevation: 3,
+            }),
     },
     cardSimulateBtnText: {
         color: '#FFFFFF',

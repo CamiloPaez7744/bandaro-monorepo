@@ -1,12 +1,12 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useRef, useEffect } from 'react';
 import {
     ActivityIndicator,
+    Platform,
     Pressable,
     ScrollView,
     StyleSheet,
     Text,
     TextInput,
-    TouchableOpacity,
     View,
     useWindowDimensions,
 } from 'react-native';
@@ -16,6 +16,8 @@ import {
     IconTarget,
     IconAdjustments,
     IconBookmark,
+    IconChevronLeft,
+    IconChevronRight,
 } from '@tabler/icons-react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -88,6 +90,106 @@ export function ShotCatalogScreen({
         toggleFavorite,
     } = useShotCatalog();
 
+    const categoriesScrollRef = useRef<ScrollView>(null);
+    const isDraggingRef = useRef(false);
+    const [canScrollLeft, setCanScrollLeft] = useState(false);
+    const [canScrollRight, setCanScrollRight] = useState(false);
+
+    // Enable mouse drag-to-scroll and horizontal mouse wheel on web
+    useEffect(() => {
+        if (Platform.OS !== 'web') return;
+        const node = (categoriesScrollRef.current as any)?.getScrollableNode?.() || (categoriesScrollRef.current as any);
+        if (!node) return;
+
+        const updateScrollArrows = () => {
+            if (!node) return;
+            const hasOverflow = node.scrollWidth > node.clientWidth + 2;
+            setCanScrollLeft(node.scrollLeft > 4);
+            setCanScrollRight(hasOverflow && node.scrollLeft < node.scrollWidth - node.clientWidth - 4);
+        };
+
+        const timer = setTimeout(updateScrollArrows, 100);
+
+        let isDown = false;
+        let startX = 0;
+        let scrollStart = 0;
+
+        const onMouseDown = (e: MouseEvent) => {
+            if (e.button !== 0) return;
+            isDown = true;
+            isDraggingRef.current = false;
+            startX = e.pageX;
+            scrollStart = node.scrollLeft;
+            node.style.cursor = 'grabbing';
+            node.style.userSelect = 'none';
+        };
+
+        const onMouseMove = (e: MouseEvent) => {
+            if (!isDown) return;
+            const deltaX = e.pageX - startX;
+            if (Math.abs(deltaX) > 4) {
+                isDraggingRef.current = true;
+            }
+            node.scrollLeft = scrollStart - deltaX;
+            updateScrollArrows();
+        };
+
+        const onMouseUp = () => {
+            if (!isDown) return;
+            isDown = false;
+            node.style.cursor = 'grab';
+            node.style.removeProperty('user-select');
+            setTimeout(() => {
+                isDraggingRef.current = false;
+            }, 60);
+            updateScrollArrows();
+        };
+
+        const onWheel = (e: WheelEvent) => {
+            if (e.deltaY !== 0 && Math.abs(e.deltaX) < Math.abs(e.deltaY)) {
+                node.scrollLeft += e.deltaY;
+                e.preventDefault();
+                updateScrollArrows();
+            }
+        };
+
+        const onScroll = () => {
+            updateScrollArrows();
+        };
+
+        node.addEventListener('mousedown', onMouseDown);
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+        node.addEventListener('wheel', onWheel, { passive: false });
+        node.addEventListener('scroll', onScroll, { passive: true });
+        window.addEventListener('resize', updateScrollArrows);
+
+        node.style.cursor = 'grab';
+        node.style.overflowX = 'auto';
+
+        return () => {
+            clearTimeout(timer);
+            node.removeEventListener('mousedown', onMouseDown);
+            window.removeEventListener('mousemove', onMouseMove);
+            window.removeEventListener('mouseup', onMouseUp);
+            node.removeEventListener('wheel', onWheel);
+            node.removeEventListener('scroll', onScroll);
+            window.removeEventListener('resize', updateScrollArrows);
+        };
+    }, [categories]);
+
+    const handleScrollStep = useCallback((direction: 'left' | 'right') => {
+        const node = (categoriesScrollRef.current as any)?.getScrollableNode?.() || (categoriesScrollRef.current as any);
+        if (!node) return;
+        const offset = direction === 'left' ? -260 : 260;
+        node.scrollBy({ left: offset, behavior: 'smooth' });
+    }, []);
+
+    const handleChipPress = useCallback((action: () => void) => {
+        if (isDraggingRef.current) return;
+        action();
+    }, []);
+
     const handlePressDetail = useCallback(
         (shot: CatalogShot) => {
             router.push({ pathname: '/catalog/[shotId]', params: { shotId: String(shot.id) } });
@@ -127,20 +229,19 @@ export function ShotCatalogScreen({
                     </View>
 
                     {isPickerMode && onClosePicker ? (
-                        <TouchableOpacity
+                        <Pressable
                             style={[styles.closeBtn, { backgroundColor: palette.surfaceLow }]}
                             onPress={onClosePicker}
                             accessibilityLabel={language === 'en' ? 'Close picker' : 'Cerrar selector'}>
                             <IconX size={20} color={palette.text} />
-                        </TouchableOpacity>
+                        </Pressable>
                     ) : (
-                        <TouchableOpacity
+                        <Pressable
                             style={[styles.quickStartBtn, { backgroundColor: palette.primary }]}
-                            onPress={() => router.push('/training/session')}
-                            activeOpacity={0.85}>
+                            onPress={() => router.push('/training/session')}>
                             <IconTarget size={18} color="#FFFFFF" strokeWidth={2.2} />
                             <Text style={styles.quickStartBtnText}>{t('catalog.freeSession')}</Text>
-                        </TouchableOpacity>
+                        </Pressable>
                     )}
                 </View>
 
@@ -156,97 +257,122 @@ export function ShotCatalogScreen({
                             style={[styles.searchInput, { color: palette.text }]}
                         />
                         {searchQuery ? (
-                            <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={8}>
+                            <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
                                 <IconX size={16} color={palette.muted} strokeWidth={2} />
-                            </TouchableOpacity>
+                            </Pressable>
                         ) : null}
                     </View>
                 </View>
 
-                {/* Horizontal Category Filter Pills Carousel */}
-                <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.categoriesScroll}>
-                    {/* All categories pill */}
-                    <TouchableOpacity
-                        style={[
-                            styles.categoryChip,
-                            !selectedCategory && !onlyFavorites
-                                ? [styles.categoryChipActive, { backgroundColor: palette.primary, borderColor: palette.primary }]
-                                : [styles.categoryChipInactive, { backgroundColor: palette.card, borderColor: palette.border }],
-                        ]}
-                        activeOpacity={0.8}
-                        onPress={() => {
-                            setSelectedCategory(undefined);
-                            setOnlyFavorites(false);
-                        }}>
-                        <Text
-                            style={[
-                                styles.categoryChipText,
-                                !selectedCategory && !onlyFavorites ? styles.categoryChipTextActive : { color: palette.muted },
-                            ]}>
-                            {t('catalog.allCategories', { total })}
-                        </Text>
-                    </TouchableOpacity>
+                {/* Horizontal Category Filter Pills Carousel with Web Drag & Arrow Support */}
+                <View style={styles.categoriesContainer}>
+                    {Platform.OS === 'web' && canScrollLeft && (
+                        <Pressable
+                            style={[styles.scrollArrowBtn, styles.scrollArrowLeft, { backgroundColor: palette.card, borderColor: palette.border }]}
+                            onPress={() => handleScrollStep('left')}
+                            hitSlop={6}
+                            accessibilityLabel="Desplazar categorías a la izquierda">
+                            <IconChevronLeft size={16} color={palette.text} />
+                        </Pressable>
+                    )}
 
-                    {/* Guardadas / Favoritas pill */}
-                    <TouchableOpacity
-                        style={[
-                            styles.categoryChip,
-                            { flexDirection: 'row', alignItems: 'center', gap: 6 },
-                            onlyFavorites
-                                ? [styles.categoryChipActive, { backgroundColor: '#F59E0B', borderColor: '#F59E0B' }]
-                                : [styles.categoryChipInactive, { backgroundColor: palette.card, borderColor: palette.border }],
-                        ]}
-                        activeOpacity={0.8}
-                        onPress={() => setOnlyFavorites((prev) => !prev)}>
-                        <IconBookmark
-                            size={14}
-                            color={onlyFavorites ? '#FFFFFF' : '#F59E0B'}
-                            fill={onlyFavorites ? '#FFFFFF' : 'transparent'}
-                        />
-                        <Text
+                    <ScrollView
+                        ref={categoriesScrollRef}
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.categoriesScroll}
+                        style={Platform.OS === 'web' ? ({ cursor: 'grab', userSelect: 'none' } as any) : undefined}>
+                        {/* All categories pill */}
+                        <Pressable
                             style={[
-                                styles.categoryChipText,
-                                onlyFavorites ? styles.categoryChipTextActive : { color: palette.text },
-                            ]}>
-                            {language === 'en' ? 'Favorites' : 'Guardadas'}
-                        </Text>
-                    </TouchableOpacity>
-
-                    {/* Specific categories */}
-                    {categories.map((item) => {
-                        const isActive = item.category === selectedCategory;
-                        const catColor = CATEGORY_COLORS[item.category] ?? palette.primary;
-                        return (
-                            <TouchableOpacity
-                                key={item.category}
+                                styles.categoryChip,
+                                !selectedCategory && !onlyFavorites
+                                    ? [styles.categoryChipActive, { backgroundColor: palette.primary, borderColor: palette.primary }]
+                                    : [styles.categoryChipInactive, { backgroundColor: palette.card, borderColor: palette.border }],
+                            ]}
+                            onPress={() =>
+                                handleChipPress(() => {
+                                    setSelectedCategory(undefined);
+                                    setOnlyFavorites(false);
+                                })
+                            }>
+                            <Text
                                 style={[
-                                    styles.categoryChip,
-                                    isActive
-                                        ? [styles.categoryChipActive, { backgroundColor: catColor, borderColor: catColor }]
-                                        : [styles.categoryChipInactive, { backgroundColor: palette.card, borderColor: palette.border }],
-                                ]}
-                                activeOpacity={0.8}
-                                onPress={() => setSelectedCategory(isActive ? undefined : item.category)}>
-                                <View
+                                    styles.categoryChipText,
+                                    !selectedCategory && !onlyFavorites ? styles.categoryChipTextActive : { color: palette.muted },
+                                ]}>
+                                {t('catalog.allCategories', { total })}
+                            </Text>
+                        </Pressable>
+
+                        {/* Guardadas / Favoritas pill */}
+                        <Pressable
+                            style={[
+                                styles.categoryChip,
+                                { flexDirection: 'row', alignItems: 'center', gap: 6 },
+                                onlyFavorites
+                                    ? [styles.categoryChipActive, { backgroundColor: '#F59E0B', borderColor: '#F59E0B' }]
+                                    : [styles.categoryChipInactive, { backgroundColor: palette.card, borderColor: palette.border }],
+                            ]}
+                            onPress={() => handleChipPress(() => setOnlyFavorites((prev) => !prev))}>
+                            <IconBookmark
+                                size={14}
+                                color={onlyFavorites ? '#FFFFFF' : '#F59E0B'}
+                                fill={onlyFavorites ? '#FFFFFF' : 'transparent'}
+                            />
+                            <Text
+                                style={[
+                                    styles.categoryChipText,
+                                    onlyFavorites ? styles.categoryChipTextActive : { color: palette.text },
+                                ]}>
+                                {language === 'en' ? 'Favorites' : 'Guardadas'}
+                            </Text>
+                        </Pressable>
+
+                        {/* Specific categories */}
+                        {categories.map((item) => {
+                            const isActive = item.category === selectedCategory;
+                            const catColor = CATEGORY_COLORS[item.category] ?? palette.primary;
+                            return (
+                                <Pressable
+                                    key={item.category}
                                     style={[
-                                        styles.categoryDot,
-                                        { backgroundColor: isActive ? '#FFFFFF' : catColor },
+                                        styles.categoryChip,
+                                        isActive
+                                            ? [styles.categoryChipActive, { backgroundColor: catColor, borderColor: catColor }]
+                                            : [styles.categoryChipInactive, { backgroundColor: palette.card, borderColor: palette.border }],
                                     ]}
-                                />
-                                <Text
-                                    style={[
-                                        styles.categoryChipText,
-                                        isActive ? styles.categoryChipTextActive : { color: palette.text },
-                                    ]}>
-                                    {getLocalizedCategoryName(item.category, language === 'en' ? 'en' : 'es')} ({item.count})
-                                </Text>
-                            </TouchableOpacity>
-                        );
-                    })}
-                </ScrollView>
+                                    onPress={() =>
+                                        handleChipPress(() => setSelectedCategory(isActive ? undefined : item.category))
+                                    }>
+                                    <View
+                                        style={[
+                                            styles.categoryDot,
+                                            { backgroundColor: isActive ? '#FFFFFF' : catColor },
+                                        ]}
+                                    />
+                                    <Text
+                                        style={[
+                                            styles.categoryChipText,
+                                            isActive ? styles.categoryChipTextActive : { color: palette.text },
+                                        ]}>
+                                        {getLocalizedCategoryName(item.category, language === 'en' ? 'en' : 'es')} ({item.count})
+                                    </Text>
+                                </Pressable>
+                            );
+                        })}
+                    </ScrollView>
+
+                    {Platform.OS === 'web' && canScrollRight && (
+                        <Pressable
+                            style={[styles.scrollArrowBtn, styles.scrollArrowRight, { backgroundColor: palette.card, borderColor: palette.border }]}
+                            onPress={() => handleScrollStep('right')}
+                            hitSlop={6}
+                            accessibilityLabel="Desplazar categorías a la derecha">
+                            <IconChevronRight size={16} color={palette.text} />
+                        </Pressable>
+                    )}
+                </View>
             </View>
 
             {/* Content Body: Grid of Shots */}
@@ -381,11 +507,37 @@ const styles = StyleSheet.create({
         fontSize: 13,
         paddingVertical: 0,
     },
+    categoriesContainer: {
+        position: 'relative',
+        width: '100%',
+        justifyContent: 'center',
+    },
+    scrollArrowBtn: {
+        position: 'absolute',
+        zIndex: 10,
+        top: '50%',
+        marginTop: -15,
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        ...(Platform.OS === 'web'
+            ? { boxShadow: '0 2px 8px rgba(0, 0, 0, 0.28)' }
+            : { elevation: 3 }),
+    },
+    scrollArrowLeft: {
+        left: -6,
+    },
+    scrollArrowRight: {
+        right: -6,
+    },
     categoriesScroll: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
-        paddingVertical: 2,
+        paddingVertical: 4,
     },
     categoryChip: {
         flexDirection: 'row',
@@ -395,6 +547,7 @@ const styles = StyleSheet.create({
         paddingVertical: 6,
         borderRadius: theme.radius.sm,
         borderWidth: 1,
+        userSelect: 'none',
     },
     categoryChipActive: {},
     categoryChipInactive: {},

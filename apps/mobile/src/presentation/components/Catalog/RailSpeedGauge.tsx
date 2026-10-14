@@ -1,5 +1,5 @@
 import React, { memo } from 'react';
-import { View, Text, StyleSheet, type ViewStyle } from 'react-native';
+import { View, Text, StyleSheet, type ViewStyle, Platform } from 'react-native';
 import type { CatalogLanguage } from '@/src/infrastructure/catalog/shotAdapter';
 
 export interface RailSpeedGaugeProps {
@@ -109,9 +109,13 @@ export const RailSpeedGauge = memo(function RailSpeedGauge({
                                         styles.segmentFill,
                                         {
                                             backgroundColor: segColor,
-                                            shadowColor: segColor,
-                                            shadowOpacity: 0.5,
-                                            shadowRadius: 4,
+                                            ...(Platform.OS === 'web'
+                                                ? { boxShadow: `0 0 6px ${segColor}80` }
+                                                : {
+                                                    shadowColor: segColor,
+                                                    shadowOpacity: 0.5,
+                                                    shadowRadius: 4,
+                                                }),
                                         },
                                     ]}
                                 />
@@ -122,9 +126,13 @@ export const RailSpeedGauge = memo(function RailSpeedGauge({
                                         styles.segmentHalf,
                                         {
                                             backgroundColor: segColor,
-                                            shadowColor: segColor,
-                                            shadowOpacity: 0.35,
-                                            shadowRadius: 3,
+                                            ...(Platform.OS === 'web'
+                                                ? { boxShadow: `0 0 4px ${segColor}60` }
+                                                : {
+                                                    shadowColor: segColor,
+                                                    shadowOpacity: 0.35,
+                                                    shadowRadius: 3,
+                                                }),
                                         },
                                     ]}
                                 />
