@@ -108,6 +108,23 @@ async function updateDailyStreak(user: typeof users.$inferSelect): Promise<numbe
     return newStreak;
 }
 
+async function generateUniqueAlias(preferredAlias: string): Promise<string> {
+    const clean = preferredAlias.trim().replace(/[^a-zA-Z0-9_]/g, '') || 'Jugador';
+    let candidate = clean;
+    for (let i = 0; i < 10; i++) {
+        const [existing] = await db
+            .select({ id: users.id })
+            .from(users)
+            .where(sql`LOWER(${users.alias}) = LOWER(${candidate})`)
+            .limit(1);
+        if (!existing) {
+            return candidate;
+        }
+        candidate = `${clean}_${Math.floor(100 + Math.random() * 900)}`;
+    }
+    return `${clean}_${Date.now().toString().slice(-4)}`;
+}
+
 // ---------------------------------------------------------------------------
 // 1. POST /auth/register — Email & Password
 // ---------------------------------------------------------------------------
@@ -128,11 +145,27 @@ authRouter.post('/register', async (req: Request, res: Response) => {
             return;
         }
 
-        // Check existing user
-        const existing = await db.select().from(users).where(eq(users.email, email.toLowerCase().trim())).limit(1);
-        if (existing.length > 0) {
+        // Check existing user by email
+        const existingEmail = await db.select().from(users).where(eq(users.email, email.toLowerCase().trim())).limit(1);
+        if (existingEmail.length > 0) {
             res.status(409).json({ error: 'Ya existe una cuenta registrada con este correo electrónico.' });
             return;
+        }
+
+        // Check or generate alias
+        let finalAlias = alias ? alias.trim() : '';
+        if (finalAlias) {
+            const [existingAlias] = await db
+                .select({ id: users.id })
+                .from(users)
+                .where(sql`LOWER(${users.alias}) = LOWER(${finalAlias})`)
+                .limit(1);
+            if (existingAlias) {
+                res.status(409).json({ error: 'El alias ya está en uso por otro jugador. Por favor elige otro.' });
+                return;
+            }
+        } else {
+            finalAlias = await generateUniqueAlias(name.split(' ')[0]);
         }
 
         const passwordHash = hashPassword(password);
@@ -142,7 +175,7 @@ authRouter.post('/register', async (req: Request, res: Response) => {
             .insert(users)
             .values({
                 name,
-                alias: alias || name.split(' ')[0],
+                alias: finalAlias,
                 email: email.toLowerCase().trim(),
                 passwordHash,
                 avatarUrl,
@@ -185,8 +218,11 @@ authRouter.post('/register', async (req: Request, res: Response) => {
                 nationality: newUser.nationality,
                 countryCode: newUser.countryCode,
                 currentStreak: newUser.currentStreak,
+                maxStreak: newUser.maxStreak,
                 totalXp: newUser.totalXp,
                 accuracyAvg: newUser.accuracyAvg,
+                tier: newUser.tier,
+                lastActivityDate: newUser.lastActivityDate,
             },
             accessToken,
             refreshToken,
@@ -194,7 +230,11 @@ authRouter.post('/register', async (req: Request, res: Response) => {
         });
     } catch (error) {
         console.error('[auth] Register error:', error);
-        res.status(500).json({ error: 'Error al registrar el usuario en el servidor.' });
+        res.status(500).json({
+            error: 'Error al registrar el usuario en el servidor.',
+            details: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined,
+        });
     }
 });
 
@@ -256,10 +296,12 @@ authRouter.post('/login', async (req: Request, res: Response) => {
                 email: user.email,
                 avatarUrl: user.avatarUrl,
                 nationality: user.nationality,
-                countryCode: user.countryCode,
                 currentStreak,
+                maxStreak: user.maxStreak,
                 totalXp: user.totalXp,
                 accuracyAvg: user.accuracyAvg,
+                tier: user.tier,
+                lastActivityDate: user.lastActivityDate,
             },
             accessToken,
             refreshToken,
@@ -291,11 +333,12 @@ authRouter.post('/google', async (req: Request, res: Response) => {
             .limit(1);
 
         if (!user) {
+            const uniqueAlias = await generateUniqueAlias(name.split(' ')[0]);
             const [created] = await db
                 .insert(users)
                 .values({
                     name,
-                    alias: name.split(' ')[0],
+                    alias: uniqueAlias,
                     email: email.toLowerCase().trim(),
                     avatarUrl,
                     nationality: 'Colombia',
@@ -383,11 +426,12 @@ authRouter.post('/microsoft', async (req: Request, res: Response) => {
             .limit(1);
 
         if (!user) {
+            const uniqueAlias = await generateUniqueAlias(name.split(' ')[0]);
             const [created] = await db
                 .insert(users)
                 .values({
                     name,
-                    alias: name.split(' ')[0],
+                    alias: uniqueAlias,
                     email: email.toLowerCase().trim(),
                     avatarUrl,
                     nationality: 'Colombia',
@@ -451,7 +495,10 @@ authRouter.post('/microsoft', async (req: Request, res: Response) => {
         });
     } catch (error) {
         console.error('[auth] Microsoft login error:', error);
-        res.status(500).json({ error: 'Error al autenticar con Microsoft.' });
+        res.status(500).json({
+            error: 'Error al autenticar con Microsoft.',
+            details: error instanceof Error ? error.message : String(error),
+        });
     }
 });
 
@@ -567,6 +614,8 @@ authRouter.get('/me', async (req: Request, res: Response) => {
                 maxStreak: user.maxStreak,
                 totalXp: user.totalXp,
                 accuracyAvg: user.accuracyAvg,
+                tier: user.tier,
+                lastActivityDate: user.lastActivityDate,
             },
         });
     } catch (error) {

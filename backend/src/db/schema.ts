@@ -29,6 +29,8 @@ export const users = pgTable(
         nationality: text('nationality').notNull().default('Colombia'),
         countryCode: text('country_code').notNull().default('CO'),
         emailVerified: boolean('email_verified').default(false),
+        tier: varchar('tier', { length: 20 }).notNull().default('free'), // 'free' | 'premium' | 'admin'
+        subscriptionExpiresAt: timestamp('subscription_expires_at', { withTimezone: true }),
         currentStreak: integer('current_streak').notNull().default(0),
         maxStreak: integer('max_streak').notNull().default(0),
         lastActivityDate: date('last_activity_date'),
@@ -39,6 +41,7 @@ export const users = pgTable(
     },
     (t) => [
         index('users_email_idx').on(t.email),
+        index('users_tier_idx').on(t.tier),
     ]
 );
 
@@ -184,9 +187,13 @@ export const billiardSystems = pgTable(
         diamondNumbers: jsonb('diamond_numbers'),
         segmentedTrajectories: jsonb('segmented_trajectories'),
         cheatSheets: jsonb('cheat_sheets'),
+        isPremium: boolean('is_premium').default(false).notNull(),
         createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     },
-    (t) => [index('billiard_systems_cat_idx').on(t.category)]
+    (t) => [
+        index('billiard_systems_cat_idx').on(t.category),
+        index('billiard_systems_premium_idx').on(t.isPremium),
+    ]
 );
 
 export const pedagogyModules = pgTable(
@@ -214,8 +221,80 @@ export const pedagogyModules = pgTable(
 
 
 // ---------------------------------------------------------------------------
-// 4. Session History & Snapshots
+// 4. Session History, Training Analytics (Propuesta 1) & Snapshots
 // ---------------------------------------------------------------------------
+export const trainingSessions = pgTable(
+    'training_sessions',
+    {
+        id: uuid('id').primaryKey().defaultRandom(),
+        userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+        guestDeviceId: varchar('guest_device_id', { length: 120 }),
+        sessionType: varchar('session_type', { length: 50 }).notNull().default('guided_route'), // 'guided_route' | 'free_practice' | 'weakness_review'
+        nodeId: varchar('node_id', { length: 80 }),
+        totalDrills: integer('total_drills').notNull().default(0),
+        totalShotsAttempted: integer('total_shots_attempted').notNull().default(0),
+        totalShotsMade: integer('total_shots_made').notNull().default(0),
+        overallAccuracy: numeric('overall_accuracy', { precision: 5, scale: 2 }).notNull().default('0.00'),
+        durationSeconds: integer('duration_seconds').notNull().default(0),
+        xpEarned: integer('xp_earned').notNull().default(0),
+        startedAt: timestamp('started_at', { withTimezone: true }).defaultNow().notNull(),
+        completedAt: timestamp('completed_at', { withTimezone: true }),
+        createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    },
+    (t) => [
+        index('training_sessions_user_idx').on(t.userId),
+        index('training_sessions_guest_idx').on(t.guestDeviceId),
+        index('training_sessions_created_idx').on(t.createdAt),
+    ]
+);
+
+export const trainingSessionDrills = pgTable(
+    'training_session_drills',
+    {
+        id: uuid('id').primaryKey().defaultRandom(),
+        sessionId: uuid('session_id')
+            .notNull()
+            .references(() => trainingSessions.id, { onDelete: 'cascade' }),
+        positionId: varchar('position_id', { length: 80 }).notNull(),
+        orderIndex: integer('order_index').notNull().default(0),
+        targetReps: integer('target_reps').notNull().default(10),
+        madeReps: integer('made_reps').notNull().default(0),
+        accuracy: numeric('accuracy', { precision: 5, scale: 2 }).notNull().default('0.00'),
+        perceivedDifficulty: integer('perceived_difficulty'), // 1: Muy fácil .. 5: Muy difícil
+        failureReason: varchar('failure_reason', { length: 50 }), // 'speed' | 'spin' | 'angle' | 'kiss' | 'stroke' | 'none'
+        userNotes: text('user_notes'),
+        completedAt: timestamp('completed_at', { withTimezone: true }).defaultNow().notNull(),
+    },
+    (t) => [
+        index('session_drills_session_idx').on(t.sessionId),
+        index('session_drills_position_idx').on(t.positionId),
+    ]
+);
+
+export const userPositionMastery = pgTable(
+    'user_position_mastery',
+    {
+        id: uuid('id').primaryKey().defaultRandom(),
+        userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+        guestDeviceId: varchar('guest_device_id', { length: 120 }),
+        positionId: varchar('position_id', { length: 80 }).notNull(),
+        totalAttempts: integer('total_attempts').notNull().default(0),
+        totalHits: integer('total_hits').notNull().default(0),
+        lifetimeAccuracy: numeric('lifetime_accuracy', { precision: 5, scale: 2 }).notNull().default('0.00'),
+        consecutiveFailures: integer('consecutive_failures').notNull().default(0),
+        perceivedDifficultyAvg: numeric('perceived_difficulty_avg', { precision: 3, scale: 2 }),
+        masteryStatus: varchar('mastery_status', { length: 30 }).notNull().default('practicing'), // 'struggling' | 'practicing' | 'mastered'
+        nextReviewDue: timestamp('next_review_due', { withTimezone: true }),
+        lastTrainedAt: timestamp('last_trained_at', { withTimezone: true }).defaultNow().notNull(),
+    },
+    (t) => [
+        index('position_mastery_user_idx').on(t.userId),
+        index('position_mastery_guest_idx').on(t.guestDeviceId),
+        index('position_mastery_pos_idx').on(t.positionId),
+        index('position_mastery_review_idx').on(t.nextReviewDue),
+    ]
+);
+
 export const trainingSessionHistory = pgTable(
     'training_session_history',
     {
@@ -298,6 +377,7 @@ export const shotCatalog = pgTable(
         isDefense: boolean('is_defense').default(false),
         isAvoidKiss: boolean('is_avoid_kiss').default(false),
         hasAnalysis: boolean('has_analysis').default(false),
+        isPremium: boolean('is_premium').default(false).notNull(),
         youtubeUrl: text('youtube_url'),
         thumbnailUrl: text('thumbnail_url'),
         createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -306,6 +386,7 @@ export const shotCatalog = pgTable(
         index('idx_shot_catalog_category').on(t.category),
         index('idx_shot_catalog_external').on(t.externalId),
         index('idx_shot_catalog_player').on(t.playerLastName),
+        index('idx_shot_catalog_premium').on(t.isPremium),
     ]
 );
 

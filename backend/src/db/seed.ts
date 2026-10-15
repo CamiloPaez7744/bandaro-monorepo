@@ -1002,7 +1002,7 @@ const SEED_PEDAGOGY_MODULES = [
   - 🔵 **Tramo 1 (1ª a 3ª banda):** Cian (#06b6d4) — Geometría base de la fórmula.
   - 🟡 **Tramo 2 (3ª a 4ª banda):** Ámbar (#f59e0b) — Rebote con rotación natural.
   - 🟢 **Tramo 3 (4ª a 5ª banda):** Esmeralda (#10b981) — Prolongación hacia la carambola.`,
-        imageUrl: '/assets/images/theory/billiard_bridges_guide.jpg',
+        imageUrl: '/assets/images/theory/billiard_base50_conti.jpg',
         youtubeUrl: 'https://www.youtube.com/@ambilliardacademy',
         keyPrinciples: [
             'Llegada en 3ª banda = Salida - Ataque.',
@@ -1050,7 +1050,7 @@ const SEED_PEDAGOGY_MODULES = [
         summary:
             'Guía completa de las figuras clásicas del billar a tres bandas tal como se denominan en Colombia y el circuito hispanohablante.',
         contentMarkdown: `### Familias de Carambolas en el Billar Colombiano\n1. **Rodada (Larga-Corta-Larga):** Jugada fundamental hacia adelante rodando naturalmente a medio cuerpo o 3/4.\n2. **Cajón (Cabaña / Corta-Larga-Corta):** Figura reina del cuadro pequeño, atacando la banda corta más próxima con mate o efecto 4.\n3. **Pase Bola (Alrededor de la Mesa):** Corrido perimétrico de 4 o 5 bandas pasando por delante de la bola 2.\n4. **Renversé (Contrabanda / Inversión de Efecto):** Efecto contrario al giro natural para invertir el ángulo de rebote en la primera banda.\n5. **Serrucho (Cerrucho):** Vaivén continuo entre bandas paralelas con efecto pronunciado.\n6. **Zigzag (Zik-Zak):** Recorrido en Z entre bandas opuestas cruzando la mesa.\n7. **Tornillo:** Efecto rotacional extremo con taco elevado donde la bola muerde y se enrosca en el paño.\n8. **Tiki (Tiki-Taki / Banda y Bola):** Sistema para bola 2 pegada a banda larga con doble contacto controlado.\n9. **Bricole (Banda Previa):** Impacto primero en bandas antes de tocar ninguna bola.`,
-        imageUrl: '/assets/images/theory/billiard_ball_thickness.jpg',
+        imageUrl: '/assets/images/theory/billiard_carom_figures.jpg',
         youtubeUrl: 'https://www.youtube.com/@elflacobillarista',
         keyPrinciples: [
             'Rodada: Larga-Corta-Larga hacia adelante con bola rodando naturalmente.',
@@ -1090,6 +1090,75 @@ const SEED_PEDAGOGY_MODULES = [
         ],
         orderIndex: 7,
     },
+    {
+        id: 'posture-multiview',
+        category: 'posture_biomechanics',
+        title: 'Biomecánica Multivista de la Postura Corporal',
+        subtitle: 'Vistas Frontal, Dorsal y Cenital para Alineación Perfecta',
+        author: 'Marco Zanetti & Torbjörn Blomdahl',
+        summary:
+            'Análisis tridimensional del cuerpo en la posición de tiro: vista frontal (ojo dominante y barbilla), vista dorsal (plano pendular de 90°) y vista cenital (base de sustentación de pies).',
+        contentMarkdown: `### Análisis Biomecánico Multivista\n1. **Vista Frontal (Front View):**\n   - Barbilla a 4 cm sobre el eje del taco sin tensión cervical.\n   - Ojo dominante centrado milimétricamente sobre la línea de visión.\n   - Hombros relajados y horizontales; mano de puente firme en trípode sobre la mesa de carambola sin huecos.\n2. **Vista Dorsal / Espalda (Rear / Back View):**\n   - Brazo ejecutor alineado en un plano pendular vertical estricto a 90°.\n   - Hombro, codo y muñeca en el mismo plano láser vertical.\n   - Pie retrasado angulado a 45° respecto a la línea de tiro como pilar de anclaje.\n3. **Vista Cenital / Desde Arriba (Top / Overhead View):**\n   - Base triangular de sustentación podal.\n   - Taco perfectamente recto y paralelo sobre la banda de carambola sin troneras.\n   - Cero cabeceo o balanceo del tronco durante el limaje y el ataque.`,
+        imageUrl: '/assets/images/theory/billiard_stance_multiview.jpg',
+        youtubeUrl: 'https://www.youtube.com/watch?v=gjLRHztVPGc',
+        keyPrinciples: [
+            'Vista frontal: barbilla a 4 cm sobre el taco y ojo dominante centrado.',
+            'Vista de espalda: codo, muñeca y taco en plano pendular vertical a 90°.',
+            'Vista cenital: triángulo de sustentación podal y taco recto.',
+            'Mesa de carambola reglamentaria de bandas continuas sin troneras.',
+        ],
+        drills: [
+            { id: 'drill-mv1', name: 'Verificación del Plano Láser de 90°', hint: 'Filmar limaje desde atrás comprobando que el codo no oscile lateralmente.', xp: 150 },
+            { id: 'drill-mv2', name: 'Triángulo de Equilibrio Podal', hint: 'Mantener la base podal sin perder el centro de gravedad durante 10 tiros.', xp: 140 },
+        ],
+        orderIndex: 8,
+    },
+    {
+        id: 'vision-aiming-routine',
+        category: 'aiming_vision',
+        title: 'Línea de Visión, Ojo Dominante & Rutina de Apunte',
+        subtitle: 'Ritmo Pendular de 3 Puntos y Regla de Fijación Final',
+        author: 'Frédéric Caudron & Dick Jaspers',
+        summary:
+            'Cómo sincronizar la mirada con el movimiento del taco: determinación del ojo dominante, alternancia visual rítmica y fijación 100% en el punto de contacto de la bola 2 al momento del tiro.',
+        contentMarkdown: `### Rutina Visual y Línea de Puntería\n1. **Test del Ojo Dominante:** Formar un triángulo con ambas manos, enfocar un punto distante con ambos ojos abiertos y cerrar un ojo para identificar cuál mantiene centrado el objetivo.\n2. **El Ritmo Visual Pendular de 3 Puntos:** Durante los 3 a 5 limajes preparatorios, los ojos alternan de forma continua y relajada entre:\n   - **Punto 1:** Punto de ataque en la bola tacadora (blanca).\n   - **Punto 2:** Punto de impacto / corte en la bola objetivo (amarilla).\n   - **Punto 3:** Diamante o punto de llegada en la primera banda.\n3. **Regla de Fijación Final (Final Shot Fixation Rule):** En el último limaje de entrega y penetración del golpe, la mirada se queda clavada al 100% en el punto de contacto de la bola 2, NUNCA en la bola blanca ni en el taco.`,
+        imageUrl: '/assets/images/theory/billiard_vision_aiming.jpg',
+        youtubeUrl: 'https://www.youtube.com/watch?v=HGfTj9vQTpY',
+        keyPrinciples: [
+            'Alinear el taco exactamente bajo el ojo dominante del jugador.',
+            'Rutina visual de 3 puntos: bola 1 -> bola 2 -> 1ª banda.',
+            'Fijación final: en el golpe, los ojos miran la bola 2, no la bola blanca.',
+            'Concentración visual sin parpadeo brusco en el instante de contacto.',
+        ],
+        drills: [
+            { id: 'drill-vis1', name: 'Test de Ojo Dominante en Mesa', hint: 'Verificar alineación con el diamante central de cabecera.', xp: 120 },
+            { id: 'drill-vis2', name: 'Ritmo Visual de 3 Limajes', hint: '3 limajes rítmicos alternando mirada y fijación final en bola 2.', xp: 160 },
+        ],
+        orderIndex: 9,
+    },
+    {
+        id: 'master-clock-effects',
+        category: 'clock_effects',
+        title: 'Sistemas de Reloj & Efectos de los Grandes Maestros',
+        subtitle: 'Reloj de 12 Horas, Ceulemans (0-4), Zanetti Micrométrico y Matriz Continental',
+        author: 'Raymond Ceulemans, Marco Zanetti & Willie Hoppe',
+        summary:
+            'Tratado completo de la rotación y efecto lateral: el cuadrante de 12 horas, el sistema de 4 efectos por puntas de suela de Raymond Ceulemans, la escala micrométrica de Zanetti y la matriz de 9 cuadrantes.',
+        contentMarkdown: `### Los Sistemas de Efectos de los Maestros\n1. **El Reloj Clásico de 12 Horas:**\n   - **12:00:** Corrido puro en el polo superior sin desvío lateral.\n   - **1:00 y 2:00:** Efecto a favor alto (Running English) para rodadas y pase bolas con avance.\n   - **3:00:** Máximo efecto lateral derecho en el ecuador (máxima apertura en bandas).\n   - **4:00 y 5:00:** Efecto bajo con retención y agarre en el paño para cajones cerrados.\n   - **6:00:** Máximo retroceso (jale puro) en el polo inferior.\n   - **7:00 a 11:00:** Efectos contrarios (Reverse English) para contrabanda y renversé.\n2. **Sistema de 4 Efectos de Raymond Ceulemans:**\n   - Efecto 0: Ataque en el centro vertical (sin giro).\n   - Efecto 1: 1 punta de suela lateral (apertura suave).\n   - Efecto 2: 2 puntas de suela (el efecto natural estándar para rodadas).\n   - Efecto 3: 3 puntas de suela (apertura amplia).\n   - Efecto 4: 4 puntas de suela al borde ecuatorial (máxima reacción).\n3. **Escala Micrométrica de Marco Zanetti:**\n   - Graduación milimétrica de altura (-2.00 a +2.00 mm) que determina el ángulo exacto de rebote en la banda (de 0° a 90°) y el decaimiento de giro tras cada contacto.\n4. **Matriz Continental de 9 Cuadrantes:**\n   - División de la semiesfera en 9 zonas de impacto para memorización táctica inmediata.`,
+        imageUrl: '/assets/images/theory/billiard_clock_systems_masters.jpg',
+        youtubeUrl: 'https://www.youtube.com/@ambilliardacademy',
+        keyPrinciples: [
+            'Reloj de 12 horas: mapeo horario completo de ataque rotacional.',
+            'Ceulemans: 4 efectos medidos por puntas de suela (1 a 4).',
+            'Zanetti: escala micrométrica para calibrar la reacción en goma de banda.',
+            'Efecto a favor ensancha el rebote; efecto contrario lo cierra o invierte.',
+        ],
+        drills: [
+            { id: 'drill-clk1', name: 'Calibración de los 4 Efectos Ceulemans', hint: 'Ejecutar 4 tiros con salidas iguales variando solo el efecto (1, 2, 3, 4).', xp: 170 },
+            { id: 'drill-clk2', name: 'Dominio de las 12:00 y 6:00', hint: 'Tiro corrido puro y retroceso puro sin desvío lateral sobre la línea central.', xp: 160 },
+        ],
+        orderIndex: 10,
+    },
 ];
 
 const SEED_SYSTEMS = [
@@ -1103,7 +1172,7 @@ const SEED_SYSTEMS = [
         difficulty: 3,
         author: 'Sistema Conti / AM Billiard Academy',
         youtubeUrl: 'https://www.youtube.com/watch?v=HGfTj9vQTpY',
-        diagramUrl: '/assets/images/theory/billiard_bridges_guide.jpg',
+        diagramUrl: '/assets/images/theory/billiard_base50_conti.jpg',
         defaultBalls: [
             { id: 'white', x: 71, y: 105, color: '#f8fafc', border: '#cbd5e1' },
             { id: 'yellow', x: 142, y: 71, color: '#facc15', border: '#ca8a04' },

@@ -146,6 +146,82 @@ export async function runSchemaUpdates() {
         CREATE INDEX IF NOT EXISTS user_favorite_shots_shot_idx ON user_favorite_shots(shot_id);
     `);
 
+    // 9. Add tier to users, is_premium to billiard_systems and shot_catalog
+    await db.execute(sql`
+        ALTER TABLE users 
+            ADD COLUMN IF NOT EXISTS tier varchar(20) NOT NULL DEFAULT 'free',
+            ADD COLUMN IF NOT EXISTS subscription_expires_at timestamptz;
+        CREATE INDEX IF NOT EXISTS users_tier_idx ON users(tier);
+
+        ALTER TABLE billiard_systems 
+            ADD COLUMN IF NOT EXISTS is_premium boolean NOT NULL DEFAULT false;
+        CREATE INDEX IF NOT EXISTS billiard_systems_premium_idx ON billiard_systems(is_premium);
+
+        ALTER TABLE shot_catalog 
+            ADD COLUMN IF NOT EXISTS is_premium boolean NOT NULL DEFAULT false;
+        CREATE INDEX IF NOT EXISTS idx_shot_catalog_premium ON shot_catalog(is_premium);
+    `);
+
+    // 10. Propuesta 1: Granular Training Sessions
+    await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS training_sessions (
+            id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id uuid REFERENCES users(id) ON DELETE CASCADE,
+            guest_device_id varchar(120),
+            session_type varchar(50) NOT NULL DEFAULT 'guided_route',
+            node_id varchar(80),
+            total_drills integer NOT NULL DEFAULT 0,
+            total_shots_attempted integer NOT NULL DEFAULT 0,
+            total_shots_made integer NOT NULL DEFAULT 0,
+            overall_accuracy numeric(5, 2) NOT NULL DEFAULT 0.00,
+            duration_seconds integer NOT NULL DEFAULT 0,
+            xp_earned integer NOT NULL DEFAULT 0,
+            started_at timestamptz DEFAULT now() NOT NULL,
+            completed_at timestamptz,
+            created_at timestamptz DEFAULT now() NOT NULL
+        );
+        ALTER TABLE training_sessions ADD COLUMN IF NOT EXISTS guest_device_id varchar(120);
+        CREATE INDEX IF NOT EXISTS training_sessions_user_idx ON training_sessions(user_id);
+        CREATE INDEX IF NOT EXISTS training_sessions_guest_idx ON training_sessions(guest_device_id);
+        CREATE INDEX IF NOT EXISTS training_sessions_created_idx ON training_sessions(created_at);
+
+        CREATE TABLE IF NOT EXISTS training_session_drills (
+            id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            session_id uuid NOT NULL REFERENCES training_sessions(id) ON DELETE CASCADE,
+            position_id varchar(80) NOT NULL,
+            order_index integer NOT NULL DEFAULT 0,
+            target_reps integer NOT NULL DEFAULT 10,
+            made_reps integer NOT NULL DEFAULT 0,
+            accuracy numeric(5, 2) NOT NULL DEFAULT 0.00,
+            perceived_difficulty integer,
+            failure_reason varchar(50),
+            user_notes text,
+            completed_at timestamptz DEFAULT now() NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS session_drills_session_idx ON training_session_drills(session_id);
+        CREATE INDEX IF NOT EXISTS session_drills_position_idx ON training_session_drills(position_id);
+
+        CREATE TABLE IF NOT EXISTS user_position_mastery (
+            id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id uuid REFERENCES users(id) ON DELETE CASCADE,
+            guest_device_id varchar(120),
+            position_id varchar(80) NOT NULL,
+            total_attempts integer NOT NULL DEFAULT 0,
+            total_hits integer NOT NULL DEFAULT 0,
+            lifetime_accuracy numeric(5, 2) NOT NULL DEFAULT 0.00,
+            consecutive_failures integer NOT NULL DEFAULT 0,
+            perceived_difficulty_avg numeric(3, 2),
+            mastery_status varchar(30) NOT NULL DEFAULT 'practicing',
+            next_review_due timestamptz,
+            last_trained_at timestamptz DEFAULT now() NOT NULL
+        );
+        ALTER TABLE user_position_mastery ADD COLUMN IF NOT EXISTS guest_device_id varchar(120);
+        CREATE INDEX IF NOT EXISTS position_mastery_user_idx ON user_position_mastery(user_id);
+        CREATE INDEX IF NOT EXISTS position_mastery_guest_idx ON user_position_mastery(guest_device_id);
+        CREATE INDEX IF NOT EXISTS position_mastery_pos_idx ON user_position_mastery(position_id);
+        CREATE INDEX IF NOT EXISTS position_mastery_review_idx ON user_position_mastery(next_review_due);
+    `);
+
     console.log('[db] Schema tables and indexes created successfully!');
 }
 

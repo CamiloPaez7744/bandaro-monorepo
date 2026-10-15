@@ -8,6 +8,7 @@ import { trainingRouter } from './routes/training.js';
 import { securityRouter } from './routes/security.js';
 import { authRouter } from './routes/auth.js';
 import { decryptPayloadMiddleware } from './middleware/decryptPayloadMiddleware.js';
+import { runSchemaUpdates } from './db/run_schema.js';
 
 dotenv.config();
 
@@ -27,6 +28,11 @@ app.use('/auth', authRouter);
 app.use('/vision', visionRouter);
 app.use('/shots', shotsRouter);
 app.use('/training', trainingRouter);
+
+// Sync database schema on startup
+runSchemaUpdates().catch((err) => {
+    console.error('[db] Error syncing schema on start:', err);
+});
 
 app.listen(PORT, () => {
     console.log(`[bandaro-backend] listening on http://localhost:${PORT}`);
