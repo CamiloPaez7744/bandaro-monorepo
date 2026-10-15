@@ -157,50 +157,96 @@ export const HairlineTrainingFigure: React.FC<HairlineFigureProps> = ({
   const pointerOverRef = useRef<[number, number] | null>(null);
 
 
-  // Main 60fps animation loop
+  // Main throttled animation loop (20 FPS cap to minimize memory churn)
   useEffect(() => {
-    let animId: number;
+    let animId: number | null = null;
+    let active = true;
     let lastTime = performance.now();
+    let lastFrameTime = 0;
     let currentClock = 2.4;
+    const FRAME_INTERVAL = 1000 / 20;
 
     const tick = (now: number) => {
-      const dt = Math.min(0.045, Math.max(0.008, (now - lastTime) / 1000));
-      lastTime = now;
+      if (!active) return;
+      if (typeof document !== 'undefined' && document.hidden) {
+        animId = null;
+        return;
+      }
+      if (!lastFrameTime) lastFrameTime = now;
+      const elapsed = now - lastFrameTime;
+      if (elapsed >= FRAME_INTERVAL) {
+        lastFrameTime = now - (elapsed % FRAME_INTERVAL);
+        const dt = Math.min(0.055, Math.max(0.008, (now - lastTime) / 1000));
+        lastTime = now;
 
-      // Spring rate interpolation for smooth slow-motion deceleration/acceleration
-      rateRef.current.x += (rateRef.current.target - rateRef.current.x) * 0.14;
-      currentClock += dt * rateRef.current.x;
-      setClock(currentClock);
+        // Spring rate interpolation for smooth slow-motion deceleration/acceleration
+        rateRef.current.x += (rateRef.current.target - rateRef.current.x) * 0.14;
+        currentClock += dt * rateRef.current.x;
+        setClock(currentClock);
 
-      // Determine hot table nearest to mouse cursor
-      const over = pointerOverRef.current;
-      let want = -1;
-      if (over) {
-        let bestDist = 36;
-        for (let j = 0; j < NC; j++) {
-          const q = j / NC + currentClock * SPEED;
-          const u = q - Math.floor(q);
-          const x = u * L6;
-          const s = tableScale(u);
-          if (s > 0.45 && Math.abs(x - over[0]) < bestDist) {
-            bestDist = Math.abs(x - over[0]);
-            want = j;
+        // Determine hot table nearest to mouse cursor
+        const over = pointerOverRef.current;
+        let want = -1;
+        if (over) {
+          let bestDist = 36;
+          for (let j = 0; j < NC; j++) {
+            const q = j / NC + currentClock * SPEED;
+            const u = q - Math.floor(q);
+            const x = u * L6;
+            const s = tableScale(u);
+            if (s > 0.45 && Math.abs(x - over[0]) < bestDist) {
+              bestDist = Math.abs(x - over[0]);
+              want = j;
+            }
           }
         }
-      }
-      setHotTable(want);
+        setHotTable(want);
 
-      // Spring lift interpolation for each table
-      for (let j = 0; j < NC; j++) {
-        const targetLift = j === want ? 11 : 0;
-        liftsRef.current[j] += (targetLift - liftsRef.current[j]) * 0.22;
+        // Spring lift interpolation for each table
+        for (let j = 0; j < NC; j++) {
+          const targetLift = j === want ? 11 : 0;
+          liftsRef.current[j] += (targetLift - liftsRef.current[j]) * 0.22;
+        }
+      } else {
+        lastTime = now;
       }
 
       animId = requestAnimationFrame(tick);
     };
 
-    animId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(animId);
+    const startLoop = () => {
+      if (!animId) {
+        lastTime = performance.now();
+        lastFrameTime = 0;
+        animId = requestAnimationFrame(tick);
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (typeof document === 'undefined') return;
+      if (document.hidden) {
+        if (animId) {
+          cancelAnimationFrame(animId);
+          animId = null;
+        }
+      } else if (active) {
+        startLoop();
+      }
+    };
+
+    startLoop();
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisibilityChange);
+    }
+
+    return () => {
+      active = false;
+      if (animId) cancelAnimationFrame(animId);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisibilityChange);
+      }
+    };
   }, []);
 
   const figureH = Math.round(size / ASPECT);

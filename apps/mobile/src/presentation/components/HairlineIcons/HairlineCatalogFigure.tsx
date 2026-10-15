@@ -259,15 +259,14 @@ export const HairlineCatalogFigure: React.FC<HairlineFigureProps> = ({
       if (moving) {
         setAngles(nextAngles);
         setLifts(nextLifts);
+        animId = requestAnimationFrame(tick);
       }
-
-      animId = requestAnimationFrame(tick);
     };
 
     animId = requestAnimationFrame(tick);
     return () => {
       running = false;
-      cancelAnimationFrame(animId);
+      if (animId) cancelAnimationFrame(animId);
     };
   }, [activeCard]);
 

@@ -50,18 +50,56 @@ export const HairlineDashboardFigure: React.FC<HairlineFigureProps> = ({
   useEffect(() => {
     let active = true;
     let step = 0;
-    const loop = () => {
+    let lastTime = 0;
+    const FRAME_INTERVAL = 1000 / 20; // 20 FPS throttle for lightweight ambient breathing
+
+    const loop = (now: number) => {
       if (!active) return;
-      step += 0.034;
-      setFrame(step);
+      if (typeof document !== 'undefined' && document.hidden) {
+        animRef.current = null;
+        return;
+      }
+      if (!lastTime) lastTime = now;
+      const delta = now - lastTime;
+      if (delta >= FRAME_INTERVAL) {
+        lastTime = now - (delta % FRAME_INTERVAL);
+        step += 0.034;
+        setFrame(step);
+      }
       animRef.current = requestAnimationFrame(loop);
     };
-    if (autoPlay || !isHovered) {
-      animRef.current = requestAnimationFrame(loop);
+
+    const startLoop = () => {
+      if (!animRef.current && (autoPlay || !isHovered)) {
+        lastTime = 0;
+        animRef.current = requestAnimationFrame(loop);
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (typeof document === 'undefined') return;
+      if (document.hidden) {
+        if (animRef.current) {
+          cancelAnimationFrame(animRef.current);
+          animRef.current = null;
+        }
+      } else if (active) {
+        startLoop();
+      }
+    };
+
+    startLoop();
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisibilityChange);
     }
+
     return () => {
       active = false;
       if (animRef.current) cancelAnimationFrame(animRef.current);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisibilityChange);
+      }
     };
   }, [autoPlay, isHovered]);
 

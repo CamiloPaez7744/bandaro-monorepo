@@ -133,48 +133,91 @@ export const HairlineMatchFigure: React.FC<HairlineFigureProps> = ({
   };
 
   useEffect(() => {
-    let animId: number;
+    let animId: number | null = null;
+    let active = true;
     let time = 0;
+    let lastTime = 0;
+    const FRAME_INTERVAL = 1000 / 20;
 
-    const tick = () => {
-      time += 0.025;
-
-      let targetGap = 0.35;
-      let targetActive = -1;
-
-      if (isLocalHovered) {
-        // PointerX controls gap opening (from tight 0.18 to wide 1.0)
-        targetGap = 0.2 + 0.8 * clamp((localPointer.x + 1) / 2, 0, 1);
-
-        // PointerY selects layer from top to bottom
-        if (localPointer.y < -0.38) targetActive = 3; // Top Badge
-        else if (localPointer.y < 0.05) targetActive = 2; // High Run
-        else if (localPointer.y < 0.52) targetActive = 1; // Innings Ledger
-        else targetActive = 0; // Base Sheet
-      } else if (autoPlay) {
-        // Idle gentle breathing cycle
-        targetGap = 0.35 + 0.22 * Math.sin(time * 0.9);
-        const cycle = Math.floor((time * 0.5) % 4);
-        targetActive = cycle;
+    const tick = (now: number) => {
+      if (!active) return;
+      if (typeof document !== 'undefined' && document.hidden) {
+        animId = null;
+        return;
       }
+      if (!lastTime) lastTime = now;
+      const elapsed = now - lastTime;
+      if (elapsed >= FRAME_INTERVAL) {
+        lastTime = now - (elapsed % FRAME_INTERVAL);
+        time += 0.025 * (elapsed / (1000 / 60));
 
-      // Smooth spring toward target gap
-      gapRef.current += (targetGap - gapRef.current) * 0.14;
-      setGapFactor(gapRef.current);
-      setActiveLayer(targetActive);
+        let targetGap = 0.35;
+        let targetActive = -1;
 
-      // Spring lift for individual layers
-      for (let i = 0; i < 4; i++) {
-        const wantLift = i === targetActive ? 6.5 : 0;
-        liftsRef.current[i] += (wantLift - liftsRef.current[i]) * 0.18;
+        if (isLocalHovered) {
+          // PointerX controls gap opening (from tight 0.18 to wide 1.0)
+          targetGap = 0.2 + 0.8 * clamp((localPointer.x + 1) / 2, 0, 1);
+
+          // PointerY selects layer from top to bottom
+          if (localPointer.y < -0.38) targetActive = 3; // Top Badge
+          else if (localPointer.y < 0.05) targetActive = 2; // High Run
+          else if (localPointer.y < 0.52) targetActive = 1; // Innings Ledger
+          else targetActive = 0; // Base Sheet
+        } else if (autoPlay) {
+          // Idle gentle breathing cycle
+          targetGap = 0.35 + 0.22 * Math.sin(time * 0.9);
+          const cycle = Math.floor((time * 0.5) % 4);
+          targetActive = cycle;
+        }
+
+        // Smooth spring toward target gap
+        gapRef.current += (targetGap - gapRef.current) * 0.14;
+        setGapFactor(gapRef.current);
+        setActiveLayer(targetActive);
+
+        // Spring lift for individual layers
+        for (let i = 0; i < 4; i++) {
+          const wantLift = i === targetActive ? 6.5 : 0;
+          liftsRef.current[i] += (wantLift - liftsRef.current[i]) * 0.18;
+        }
       }
 
       animId = requestAnimationFrame(tick);
     };
 
-    animId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(animId);
-  }, [isHovered, pointerX, pointerY, autoPlay]);
+    const startLoop = () => {
+      if (!animId) {
+        lastTime = 0;
+        animId = requestAnimationFrame(tick);
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (typeof document === 'undefined') return;
+      if (document.hidden) {
+        if (animId) {
+          cancelAnimationFrame(animId);
+          animId = null;
+        }
+      } else if (active) {
+        startLoop();
+      }
+    };
+
+    startLoop();
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisibilityChange);
+    }
+
+    return () => {
+      active = false;
+      if (animId) cancelAnimationFrame(animId);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisibilityChange);
+      }
+    };
+  }, [isHovered, pointerX, pointerY, autoPlay, isLocalHovered, localPointer]);
 
   // Current calculated gap separation
   const currentGap = 14 + gapFactor * 22; // from 14px to 36px

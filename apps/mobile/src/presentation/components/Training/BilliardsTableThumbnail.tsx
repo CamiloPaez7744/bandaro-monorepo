@@ -1,4 +1,4 @@
-import { memo, useId } from 'react';
+import { memo, useId, useMemo } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Circle, Defs, G, Line, LinearGradient, Polyline, RadialGradient, Rect, Stop, Text as SvgText } from 'react-native-svg';
 
@@ -182,10 +182,13 @@ function BilliardsTableThumbnailBase(props: Readonly<BilliardsTableThumbnailProp
     const { orientation = 'horizontal', style, balls = [], path = [], paths = [], aim, showPath = true, showZones = true, diamondLabels = [] } = props;
     const layout = getLayout(orientation);
     const uid = useId();
-    let derivedPaths: TrajectoryPath[] = paths;
-    if (derivedPaths.length === 0 && path.length > 1) {
-        derivedPaths = [{ id: 'solution', points: path, color: '#f8fafc', width: 2.25, dash: [8, 8], opacity: 1 }];
-    }
+    const derivedPaths = useMemo<TrajectoryPath[]>(() => {
+        if (paths.length > 0) return paths;
+        if (path.length > 1) {
+            return [{ id: 'solution', points: path, color: '#f8fafc', width: 2.25, dash: [8, 8], opacity: 1 }];
+        }
+        return [];
+    }, [paths, path]);
 
     return (
         <View style={[styles.container, { aspectRatio: layout.viewBox.width / layout.viewBox.height }, style]}>
@@ -318,7 +321,7 @@ function BilliardsTableThumbnailBase(props: Readonly<BilliardsTableThumbnailProp
                 ) : null}
 
                 {showPath && derivedPaths.length > 0
-                    ? derivedPaths.map((trajectory) => {
+                    ? derivedPaths.map((trajectory: TrajectoryPath) => {
                           if (trajectory.points.length < 2) return null;
                           const pathStroke = trajectory.color ?? '#f8fafc';
                           const pathWidth = trajectory.width ?? 2;
@@ -343,7 +346,7 @@ function BilliardsTableThumbnailBase(props: Readonly<BilliardsTableThumbnailProp
                                       strokeLinecap="round"
                                       strokeLinejoin="round"
                                   />
-                                  {trajectory.points.slice(1, -1).map((point, index) => {
+                                  {trajectory.points.slice(1, -1).map((point: Point2D, index: number) => {
                                       const mapped = mapPoint(point, orientation, layout);
                                       return <Circle key={`${trajectory.id}-bounce-${index}-${mapped.x}-${mapped.y}`} cx={mapped.x} cy={mapped.y} r={1.5} fill={pathStroke} opacity={0.9} />;
                                   })}

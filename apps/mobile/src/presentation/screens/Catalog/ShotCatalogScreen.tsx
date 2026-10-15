@@ -1,6 +1,8 @@
 import { useCallback, useState, useRef, useEffect } from 'react';
 import {
     ActivityIndicator,
+    Alert,
+    FlatList,
     Platform,
     Pressable,
     ScrollView,
@@ -18,7 +20,10 @@ import {
     IconBookmark,
     IconChevronLeft,
     IconChevronRight,
-} from '@tabler/icons-react-native';
+    IconSparkles,
+    IconUserPlus,
+    IconLock,
+} from '@/src/presentation/components/icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -70,6 +75,7 @@ export function ShotCatalogScreen({
     const isPickerMode = mode === 'picker';
     const contentWidth = isPickerMode ? windowWidth : windowWidth - sidebarWidth;
     const isWide = contentWidth >= 800;
+    const numCols = isWide ? (contentWidth > 1100 ? 3 : 2) : 1;
     const paddingHorizontal = isWide ? theme.spacing.lg : theme.spacing.md;
     const paddingTop = isPickerMode ? Math.max(insets.top, 16) : 16;
 
@@ -86,8 +92,16 @@ export function ShotCatalogScreen({
         setOnlyFavorites,
         searchQuery,
         setSearchQuery,
+        selectCategory,
+        toggleOnlyFavorites,
+        resetFilters,
         loadMore,
         toggleFavorite,
+        isGuestPreview,
+        totalAvailable,
+        catalogTotal,
+        favoritesCount,
+        previewLimit,
     } = useShotCatalog();
 
     const categoriesScrollRef = useRef<ScrollView>(null);
@@ -199,6 +213,19 @@ export function ShotCatalogScreen({
 
     const handleTrainShot = useCallback(
         (shot: CatalogShot) => {
+            if (shot.isLocked) {
+                const title = language === 'en' ? 'VIP Content' : 'Contenido Exclusivo';
+                const msg = language === 'en'
+                    ? 'This master shot is part of the VIP tier. Sign in or upgrade to unlock!'
+                    : 'Esta carambola maestra es exclusiva para miembros. ¡Inicia sesión o actualiza para desbloquearla!';
+                if (Platform.OS === 'web') {
+                    window.alert(`${title}\n\n${msg}`);
+                } else {
+                    Alert.alert(title, msg);
+                }
+                return;
+            }
+
             if (onSelectShot) {
                 onSelectShot(shot);
                 if (onClosePicker) {
@@ -211,7 +238,23 @@ export function ShotCatalogScreen({
                 });
             }
         },
-        [onSelectShot, onClosePicker, router]
+        [onSelectShot, onClosePicker, router, language]
+    );
+
+    const renderCardItem = useCallback(
+        ({ item: shot }: { item: CatalogShot }) => (
+            <View style={[styles.cardItem, numCols > 1 ? { margin: 8 } : { marginBottom: 16 }]}>
+                <ShotCatalogCard
+                    shot={shot}
+                    onPress={handlePressDetail}
+                    onTrain={handleTrainShot}
+                    onToggleFavorite={toggleFavorite}
+                    palette={palette}
+                    isPickerMode={isPickerMode}
+                />
+            </View>
+        ),
+        [handlePressDetail, handleTrainShot, toggleFavorite, palette, isPickerMode, numCols]
     );
 
     return (
@@ -264,6 +307,37 @@ export function ShotCatalogScreen({
                     </View>
                 </View>
 
+                {/* Guest Preview Invitation Banner */}
+                {isGuestPreview && (
+                    <View style={[styles.guestBanner, { backgroundColor: '#3B82F614', borderColor: '#3B82F644' }]}>
+                        <View style={styles.guestBannerContent}>
+                            <View style={[styles.guestBannerIconWrap, { backgroundColor: '#3B82F625' }]}>
+                                <IconSparkles size={18} color="#60A5FA" />
+                            </View>
+                            <View style={{ flex: 1, gap: 2 }}>
+                                <Text style={[styles.guestBannerTitle, { color: palette.text }]}>
+                                    {language === 'en' ? 'Guest Preview Sample' : 'Muestra reducida de 12 carambolas'}
+                                </Text>
+                                <Text style={[styles.guestBannerText, { color: palette.muted }]}>
+                                    {language === 'en'
+                                        ? `Showing ${shots.length} preview shots. Sign in for free to unlock all ${totalAvailable || 180}+ master plays and Spaced Repetition!`
+                                        : `Mostrando ${shots.length} carambolas de muestra. ¡Inicia sesión gratis para ver las ${totalAvailable || 180}+ jugadas maestras y activar el repaso espaciado!`
+                                    }
+                                </Text>
+                            </View>
+                        </View>
+                        <Pressable
+                            style={[styles.guestBannerAction, { backgroundColor: palette.primary }]}
+                            onPress={() => router.push('/auth/login')}
+                            accessibilityRole="button">
+                            <IconUserPlus size={14} color="#FFFFFF" strokeWidth={2.2} />
+                            <Text style={styles.guestBannerActionText}>
+                                {language === 'en' ? 'Sign In Free' : 'Iniciar Sesión'}
+                            </Text>
+                        </Pressable>
+                    </View>
+                )}
+
                 {/* Horizontal Category Filter Pills Carousel with Web Drag & Arrow Support */}
                 <View style={styles.categoriesContainer}>
                     {Platform.OS === 'web' && canScrollLeft && (
@@ -290,18 +364,13 @@ export function ShotCatalogScreen({
                                     ? [styles.categoryChipActive, { backgroundColor: palette.primary, borderColor: palette.primary }]
                                     : [styles.categoryChipInactive, { backgroundColor: palette.card, borderColor: palette.border }],
                             ]}
-                            onPress={() =>
-                                handleChipPress(() => {
-                                    setSelectedCategory(undefined);
-                                    setOnlyFavorites(false);
-                                })
-                            }>
+                            onPress={() => handleChipPress(resetFilters)}>
                             <Text
                                 style={[
                                     styles.categoryChipText,
                                     !selectedCategory && !onlyFavorites ? styles.categoryChipTextActive : { color: palette.muted },
                                 ]}>
-                                {t('catalog.allCategories', { total })}
+                                {t('catalog.allCategories', { total: catalogTotal || totalAvailable || total })}
                             </Text>
                         </Pressable>
 
@@ -314,7 +383,7 @@ export function ShotCatalogScreen({
                                     ? [styles.categoryChipActive, { backgroundColor: '#F59E0B', borderColor: '#F59E0B' }]
                                     : [styles.categoryChipInactive, { backgroundColor: palette.card, borderColor: palette.border }],
                             ]}
-                            onPress={() => handleChipPress(() => setOnlyFavorites((prev) => !prev))}>
+                            onPress={() => handleChipPress(toggleOnlyFavorites)}>
                             <IconBookmark
                                 size={14}
                                 color={onlyFavorites ? '#FFFFFF' : '#F59E0B'}
@@ -326,6 +395,7 @@ export function ShotCatalogScreen({
                                     onlyFavorites ? styles.categoryChipTextActive : { color: palette.text },
                                 ]}>
                                 {language === 'en' ? 'Favorites' : 'Guardadas'}
+                                {favoritesCount > 0 ? ` (${favoritesCount})` : ''}
                             </Text>
                         </Pressable>
 
@@ -342,9 +412,7 @@ export function ShotCatalogScreen({
                                             ? [styles.categoryChipActive, { backgroundColor: catColor, borderColor: catColor }]
                                             : [styles.categoryChipInactive, { backgroundColor: palette.card, borderColor: palette.border }],
                                     ]}
-                                    onPress={() =>
-                                        handleChipPress(() => setSelectedCategory(isActive ? undefined : item.category))
-                                    }>
+                                    onPress={() => handleChipPress(() => selectCategory(item.category))}>
                                     <View
                                         style={[
                                             styles.categoryDot,
@@ -375,7 +443,7 @@ export function ShotCatalogScreen({
                 </View>
             </View>
 
-            {/* Content Body: Grid of Shots */}
+            {/* Content Body: Virtualized Grid of Shots */}
             {loading ? (
                 <View style={styles.centerContainer}>
                     <ActivityIndicator size="large" color={palette.primary} />
@@ -388,52 +456,84 @@ export function ShotCatalogScreen({
                     <Text style={[styles.errorText, { color: palette.danger }]}>{error}</Text>
                 </View>
             ) : (
-                <ScrollView
+                <FlatList
+                    key={`catalog_grid_${numCols}`}
+                    data={shots}
+                    keyExtractor={(item) => String(item.id)}
+                    numColumns={numCols}
+                    renderItem={renderCardItem}
                     contentContainerStyle={[
                         styles.scrollContent,
                         { paddingHorizontal, paddingBottom: 100 },
                     ]}
-                    onScroll={(e) => {
-                        const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
-                        if (contentOffset.y + layoutMeasurement.height >= contentSize.height - 250) {
+                    windowSize={3}
+                    initialNumToRender={6}
+                    maxToRenderPerBatch={6}
+                    removeClippedSubviews={Platform.OS !== 'web'}
+                    onEndReached={() => {
+                        if (!loadingMore && shots.length < total) {
                             loadMore();
                         }
                     }}
-                    scrollEventThrottle={16}
-                    showsVerticalScrollIndicator={false}>
-                    {shots.length === 0 ? (
+                    onEndReachedThreshold={0.5}
+                    showsVerticalScrollIndicator={false}
+                    ListEmptyComponent={
                         <View style={styles.emptyContainer}>
-                            <IconAdjustments size={40} color={palette.muted} strokeWidth={1.5} />
-                            <Text style={[styles.emptyTitle, { color: palette.text }]}>
-                                {t('catalog.emptyTitle')}
-                            </Text>
-                            <Text style={[styles.emptyDesc, { color: palette.muted }]}>
-                                {t('catalog.emptyDesc')}
-                            </Text>
+                            {onlyFavorites ? (
+                                <>
+                                    <IconBookmark size={42} color="#F59E0B" fill="#F59E0B" />
+                                    <Text style={[styles.emptyTitle, { color: palette.text }]}>
+                                        {language === 'en' ? 'No saved shots yet' : 'Sin jugadas guardadas'}
+                                    </Text>
+                                    <Text style={[styles.emptyDesc, { color: palette.muted }]}>
+                                        {language === 'en'
+                                            ? 'Save your favorite shots using the bookmark icon to easily find them here.'
+                                            : 'Guarda tus carambolas favoritas usando el ícono de marcador para tenerlas a mano.'}
+                                    </Text>
+                                    <Pressable
+                                        style={[
+                                            styles.resetFilterBtn,
+                                            { backgroundColor: palette.card, borderColor: palette.border },
+                                        ]}
+                                        onPress={resetFilters}>
+                                        <Text style={[styles.resetFilterBtnText, { color: palette.primary }]}>
+                                            {language === 'en' ? 'Explore full catalog' : 'Explorar todo el catálogo'}
+                                        </Text>
+                                    </Pressable>
+                                </>
+                            ) : (
+                                <>
+                                    <IconAdjustments size={40} color={palette.muted} strokeWidth={1.5} />
+                                    <Text style={[styles.emptyTitle, { color: palette.text }]}>
+                                        {t('catalog.emptyTitle')}
+                                    </Text>
+                                    <Text style={[styles.emptyDesc, { color: palette.muted }]}>
+                                        {t('catalog.emptyDesc')}
+                                    </Text>
+                                    {(selectedCategory || searchQuery) && (
+                                        <Pressable
+                                            style={[
+                                                styles.resetFilterBtn,
+                                                { backgroundColor: palette.card, borderColor: palette.border },
+                                            ]}
+                                            onPress={resetFilters}>
+                                            <Text style={[styles.resetFilterBtnText, { color: palette.primary }]}>
+                                                {language === 'en' ? 'Clear filters' : 'Limpiar filtros'}
+                                            </Text>
+                                        </Pressable>
+                                    )}
+                                </>
+                            )}
                         </View>
-                    ) : (
-                        <View style={styles.cardsGrid}>
-                            {shots.map((shot) => (
-                                <View key={shot.id} style={styles.cardItem}>
-                                    <ShotCatalogCard
-                                        shot={shot}
-                                        onPress={handlePressDetail}
-                                        onTrain={handleTrainShot}
-                                        onToggleFavorite={toggleFavorite}
-                                        palette={palette}
-                                        isPickerMode={isPickerMode}
-                                    />
-                                </View>
-                            ))}
-                        </View>
-                    )}
-
-                    {loadingMore ? (
-                        <View style={styles.loadingMoreWrap}>
-                            <ActivityIndicator size="small" color={palette.primary} />
-                        </View>
-                    ) : null}
-                </ScrollView>
+                    }
+                    ListFooterComponent={
+                        loadingMore ? (
+                            <View style={styles.loadingMoreWrap}>
+                                <ActivityIndicator size="small" color={palette.primary} />
+                            </View>
+                        ) : null
+                    }
+                />
             )}
         </View>
     );
@@ -442,6 +542,17 @@ export function ShotCatalogScreen({
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+    },
+    cardItem: {
+        flex: 1,
+        minWidth: 280,
+        maxWidth: 600,
+        ...(Platform.OS === 'web'
+            ? ({
+                  contentVisibility: 'auto',
+                  containIntrinsicSize: '0 380px',
+              } as any)
+            : {}),
     },
     header: {
         paddingTop: 16,
@@ -572,11 +683,6 @@ const styles = StyleSheet.create({
         flexWrap: 'wrap',
         gap: 16,
     },
-    cardItem: {
-        flexGrow: 1,
-        flexBasis: 300,
-        maxWidth: 600,
-    },
     centerContainer: {
         flex: 1,
         alignItems: 'center',
@@ -606,8 +712,65 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         maxWidth: 320,
     },
+    resetFilterBtn: {
+        marginTop: 8,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        borderWidth: 1,
+    },
+    resetFilterBtnText: {
+        fontSize: 13,
+        fontWeight: '600',
+    },
     loadingMoreWrap: {
         paddingVertical: 24,
         alignItems: 'center',
+    },
+    guestBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderRadius: 12,
+        borderWidth: 1,
+        padding: 12,
+        marginTop: 10,
+        gap: 12,
+        flexWrap: 'wrap',
+    },
+    guestBannerContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        flex: 1,
+        minWidth: 240,
+    },
+    guestBannerIconWrap: {
+        width: 34,
+        height: 34,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    guestBannerTitle: {
+        fontSize: 13,
+        fontWeight: '700',
+    },
+    guestBannerText: {
+        fontSize: 11.5,
+        lineHeight: 16,
+    },
+    guestBannerAction: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 8,
+    },
+    guestBannerActionText: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '700',
     },
 });

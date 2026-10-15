@@ -11,6 +11,7 @@ import { Platform } from 'react-native';
 class BilliardAudioManager {
     private ctx: AudioContext | null = null;
     private isUnlocked = false;
+    private cachedNoiseBuffer: AudioBuffer | null = null;
 
     constructor() {
         if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -57,6 +58,46 @@ class BilliardAudioManager {
     }
 
     /**
+     * Reusable cached white noise buffer to eliminate continuous Float32Array allocations on every collision.
+     */
+    private getSharedNoiseBuffer(ctx: AudioContext, duration: number = 0.06): AudioBuffer {
+        if (this.cachedNoiseBuffer && this.cachedNoiseBuffer.duration >= duration && this.cachedNoiseBuffer.sampleRate === ctx.sampleRate) {
+            return this.cachedNoiseBuffer;
+        }
+        const sampleRate = ctx.sampleRate;
+        const bufferSize = Math.floor(sampleRate * 0.08); // 80ms buffer covers all transients
+        const buffer = ctx.createBuffer(1, bufferSize, sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (sampleRate * 0.012));
+        }
+        this.cachedNoiseBuffer = buffer;
+        return buffer;
+    }
+
+    /**
+     * Safe helper to bind onended cleanup so Web Audio nodes are immediately unlinked
+     * from ctx.destination and garbage collected.
+     */
+    private playWithAutoCleanup(
+        source: AudioScheduledSourceNode,
+        nodes: AudioNode[],
+        startTime: number,
+        stopTime: number
+    ) {
+        source.onended = () => {
+            try {
+                source.disconnect();
+                for (const node of nodes) {
+                    node.disconnect();
+                }
+            } catch {}
+        };
+        source.start(startTime);
+        source.stop(stopTime);
+    }
+
+    /**
      * Cue stick leather tip strike on cue ball.
      * Accurately reflects how deeply the cue follows through ("atraviesa la bola").
      * @param power Power percentage (0 to 100) or rail speed (0 to 5)
@@ -73,15 +114,8 @@ class BilliardAudioManager {
 
         // 1. Initial Chalk/Leather Impact Transient Crack
         const crackDuration = isDryHit ? 0.015 : 0.028;
-        const crackBufferSize = Math.floor(ctx.sampleRate * crackDuration);
-        const crackBuffer = ctx.createBuffer(1, crackBufferSize, ctx.sampleRate);
-        const crackData = crackBuffer.getChannelData(0);
-        for (let i = 0; i < crackBufferSize; i++) {
-            crackData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * (isDryHit ? 0.003 : 0.006)));
-        }
-
         const crackSource = ctx.createBufferSource();
-        crackSource.buffer = crackBuffer;
+        crackSource.buffer = this.getSharedNoiseBuffer(ctx, crackDuration);
 
         const crackFilter = ctx.createBiquadFilter();
         crackFilter.type = 'bandpass';
@@ -96,7 +130,7 @@ class BilliardAudioManager {
         crackSource.connect(crackFilter);
         crackFilter.connect(crackGain);
         crackGain.connect(ctx.destination);
-        crackSource.start(now);
+        this.playWithAutoCleanup(crackSource, [crackFilter, crackGain], now, now + crackDuration + 0.005);
 
         // 2. Cue Shaft Wooden Body Compression (Maple / Ash vibration)
         const shaftOsc = ctx.createOscillator();
@@ -113,21 +147,13 @@ class BilliardAudioManager {
 
         shaftOsc.connect(shaftGain);
         shaftGain.connect(ctx.destination);
-        shaftOsc.start(now);
-        shaftOsc.stop(now + 0.07);
+        this.playWithAutoCleanup(shaftOsc, [shaftGain], now, now + 0.07);
 
         // 3. Follow-through stroke friction ("cuando el taco atraviesa la bola")
         if (isFollowThrough) {
             const glideDuration = 0.06;
-            const glideBufferSize = Math.floor(ctx.sampleRate * glideDuration);
-            const glideBuffer = ctx.createBuffer(1, glideBufferSize, ctx.sampleRate);
-            const glideData = glideBuffer.getChannelData(0);
-            for (let i = 0; i < glideBufferSize; i++) {
-                glideData[i] = (Math.random() * 2 - 1) * Math.sin((i / glideBufferSize) * Math.PI);
-            }
-
             const glideSource = ctx.createBufferSource();
-            glideSource.buffer = glideBuffer;
+            glideSource.buffer = this.getSharedNoiseBuffer(ctx, glideDuration);
 
             const glideFilter = ctx.createBiquadFilter();
             glideFilter.type = 'lowpass';
@@ -140,7 +166,7 @@ class BilliardAudioManager {
             glideSource.connect(glideFilter);
             glideFilter.connect(glideGain);
             glideGain.connect(ctx.destination);
-            glideSource.start(now + 0.005);
+            this.playWithAutoCleanup(glideSource, [glideFilter, glideGain], now + 0.005, now + glideDuration + 0.01);
         }
     }
 
@@ -161,19 +187,11 @@ class BilliardAudioManager {
         const masterVol = 0.62 * Math.pow(normalizedSpeed, 0.65);
 
         // 1. Ultra-sharp contact shockwave transient (instantaneous crack < 2.5ms)
-        const transientSize = Math.floor(ctx.sampleRate * 0.012);
-        const transientBuffer = ctx.createBuffer(1, transientSize, ctx.sampleRate);
-        const tData = transientBuffer.getChannelData(0);
-        for (let i = 0; i < transientSize; i++) {
-            tData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.0015));
-        }
-
         const tSource = ctx.createBufferSource();
-        tSource.buffer = transientBuffer;
+        tSource.buffer = this.getSharedNoiseBuffer(ctx, 0.015);
 
         const tFilter = ctx.createBiquadFilter();
         tFilter.type = 'bandpass';
-        // Center frequency varies by cut: thin cut = 4800Hz, full ball = 3600Hz
         tFilter.frequency.setValueAtTime(4800 - clampedThickness * 1200, now);
         tFilter.Q.setValueAtTime(3.8, now);
 
@@ -184,7 +202,7 @@ class BilliardAudioManager {
         tSource.connect(tFilter);
         tFilter.connect(tGain);
         tGain.connect(ctx.destination);
-        tSource.start(now);
+        this.playWithAutoCleanup(tSource, [tFilter, tGain], now, now + 0.015);
 
         // 2. Primary Phenolic Resin Ring Mode (Aramith Pro-Cup ~3250Hz - 3600Hz)
         const primaryFreq = 3650 - clampedThickness * 850;
@@ -199,8 +217,7 @@ class BilliardAudioManager {
 
         osc1.connect(gain1);
         gain1.connect(ctx.destination);
-        osc1.start(now);
-        osc1.stop(now + ringDuration + 0.005);
+        this.playWithAutoCleanup(osc1, [gain1], now, now + ringDuration + 0.005);
 
         // 3. High Inharmonic Surface Shimmer (~5200Hz - 6400Hz)
         const osc2 = ctx.createOscillator();
@@ -213,8 +230,7 @@ class BilliardAudioManager {
 
         osc2.connect(gain2);
         gain2.connect(ctx.destination);
-        osc2.start(now);
-        osc2.stop(now + 0.018);
+        this.playWithAutoCleanup(osc2, [gain2], now, now + 0.018);
 
         // 4. Solid 210g Sphere Mass Body Pop (Low-mid punch for full & half hits)
         if (clampedThickness >= 0.2) {
@@ -231,8 +247,7 @@ class BilliardAudioManager {
 
             oscBody.connect(gainBody);
             gainBody.connect(ctx.destination);
-            oscBody.start(now);
-            oscBody.stop(now + 0.032);
+            this.playWithAutoCleanup(oscBody, [gainBody], now, now + 0.032);
         }
     }
 
@@ -267,8 +282,7 @@ class BilliardAudioManager {
         filter.connect(gain);
         gain.connect(ctx.destination);
 
-        osc.start(now);
-        osc.stop(now + 0.065);
+        this.playWithAutoCleanup(osc, [filter, gain], now, now + 0.065);
     }
 
     /**
@@ -293,8 +307,7 @@ class BilliardAudioManager {
 
             osc.connect(gain);
             gain.connect(ctx.destination);
-            osc.start(now + idx * 0.07);
-            osc.stop(now + idx * 0.07 + 0.50);
+            this.playWithAutoCleanup(osc, [gain], now + idx * 0.07, now + idx * 0.07 + 0.50);
         });
     }
 }

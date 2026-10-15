@@ -1,5 +1,5 @@
-import { HistoryScreen } from '@/src/presentation/screens/History/HistoryScreen';
+import { DashboardScreen } from '@/src/presentation/screens/Dashboard/DashboardScreen';
 
-export default function HistoryRoute() {
-  return <HistoryScreen />;
+export default function DashboardRoute() {
+  return <DashboardScreen />;
 }

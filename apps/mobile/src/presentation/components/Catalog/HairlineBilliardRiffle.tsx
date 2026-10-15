@@ -179,20 +179,61 @@ export const HairlineBilliardRiffle: React.FC<HairlineBilliardRiffleProps> = ({
   const containerRef = useRef<View>(null);
   const layoutWidth = useRef(windowWidth);
 
-  // Auto-play idle wave when user is not interacting
+  // Auto-play idle wave when user is not interacting (throttled to 20 FPS to minimize memory)
   useEffect(() => {
-    let animId: number;
+    let animId: number | null = null;
+    let active = true;
     let step = 0;
-    const loop = () => {
-      step += 0.025;
-      setFrame(step);
+    let lastTime = 0;
+    const FRAME_INTERVAL = 1000 / 20;
+
+    const loop = (now: number) => {
+      if (!active) return;
+      if (typeof document !== 'undefined' && document.hidden) {
+        animId = null;
+        return;
+      }
+      if (!lastTime) lastTime = now;
+      const elapsed = now - lastTime;
+      if (elapsed >= FRAME_INTERVAL) {
+        lastTime = now - (elapsed % FRAME_INTERVAL);
+        step += 0.025;
+        setFrame(step);
+      }
       animId = requestAnimationFrame(loop);
     };
-    if (autoPlay && !isHovered) {
-      animId = requestAnimationFrame(loop);
+
+    const startLoop = () => {
+      if (!animId && autoPlay && !isHovered) {
+        lastTime = 0;
+        animId = requestAnimationFrame(loop);
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (typeof document === 'undefined') return;
+      if (document.hidden) {
+        if (animId) {
+          cancelAnimationFrame(animId);
+          animId = null;
+        }
+      } else if (active) {
+        startLoop();
+      }
+    };
+
+    startLoop();
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisibilityChange);
     }
+
     return () => {
+      active = false;
       if (animId) cancelAnimationFrame(animId);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisibilityChange);
+      }
     };
   }, [autoPlay, isHovered]);
 

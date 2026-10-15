@@ -193,7 +193,7 @@ export function AnimatedTabBar({ state, descriptors, navigation }: TabBarProps) 
                 : route.name === 'training'
                   ? 'tabs.training'
                   : route.name === 'history'
-                    ? 'tabs.history'
+                    ? 'tabs.dashboard'
                     : 'tabs.profile';
 
           const label = t(labelKey as Parameters<typeof t>[0]);

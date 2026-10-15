@@ -1,4 +1,4 @@
-import { memo, useState } from 'react';
+import { memo, useState, useCallback } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import {
     IconBolt,
@@ -10,7 +10,9 @@ import {
     IconPlayerPlay,
     IconCircleDot,
     IconBookmark,
-} from '@tabler/icons-react-native';
+    IconLock,
+    IconCrown,
+} from '@/src/presentation/components/icons';
 
 import { TrainingPlayTable } from '@/src/presentation/components/Training/TrainingPlayTable';
 import { getPalette, theme } from '@/constants/theme';
@@ -95,6 +97,10 @@ export const ShotCatalogCard = memo(function ShotCatalogCard({
     const [isHovered, setIsHovered] = useState(false);
     const [isSimulating, setIsSimulating] = useState(false);
 
+    const handleSimulationEnd = useCallback(() => {
+        setIsSimulating(false);
+    }, []);
+
     return (
         <View
             style={[
@@ -153,6 +159,12 @@ export const ShotCatalogCard = memo(function ShotCatalogCard({
                     {shot.isDifficult && (
                         <AnimatedFlameBadge size={14} />
                     )}
+                    {(shot.isPremium || shot.requiresPremium) && (
+                        <View style={[styles.premiumBadge, { backgroundColor: '#F59E0B20', borderColor: '#F59E0B70' }]}>
+                            <IconCrown size={12} color="#F59E0B" strokeWidth={2.2} />
+                            <Text style={styles.premiumBadgeText}>VIP</Text>
+                        </View>
+                    )}
                     <View style={[styles.categoryBadge, { backgroundColor: `${color}20`, borderColor: `${color}60` }]}>
                         <View style={[styles.categoryDot, { backgroundColor: color }]} />
                         <Text style={[styles.categoryText, { color }]}>
@@ -176,7 +188,7 @@ export const ShotCatalogCard = memo(function ShotCatalogCard({
                         trajectory={shot.cueBallTrajectory}
                         trajectoryColor={color}
                         isSimulating={isSimulating}
-                        onSimulationEnd={() => setIsSimulating(false)}
+                        onSimulationEnd={handleSimulationEnd}
                         showGrid={false}
                         showDiamondNumbers={false}
                         style={styles.tableThumbnail}
@@ -248,10 +260,22 @@ export const ShotCatalogCard = memo(function ShotCatalogCard({
             <View style={styles.actionsBar}>
                 {onTrain ? (
                     <Pressable
-                        style={[styles.trainBtn, { backgroundColor: palette.primary }]}
+                        style={[
+                            styles.trainBtn,
+                            shot.isLocked
+                                ? { backgroundColor: '#F59E0B1A', borderWidth: 1.2, borderColor: '#F59E0B80' }
+                                : { backgroundColor: palette.primary },
+                        ]}
                         onPress={() => onTrain(shot)}
                         accessibilityRole="button">
-                        {isPickerMode ? (
+                        {shot.isLocked ? (
+                            <>
+                                <IconLock size={15} color="#F59E0B" strokeWidth={2.2} />
+                                <Text style={[styles.trainBtnText, { color: '#F59E0B' }]}>
+                                    {language === 'en' ? 'VIP Shot' : 'Jugada VIP'}
+                                </Text>
+                            </>
+                        ) : isPickerMode ? (
                             <>
                                 <IconPlus size={16} color="#FFFFFF" strokeWidth={2.2} />
                                 <Text style={styles.trainBtnText}>{t('catalog.card.addToSession')}</Text>
@@ -326,6 +350,21 @@ const styles = StyleSheet.create({
         fontSize: 10,
         fontWeight: '700',
         textTransform: 'uppercase',
+    },
+    premiumBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        borderRadius: 6,
+        paddingHorizontal: 7,
+        paddingVertical: 2.5,
+        borderWidth: 1,
+    },
+    premiumBadgeText: {
+        fontSize: 10,
+        fontWeight: '800',
+        color: '#F59E0B',
+        letterSpacing: 0.5,
     },
     categoryBadge: {
         flexDirection: 'row',

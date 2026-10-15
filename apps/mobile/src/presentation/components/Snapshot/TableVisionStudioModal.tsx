@@ -347,9 +347,10 @@ function TableVisionStudioModalBase({
     }, 2200);
   }, []);
 
-  // Continuous radar pulse animation for the active corner handle
+  // Continuous radar pulse animation for the active corner handle (only active when modal is visible)
   const pulseAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
+    if (!visible) return;
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
@@ -366,7 +367,7 @@ function TableVisionStudioModalBase({
     );
     loop.start();
     return () => loop.stop();
-  }, [pulseAnim]);
+  }, [visible, pulseAnim]);
 
   // Visual toggles
   const [showProjectedGrid, setShowProjectedGrid] = useState(true);
@@ -625,6 +626,27 @@ function TableVisionStudioModalBase({
     [imageSize]
   );
 
+  const lastBlobUrlRef = useRef<string | null>(null);
+  const registerBlobUrl = useCallback((newUrl: string) => {
+    if (isWeb && lastBlobUrlRef.current && typeof window !== 'undefined' && window.URL) {
+      try {
+        window.URL.revokeObjectURL(lastBlobUrlRef.current);
+      } catch {}
+    }
+    lastBlobUrlRef.current = newUrl;
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (isWeb && lastBlobUrlRef.current && typeof window !== 'undefined' && window.URL) {
+        try {
+          window.URL.revokeObjectURL(lastBlobUrlRef.current);
+        } catch {}
+        lastBlobUrlRef.current = null;
+      }
+    };
+  }, []);
+
   // Web Clipboard Paste (Ctrl + V)
   useEffect(() => {
     if (!visible || !isWeb) return;
@@ -638,6 +660,7 @@ function TableVisionStudioModalBase({
           const blob = items[i].getAsFile();
           if (blob) {
             const blobUrl = URL.createObjectURL(blob);
+            registerBlobUrl(blobUrl);
             processImage(blobUrl);
             break;
           }
@@ -647,7 +670,7 @@ function TableVisionStudioModalBase({
 
     window.addEventListener('paste', handlePaste);
     return () => window.removeEventListener('paste', handlePaste);
-  }, [visible, processImage]);
+  }, [visible, processImage, registerBlobUrl]);
 
   // Gallery file picker
   const pickFromGallery = useCallback(async () => {
@@ -662,6 +685,7 @@ function TableVisionStudioModalBase({
           const file = target.files?.[0];
           if (!file) return;
           const blobUrl = URL.createObjectURL(file);
+          registerBlobUrl(blobUrl);
           processImage(blobUrl);
           target.value = '';
         }) as EventListener);

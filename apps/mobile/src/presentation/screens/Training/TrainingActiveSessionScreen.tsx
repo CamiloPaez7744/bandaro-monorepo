@@ -49,7 +49,12 @@ import {
   getRandomCongratulationQuote,
   type CongratulationQuote,
 } from '@/src/presentation/screens/Training/congratulationQuotes';
-import { saveTrainingSessionToBackend } from '@/src/infrastructure/training/trainingApi';
+import { useAuth } from '@/components/useAuth';
+import {
+  saveTrainingSessionToBackend,
+  getOrCreateGuestDeviceId,
+  type TrainingSessionResponse,
+} from '@/src/infrastructure/training/trainingApi';
 import { apiFetch } from '@/src/infrastructure/security/cryptoClient';
 import {
   TRAINING_ROUTE_LEVELS,
@@ -192,6 +197,7 @@ export function TrainingActiveSessionScreen() {
   const { t, language } = useI18n();
   const palette = getPalette(useColorScheme());
   const styles = getStyles(palette, isWideScreen);
+  const { session } = useAuth();
 
   const params = useLocalSearchParams<{
     shotId?: string;
@@ -490,16 +496,25 @@ export function TrainingActiveSessionScreen() {
 
     // 2. Persist to backend PostgreSQL API
     let backendSaved = false;
+    let backendResult: TrainingSessionResponse | null = null;
     try {
-      const backendRes = await saveTrainingSessionToBackend({
-        id: sessionRecord.id,
-        totalTarget: sessionRecord.totalTarget,
-        totalHits: sessionRecord.totalHits,
-        accuracy: sessionRecord.accuracy,
-        positionsCount: sessionRecord.positionsCount,
-        positions: sessionRecord.positions,
-      });
+      const guestDeviceId = !session?.accessToken ? await getOrCreateGuestDeviceId() : undefined;
+      const backendRes = await saveTrainingSessionToBackend(
+        {
+          id: sessionRecord.id,
+          sessionType: params.nodeId ? 'guided_route' : 'free_practice',
+          nodeId: params.nodeId,
+          guestDeviceId,
+          totalTarget: sessionRecord.totalTarget,
+          totalHits: sessionRecord.totalHits,
+          accuracy: sessionRecord.accuracy,
+          positionsCount: sessionRecord.positionsCount,
+          positions: sessionRecord.positions,
+        },
+        session?.accessToken
+      );
       backendSaved = backendRes.success;
+      backendResult = backendRes;
 
       // If this session is part of the guided Learning Roadmap (nodeId is present)
       if (params.nodeId) {
@@ -507,7 +522,10 @@ export function TrainingActiveSessionScreen() {
         const xpGained = activeRouteNode?.xp || 150;
         await apiFetch('/training/node-progress', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(session?.accessToken ? { Authorization: `Bearer ${session.accessToken}` } : {}),
+          },
           body: JSON.stringify({
             nodeId: params.nodeId,
             stars: calculatedStars,
@@ -525,6 +543,10 @@ export function TrainingActiveSessionScreen() {
     setCelebrationSummary({
       ...sessionRecord,
       savedToBackend: backendSaved,
+      isGuest: backendResult?.isGuest ?? !session?.accessToken,
+      suggestLogin: backendResult?.suggestLogin ?? !session?.accessToken,
+      xpEarned: backendResult?.xpEarned,
+      strugglingPositionsCount: backendResult?.strugglingPositionsCount,
     });
     setCelebrationQuote(getRandomCongratulationQuote(language));
     setCelebrationModalVisible(true);

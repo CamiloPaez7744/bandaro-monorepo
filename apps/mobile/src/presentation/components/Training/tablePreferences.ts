@@ -40,6 +40,20 @@ export interface TableArenaSkin {
 
 export const TABLE_ARENA_SKINS: TableArenaSkin[] = [
   {
+    id: 'canonical_dark_slate',
+    name: 'Canónica Pro Dark Slate',
+    subtitle: 'Edición Simulador Táctico Bandaro',
+    description: 'La mesa canónica oficial de referencia: paño pizarra azul noche (#151e2b) con iluminación central, rombos dorados brillantes y máxima claridad táctica.',
+    clothColor: '#151e2b',
+    clothVignetteHex: '#223348',
+    woodFinish: 'ebony',
+    cornerMetal: 'chrome',
+    diamondShape: 'rhombus',
+    diamondColor: '#fbbf24',
+    tableDecal: 'none',
+    accentGlow: '#38bdf8',
+  },
+  {
     id: 'rebel_skull',
     name: 'Rebel Skull Arena',
     subtitle: 'Edición Calavera Street & Rock',
@@ -126,6 +140,12 @@ export const TABLE_ARENA_SKINS: TableArenaSkin[] = [
 ];
 
 export const CLOTH_SKIN_PRESETS: ClothSkinPreset[] = [
+  {
+    id: 'canonical_dark_slate',
+    name: 'Azul Pizarra Canónica',
+    hex: '#151e2b',
+    description: 'Paño oscuro táctico Simonis Slate de alto contraste',
+  },
   {
     id: 'tournament_blue',
     name: 'Azul Torneo',
@@ -287,19 +307,19 @@ export interface TablePreferences {
 }
 
 export const DEFAULT_TABLE_PREFERENCES: TablePreferences = {
-  activeSkinId: 'tournament_umb',
-  clothColor: 'tournament_blue',
+  activeSkinId: 'canonical_dark_slate',
+  clothColor: 'canonical_dark_slate',
   diamondShape: 'rhombus',
   diamondCount: '9_5',
   showCornerDiamonds: true,
   showGrid: true,
   showDiamondNumbers: false,
-  woodFinish: 'mahogany',
-  cornerMetal: 'brass',
-  tableDecal: 'blackhole',
+  woodFinish: 'ebony',
+  cornerMetal: 'chrome',
+  tableDecal: 'none',
   decalOpacity: 0.20,
   showSpotlight: true,
-  showTableDecal: true,
+  showTableDecal: false,
   cueSkin: 'venom_azure',
   ballSkin: 'aramith_pro_cup',
   showBallDots: true,

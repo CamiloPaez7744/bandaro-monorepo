@@ -130,30 +130,36 @@ function TrainingPlayTableBase({
     }
     const totalDist = dists[dists.length - 1];
 
+    let lastStepTime = 0;
+    const SIM_INTERVAL = 1000 / 40; // 40 FPS gives fluid ball motion while preventing V8 heap exhaustion
+
     const step = (timestamp: number) => {
       if (!startTime) startTime = timestamp;
       const elapsed = timestamp - startTime;
       const progress = Math.min(elapsed / duration, 1);
 
-      // Interpolate along polyline
-      const currentTargetDist = progress * totalDist;
-      let segIdx = 0;
-      while (segIdx < dists.length - 1 && dists[segIdx + 1] < currentTargetDist) {
-        segIdx++;
+      if (timestamp - lastStepTime >= SIM_INTERVAL || progress >= 1) {
+        lastStepTime = timestamp;
+        // Interpolate along polyline
+        const currentTargetDist = progress * totalDist;
+        let segIdx = 0;
+        while (segIdx < dists.length - 1 && dists[segIdx + 1] < currentTargetDist) {
+          segIdx++;
+        }
+
+        const segStartDist = dists[segIdx];
+        const segEndDist = dists[segIdx + 1] || totalDist;
+        const segSpan = segEndDist - segStartDist;
+        const segFactor = segSpan > 0 ? (currentTargetDist - segStartDist) / segSpan : 1;
+
+        const p0 = effectiveTrajectory[segIdx];
+        const p1 = effectiveTrajectory[Math.min(segIdx + 1, effectiveTrajectory.length - 1)];
+
+        setSimBallPos({
+          x: p0.x + (p1.x - p0.x) * segFactor,
+          y: p0.y + (p1.y - p0.y) * segFactor,
+        });
       }
-
-      const segStartDist = dists[segIdx];
-      const segEndDist = dists[segIdx + 1] || totalDist;
-      const segSpan = segEndDist - segStartDist;
-      const segFactor = segSpan > 0 ? (currentTargetDist - segStartDist) / segSpan : 1;
-
-      const p0 = effectiveTrajectory[segIdx];
-      const p1 = effectiveTrajectory[Math.min(segIdx + 1, effectiveTrajectory.length - 1)];
-
-      setSimBallPos({
-        x: p0.x + (p1.x - p0.x) * segFactor,
-        y: p0.y + (p1.y - p0.y) * segFactor,
-      });
 
       if (progress < 1) {
         animFrameRef.current = requestAnimationFrame(step);

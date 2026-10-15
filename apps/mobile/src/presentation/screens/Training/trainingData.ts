@@ -146,7 +146,7 @@ export const TRAINING_SYSTEMS: TrainingSystem[] = [
         difficulty: 'basic',
         author: 'Sistema Conti / AM Billiard Academy',
         youtubeUrl: 'https://www.youtube.com/watch?v=HGfTj9vQTpY',
-        diagramUrl: '/assets/images/theory/billiard_bridges_guide.jpg',
+        diagramUrl: '/assets/images/theory/billiard_base50_conti.jpg',
         focus: 'Memoria de salidas y lectura de diamantes',
         recommendedPower: 60,
         recommendedEffect: 'center',

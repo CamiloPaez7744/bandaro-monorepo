@@ -55,6 +55,9 @@ export interface CatalogShot {
     isPosition: boolean;
     isDefense: boolean;
     isAvoidKiss: boolean;
+    isPremium?: boolean;
+    isLocked?: boolean;
+    requiresPremium?: boolean;
     youtubeUrl: string | null;
     isFavorite: boolean;
 }
@@ -397,6 +400,9 @@ export function adaptCatalogShot(raw: any): CatalogShot {
         isPosition: raw.is_position,
         isDefense: raw.is_defense,
         isAvoidKiss: raw.is_avoid_kiss,
+        isPremium: Boolean(raw.is_premium),
+        isLocked: Boolean(raw.is_locked),
+        requiresPremium: Boolean(raw.requires_premium),
         youtubeUrl: raw.youtube_url,
         isFavorite: Boolean(raw.is_favorite),
     };

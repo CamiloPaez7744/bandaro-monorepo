@@ -30,6 +30,9 @@ export interface CatalogShotRaw {
     is_position: boolean;
     is_defense: boolean;
     is_avoid_kiss: boolean;
+    is_premium?: boolean;
+    is_locked?: boolean;
+    requires_premium?: boolean;
     youtube_url: string;
     is_favorite?: boolean;
 }
@@ -37,8 +40,15 @@ export interface CatalogShotRaw {
 export interface CatalogResponse {
     shots: CatalogShotRaw[];
     total: number;
+    totalAvailable?: number;
+    grandTotal?: number;
     limit: number;
     offset: number;
+    isGuestPreview?: boolean;
+    previewLimit?: number | null;
+    userTier?: string;
+    requiresLoginForFullCatalog?: boolean;
+    message?: string | null;
 }
 
 export interface CategoryCount {
@@ -56,6 +66,7 @@ export async function fetchCatalog(params?: {
     userId?: string;
     limit?: number;
     offset?: number;
+    accessToken?: string;
 }): Promise<CatalogResponse> {
     const query = new URLSearchParams();
     if (params?.category) query.set('category', params.category);
@@ -66,8 +77,13 @@ export async function fetchCatalog(params?: {
     if (params?.limit) query.set('limit', String(params.limit));
     if (params?.offset) query.set('offset', String(params.offset));
 
+    const headers: Record<string, string> = {};
+    if (params?.accessToken) {
+        headers.Authorization = `Bearer ${params.accessToken}`;
+    }
+
     const url = `${BASE}/catalog${query.toString() ? '?' + query.toString() : ''}`;
-    const res = await fetch(url);
+    const res = await fetch(url, { headers });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
 }

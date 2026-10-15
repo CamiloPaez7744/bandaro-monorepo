@@ -16,8 +16,10 @@ import {
     IconSparkles,
     IconTarget,
     IconTrophy,
+    IconUserCheck,
     IconX,
-} from '@tabler/icons-react-native';
+} from '@/src/presentation/components/icons';
+import { useRouter } from 'expo-router';
 
 import { getPalette, theme } from '@/constants/theme';
 import { useColorScheme } from '@/components/useColorScheme';
@@ -34,6 +36,10 @@ export interface TrainingCelebrationSessionSummary {
     accuracy: number;
     positionsCount: number;
     savedToBackend?: boolean;
+    isGuest?: boolean;
+    suggestLogin?: boolean;
+    xpEarned?: number;
+    strugglingPositionsCount?: number;
     positions: {
         id: string;
         name: string;
@@ -59,6 +65,7 @@ export function TrainingCelebrationModal({
     onClose,
     onNewSession,
 }: TrainingCelebrationModalProps) {
+    const router = useRouter();
     const { t, language } = useI18n();
     const localizedQuote = getLocalizedCongratulationQuote(quote, language);
     const palette = getPalette(useColorScheme());
@@ -207,6 +214,38 @@ export function TrainingCelebrationModal({
                                     </View>
                                 ))}
                             </ScrollView>
+                        </View>
+                    )}
+
+                    {/* Guest Retention Prompt (Propuesta 1) */}
+                    {(session.suggestLogin || session.isGuest) && (
+                        <View style={[styles.guestCallout, { backgroundColor: '#3B82F614', borderColor: '#3B82F644' }]}>
+                            <View style={styles.guestCalloutHeader}>
+                                <View style={[styles.guestCalloutIconWrap, { backgroundColor: '#3B82F625' }]}>
+                                    <IconUserCheck size={18} color="#60A5FA" />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={[styles.guestCalloutTitle, { color: palette.text }]}>
+                                        {language === 'en' ? 'Protect Your Streak & Data' : '¡Conserva tu Racha y Datos!'}
+                                    </Text>
+                                    <Text style={[styles.guestCalloutText, { color: palette.muted }]}>
+                                        {language === 'en'
+                                            ? 'Create a free account to back up training history, claim your earned XP, and unlock smart Spaced Repetition!'
+                                            : 'Crea una cuenta gratis para sincronizar tu historial, asegurar tu XP ganado y activar el repaso espaciado de carambolas débiles.'}
+                                    </Text>
+                                </View>
+                            </View>
+                            <TouchableOpacity
+                                style={[styles.guestCalloutBtn, { backgroundColor: palette.primary }]}
+                                activeOpacity={0.85}
+                                onPress={() => {
+                                    onClose();
+                                    router.push('/auth/register');
+                                }}>
+                                <Text style={styles.guestCalloutBtnText}>
+                                    {language === 'en' ? 'Create Free Account' : 'Crear Cuenta Gratis'}
+                                </Text>
+                            </TouchableOpacity>
                         </View>
                     )}
 
@@ -506,5 +545,43 @@ const getStyles = (palette: ReturnType<typeof getPalette>) =>
             fontSize: 13,
             fontWeight: '700',
             color: '#FFFFFF',
+        },
+        guestCallout: {
+            borderRadius: theme.radius.lg,
+            borderWidth: 1,
+            padding: 12,
+            gap: 10,
+        },
+        guestCalloutHeader: {
+            flexDirection: 'row',
+            alignItems: 'flex-start',
+            gap: 10,
+        },
+        guestCalloutIconWrap: {
+            width: 32,
+            height: 32,
+            borderRadius: 8,
+            alignItems: 'center',
+            justifyContent: 'center',
+        },
+        guestCalloutTitle: {
+            fontSize: 13,
+            fontWeight: '700',
+        },
+        guestCalloutText: {
+            fontSize: 11.5,
+            lineHeight: 16,
+            marginTop: 2,
+        },
+        guestCalloutBtn: {
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingVertical: 8,
+            borderRadius: theme.radius.md,
+        },
+        guestCalloutBtnText: {
+            color: '#FFFFFF',
+            fontSize: 12,
+            fontWeight: '700',
         },
     });

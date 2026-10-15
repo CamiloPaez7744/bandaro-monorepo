@@ -67,6 +67,9 @@ import IconClipboardList from '@tabler/icons-react-native/IconClipboardList';
 import IconMenu2 from '@tabler/icons-react-native/IconMenu2';
 import IconEyeOff from '@tabler/icons-react-native/IconEyeOff';
 import IconBulb from '@tabler/icons-react-native/IconBulb';
+import IconCrown from '@tabler/icons-react-native/IconCrown';
+import IconUserCheck from '@tabler/icons-react-native/IconUserCheck';
+import IconUserPlus from '@tabler/icons-react-native/IconUserPlus';
 
 export {
     IconEyeOff,
@@ -138,6 +141,9 @@ export {
     IconChartBar,
     IconClipboardList,
     IconMenu2,
+    IconCrown,
+    IconUserCheck,
+    IconUserPlus,
 };
 
 

@@ -218,6 +218,12 @@ export class ApiAuthRepository implements IAuthRepository {
             email: cached?.email || '',
             passwordHash: '',
             createdAt: cached?.createdAt || new Date().toISOString(),
+            currentStreak: cached?.currentStreak,
+            maxStreak: cached?.maxStreak,
+            totalXp: cached?.totalXp,
+            accuracyAvg: cached?.accuracyAvg,
+            tier: cached?.tier,
+            lastActivityDate: cached?.lastActivityDate,
         };
 
         await AsyncStorage.setItem(USER_CACHE_KEY, JSON.stringify(updated));
@@ -235,6 +241,12 @@ export class ApiAuthRepository implements IAuthRepository {
             email: bUser.email,
             passwordHash: '',
             createdAt: bUser.createdAt || new Date().toISOString(),
+            currentStreak: bUser.currentStreak !== undefined ? Number(bUser.currentStreak) : 0,
+            maxStreak: bUser.maxStreak !== undefined ? Number(bUser.maxStreak) : 0,
+            totalXp: bUser.totalXp !== undefined ? Number(bUser.totalXp) : 0,
+            accuracyAvg: bUser.accuracyAvg !== undefined ? Number(bUser.accuracyAvg) : 0,
+            tier: bUser.tier || 'free',
+            lastActivityDate: bUser.lastActivityDate || null,
         };
     }
 

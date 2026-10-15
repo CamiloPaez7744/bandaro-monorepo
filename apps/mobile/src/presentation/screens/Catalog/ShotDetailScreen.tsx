@@ -4,7 +4,7 @@ import {
     useWindowDimensions, StyleSheet, type ViewStyle, type TextStyle,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { IconX, IconPlayerPlay, IconBookmark, IconTarget, IconArrowLeft } from '@tabler/icons-react-native';
+import { IconX, IconPlayerPlay, IconBookmark, IconTarget, IconArrowLeft } from '@/src/presentation/components/icons';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { useAuth } from '@/components/useAuth';

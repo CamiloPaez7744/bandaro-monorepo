@@ -22,6 +22,7 @@ import {
     IconArrowRight,
     IconBrain,
     IconNumbers,
+    IconMaximize,
 } from '@/src/presentation/components/icons';
 import { useColorScheme } from '@/components/useColorScheme';
 import { useI18n } from '@/components/useLanguage';
@@ -130,7 +131,7 @@ const LOCAL_FALLBACK_LESSONS: PedagogyLesson[] = [
         summary:
             'El sistema universal de 3 bandas: lectura de diamantes, cheat sheet de salidas y proyecciones tramo a tramo hacia 4ª y 5ª banda con códigos cromáticos.',
         contentMarkdown: `### Sistema Base 50 (Sistema Clásico Conti)\n- **Fórmula Universal:** Llegada (3ª banda) = Salida (banda larga) - Ataque (1ª banda).\n- **Efecto Recomendado:** Efecto horario natural de 2 a 3 tips (rotación a favor).\n- **Segmentación Cromática:**\n  - 🔵 **Tramo 1 (1ª a 3ª banda):** Cian (#06b6d4) — Geometría base de la fórmula.\n  - 🟡 **Tramo 2 (3ª a 4ª banda):** Ámbar (#f59e0b) — Rebote con rotación natural.\n  - 🟢 **Tramo 3 (4ª a 5ª banda):** Esmeralda (#10b981) — Prolongación hacia la carambola.`,
-        imageUrl: '/assets/images/theory/billiard_bridges_guide.jpg',
+        imageUrl: '/assets/images/theory/billiard_base50_conti.jpg',
         youtubeUrl: 'https://www.youtube.com/@ambilliardacademy',
         keyPrinciples: [
             'Llegada en 3ª banda = Salida - Ataque.',
@@ -178,7 +179,7 @@ const LOCAL_FALLBACK_LESSONS: PedagogyLesson[] = [
         summary:
             'Guía completa de las figuras clásicas del billar a tres bandas tal como se denominan en Colombia y el circuito hispanohablante.',
         contentMarkdown: `### Familias de Carambolas en el Billar Colombiano\n1. **Rodada (Larga-Corta-Larga):** Jugada fundamental hacia adelante rodando naturalmente a medio cuerpo o 3/4.\n2. **Cajón (Cabaña / Corta-Larga-Corta):** Figura reina del cuadro pequeño, atacando la banda corta más próxima con mate o efecto 4.\n3. **Pase Bola (Alrededor de la Mesa):** Corrido perimétrico de 4 o 5 bandas pasando por delante de la bola 2.\n4. **Renversé (Contrabanda / Inversión de Efecto):** Efecto contrario al giro natural para invertir el ángulo de rebote en la primera banda.\n5. **Serrucho (Cerrucho):** Vaivén continuo entre bandas paralelas con efecto pronunciado.\n6. **Zigzag (Zik-Zak):** Recorrido en Z entre bandas opuestas cruzando la mesa.\n7. **Tornillo:** Efecto rotacional extremo con taco elevado donde la bola muerde y se enrosca en el paño.\n8. **Tiki (Tiki-Taki / Banda y Bola):** Sistema para bola 2 pegada a banda larga con doble contacto controlado.\n9. **Bricole (Banda Previa):** Impacto primero en bandas antes de tocar ninguna bola.`,
-        imageUrl: '/assets/images/theory/billiard_ball_thickness.jpg',
+        imageUrl: '/assets/images/theory/billiard_carom_figures.jpg',
         youtubeUrl: 'https://www.youtube.com/@elflacobillarista',
         keyPrinciples: [
             'Rodada: Larga-Corta-Larga hacia adelante con bola rodando naturalmente.',
@@ -293,7 +294,9 @@ const LOCAL_ASSET_IMAGES: Record<string, any> = {
     '/assets/images/theory/billiard_posture_stance.jpg': require('@/assets/images/theory/billiard_posture_stance.jpg'),
     '/assets/images/theory/billiard_bridges_guide.jpg': require('@/assets/images/theory/billiard_bridges_guide.jpg'),
     '/assets/images/theory/billiard_ball_thickness.jpg': require('@/assets/images/theory/billiard_ball_thickness.jpg'),
+    '/assets/images/theory/billiard_base50_conti.jpg': require('@/assets/images/theory/billiard_base50_conti.jpg'),
     '/assets/images/theory/billiard_shot_types.jpg': require('@/assets/images/theory/billiard_shot_types.jpg'),
+    '/assets/images/theory/billiard_carom_figures.jpg': require('@/assets/images/theory/billiard_carom_figures.jpg'),
     '/assets/images/theory/billiard_hoppe_system.jpg': require('@/assets/images/theory/billiard_hoppe_system.jpg'),
     '/assets/images/theory/billiard_stance_multiview.jpg': require('@/assets/images/theory/billiard_stance_multiview.jpg'),
     '/assets/images/theory/billiard_vision_aiming.jpg': require('@/assets/images/theory/billiard_vision_aiming.jpg'),
@@ -317,6 +320,7 @@ export function MasterPedagogyModal({ visible, onClose, initialModuleId }: Maste
 
     const [lessons, setLessons] = useState<PedagogyLesson[]>(LOCAL_FALLBACK_LESSONS);
     const [selectedLessonId, setSelectedLessonId] = useState<string>(initialModuleId ?? 'posture-biomechanics');
+    const [lightboxVisible, setLightboxVisible] = useState(false);
 
     useEffect(() => {
         if (initialModuleId) {
@@ -354,7 +358,9 @@ export function MasterPedagogyModal({ visible, onClose, initialModuleId }: Maste
         Linking.openURL(url).catch((err) => console.warn('Could not open YouTube link:', err));
     };
 
-    const imageSource = activeLesson.imageUrl ? LOCAL_ASSET_IMAGES[activeLesson.imageUrl] : null;
+    const imageSource = activeLesson.imageUrl
+        ? LOCAL_ASSET_IMAGES[activeLesson.imageUrl] ?? { uri: activeLesson.imageUrl }
+        : null;
 
     return (
         <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onClose}>
@@ -421,15 +427,46 @@ export function MasterPedagogyModal({ visible, onClose, initialModuleId }: Maste
                         {/* LEFT COLUMN: Visual Media (Infographic & YouTube Link) */}
                         <View style={[styles.mediaCol, isWide && styles.mediaColWide]}>
                             {imageSource && (
-                                <View style={[styles.imageCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
-                                    <Image source={imageSource} style={styles.infographicImage} resizeMode="cover" />
-                                    <View style={styles.imageCaptionBar}>
-                                        <IconSparkles size={14} color="#38bdf8" />
-                                        <Text style={styles.imageCaptionText}>
-                                            {isEn ? 'Official Didactic Infographic' : 'Infografía Didáctica Oficial'}
-                                        </Text>
+                                <TouchableOpacity
+                                    style={[
+                                        styles.imageCard,
+                                        {
+                                            backgroundColor: '#071638',
+                                            borderColor: palette.border,
+                                            ...(Platform.OS === 'web' ? ({ cursor: 'pointer' } as any) : {}),
+                                        },
+                                    ]}
+                                    activeOpacity={0.9}
+                                    onPress={() => setLightboxVisible(true)}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={isEn ? 'View high resolution infographic' : 'Ver infografía en alta resolución'}
+                                    accessibilityHint={isEn ? 'Opens full screen image viewer' : 'Abre el visor de imagen en pantalla completa'}
+                                >
+                                    <View style={styles.imageWrapper}>
+                                        <Image
+                                            source={imageSource}
+                                            style={styles.infographicImage}
+                                            resizeMode="contain"
+                                        />
+                                        <View style={styles.zoomAffordanceBadge}>
+                                            <IconMaximize size={12} color="#ffffff" />
+                                            <Text style={styles.zoomAffordanceText}>
+                                                {isEn ? 'Tap to Zoom' : 'Ampliar'}
+                                            </Text>
+                                        </View>
                                     </View>
-                                </View>
+                                    <View style={styles.imageCaptionBar}>
+                                        <View style={styles.imageCaptionLeft}>
+                                            <IconSparkles size={14} color="#38bdf8" />
+                                            <Text style={styles.imageCaptionText}>
+                                                {isEn ? 'Official Master Infographic' : 'Infografía Didáctica Oficial'}
+                                            </Text>
+                                        </View>
+                                        <View style={styles.badgeHD}>
+                                            <Text style={styles.badgeHDText}>1080p HD</Text>
+                                        </View>
+                                    </View>
+                                </TouchableOpacity>
                             )}
 
                             {activeLesson.youtubeUrl && (
@@ -522,6 +559,57 @@ export function MasterPedagogyModal({ visible, onClose, initialModuleId }: Maste
                     </View>
                 </ScrollView>
             </View>
+
+            {/* Fullscreen Lightbox Modal for High Resolution Inspection */}
+            <Modal
+                visible={lightboxVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setLightboxVisible(false)}
+            >
+                <View style={styles.lightboxBackdrop}>
+                    <Pressable
+                        style={StyleSheet.absoluteFill}
+                        onPress={() => setLightboxVisible(false)}
+                        accessibilityLabel={isEn ? 'Close full screen view' : 'Cerrar vista completa'}
+                    />
+                    <View style={[styles.lightboxHeader, { paddingTop: Math.max(insets.top, 16) }]}>
+                        <View style={styles.lightboxHeaderInfo}>
+                            <Text style={styles.lightboxTitle} numberOfLines={1}>
+                                {activeLesson.title}
+                            </Text>
+                            <Text style={styles.lightboxSubtitle} numberOfLines={1}>
+                                {activeLesson.subtitle}
+                            </Text>
+                        </View>
+                        <TouchableOpacity
+                            style={styles.lightboxCloseBtn}
+                            onPress={() => setLightboxVisible(false)}
+                            accessibilityLabel="Cerrar"
+                        >
+                            <IconX size={20} color="#ffffff" />
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.lightboxImageContainer}>
+                        {imageSource && (
+                            <Image
+                                source={imageSource}
+                                style={styles.lightboxImage}
+                                resizeMode="contain"
+                            />
+                        )}
+                    </View>
+
+                    <View style={[styles.lightboxFooter, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+                        <Text style={styles.lightboxFooterHint}>
+                            {isEn
+                                ? 'Pinch or zoom on mobile • Click outside or press X to close'
+                                : 'Apto para Web y Móvil • Toca fuera o presiona X para volver'}
+                        </Text>
+                    </View>
+                </View>
+            </Modal>
         </Modal>
     );
 }
@@ -615,23 +703,134 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         borderWidth: 1,
         overflow: 'hidden',
+        backgroundColor: '#071638',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.35,
+        shadowRadius: 10,
+        elevation: 6,
+    },
+    imageWrapper: {
+        position: 'relative',
+        width: '100%',
+        aspectRatio: 16 / 9,
+        backgroundColor: '#071638',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     infographicImage: {
         width: '100%',
-        aspectRatio: 16 / 9,
+        height: '100%',
+    },
+    zoomAffordanceBadge: {
+        position: 'absolute',
+        top: 10,
+        right: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        backgroundColor: 'rgba(2, 6, 23, 0.75)',
+        paddingHorizontal: 9,
+        paddingVertical: 5,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.2)',
+    },
+    zoomAffordanceText: {
+        color: '#f8fafc',
+        fontSize: 11,
+        fontWeight: '700',
     },
     imageCaptionBar: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
+        justifyContent: 'space-between',
         paddingHorizontal: 14,
         paddingVertical: 10,
-        backgroundColor: 'rgba(0, 0, 0, 0.4)',
+        backgroundColor: 'rgba(3, 7, 18, 0.75)',
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    },
+    imageCaptionLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
     },
     imageCaptionText: {
         color: '#f8fafc',
         fontSize: 12,
         fontWeight: '700',
+    },
+    badgeHD: {
+        backgroundColor: 'rgba(56, 189, 248, 0.18)',
+        paddingHorizontal: 7,
+        paddingVertical: 2,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: 'rgba(56, 189, 248, 0.4)',
+    },
+    badgeHDText: {
+        color: '#38bdf8',
+        fontSize: 10,
+        fontWeight: '800',
+        letterSpacing: 0.5,
+    },
+    lightboxBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(2, 6, 23, 0.96)',
+        justifyContent: 'space-between',
+    },
+    lightboxHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingBottom: 12,
+        zIndex: 10,
+    },
+    lightboxHeaderInfo: {
+        flex: 1,
+        paddingRight: 16,
+    },
+    lightboxTitle: {
+        color: '#f8fafc',
+        fontSize: 16,
+        fontWeight: '800',
+    },
+    lightboxSubtitle: {
+        color: '#94a3b8',
+        fontSize: 12,
+        marginTop: 2,
+    },
+    lightboxCloseBtn: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255, 255, 255, 0.14)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    lightboxImageContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+    },
+    lightboxImage: {
+        width: '100%',
+        height: '100%',
+        maxWidth: 1400,
+    },
+    lightboxFooter: {
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingTop: 8,
+    },
+    lightboxFooterHint: {
+        color: '#64748b',
+        fontSize: 12,
+        textAlign: 'center',
     },
     youtubeCard: {
         flexDirection: 'row',

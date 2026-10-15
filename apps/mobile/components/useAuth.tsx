@@ -5,6 +5,7 @@ import { AppState, Platform } from 'react-native';
 import type { Session } from '@/src/domain/entities/Session';
 import type { User } from '@/src/domain/entities/User';
 import { container } from '@/src/presentation/container';
+import { claimGuestTrainingData, getOrCreateGuestDeviceId } from '@/src/infrastructure/training/trainingApi';
 
 interface RegisterInput {
   nombre: string;
@@ -106,6 +107,17 @@ export function AuthProvider({ children }: PropsWithChildren) {
     hydrate();
   }, [hydrate]);
 
+  const syncGuestData = async (token: string) => {
+    try {
+      const guestDeviceId = await getOrCreateGuestDeviceId();
+      if (guestDeviceId) {
+        await claimGuestTrainingData(guestDeviceId, token);
+      }
+    } catch (err) {
+      console.warn('[Auth] Error claiming guest training data:', err);
+    }
+  };
+
   const login = useCallback(async (input: LoginInput) => {
     const nextSession = await container.loginUser.execute(input);
     const nextUser = await container.getUserById.execute(nextSession.userId);
@@ -115,6 +127,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
     setSession(nextSession);
     setUser(nextUser);
+    syncGuestData(nextSession.accessToken);
   }, []);
 
   const register = useCallback(async (input: RegisterInput) => {
@@ -127,6 +140,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
     setSession(nextSession);
     setUser(nextUser);
+    syncGuestData(nextSession.accessToken);
   }, []);
 
   const loginWithGoogle = useCallback(async (payload?: any) => {
@@ -137,6 +151,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     }
     setSession(nextSession);
     setUser(nextUser);
+    syncGuestData(nextSession.accessToken);
   }, []);
 
   const loginWithMicrosoft = useCallback(async (payload?: any) => {
@@ -147,6 +162,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     }
     setSession(nextSession);
     setUser(nextUser);
+    syncGuestData(nextSession.accessToken);
   }, []);
 
   const logout = useCallback(async () => {

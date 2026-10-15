@@ -54,15 +54,60 @@ export const HairlineSimulatorFigure: React.FC<HairlineFigureProps> = ({
   const animRef = useRef<number | null>(null);
 
   useEffect(() => {
-    let frameId: number;
+    let frameId: number | null = null;
+    let active = true;
     let start = performance.now();
+    let lastTime = 0;
+    const FRAME_INTERVAL = 1000 / 20; // 20 FPS throttle
+
     const tick = (now: number) => {
-      const dt = (now - start) / 1000;
-      setAnimTime(dt);
+      if (!active) return;
+      if (typeof document !== 'undefined' && document.hidden) {
+        frameId = null;
+        return;
+      }
+      if (!lastTime) lastTime = now;
+      const delta = now - lastTime;
+      if (delta >= FRAME_INTERVAL) {
+        lastTime = now - (delta % FRAME_INTERVAL);
+        const dt = (now - start) / 1000;
+        setAnimTime(dt);
+      }
       frameId = requestAnimationFrame(tick);
     };
-    frameId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frameId);
+
+    const startLoop = () => {
+      if (!frameId) {
+        lastTime = 0;
+        frameId = requestAnimationFrame(tick);
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (typeof document === 'undefined') return;
+      if (document.hidden) {
+        if (frameId) {
+          cancelAnimationFrame(frameId);
+          frameId = null;
+        }
+      } else if (active) {
+        startLoop();
+      }
+    };
+
+    startLoop();
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisibilityChange);
+    }
+
+    return () => {
+      active = false;
+      if (frameId) cancelAnimationFrame(frameId);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisibilityChange);
+      }
+    };
   }, []);
 
   const handlePointerMove = (e: any) => {

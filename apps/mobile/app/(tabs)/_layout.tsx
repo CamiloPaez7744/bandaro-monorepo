@@ -1,5 +1,11 @@
 import { Tabs } from 'expo-router';
-import { IconHome, IconBook, IconClock, IconBarbell, IconUser } from '@tabler/icons-react-native';
+import {
+  IconHome,
+  IconBook,
+  IconBarbell,
+  IconUser,
+  IconChartBar,
+} from '@/src/presentation/components/icons';
 import { Platform, useWindowDimensions } from 'react-native';
 
 import { AnimatedTabBar } from '@/src/presentation/components/AnimatedTabBar';
@@ -13,8 +19,8 @@ function CatalogTabIcon({ color, size }: Readonly<{ color: any; size: number }>)
   return <IconBook size={size} color={color} strokeWidth={2} />;
 }
 
-function HistoryTabIcon({ color, size }: Readonly<{ color: any; size: number }>) {
-  return <IconClock size={size} color={color} strokeWidth={2} />;
+function DashboardTabIcon({ color, size }: Readonly<{ color: any; size: number }>) {
+  return <IconChartBar size={size} color={color} strokeWidth={2} />;
 }
 
 function TrainingTabIcon({ color, size }: Readonly<{ color: any; size: number }>) {
@@ -62,8 +68,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="history"
         options={{
-          title: t('tabs.history'),
-          tabBarIcon: HistoryTabIcon,
+          title: t('tabs.dashboard'),
+          tabBarIcon: DashboardTabIcon,
         }}
       />
       <Tabs.Screen

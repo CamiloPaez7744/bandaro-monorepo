@@ -30,24 +30,53 @@ export const AnimatedFlameBadge = memo(function AnimatedFlameBadge({
     const anim = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
-        const loop = Animated.loop(
-            Animated.sequence([
-                Animated.timing(anim, {
-                    toValue: 1,
-                    duration: 750,
-                    easing: Easing.inOut(Easing.quad),
-                    useNativeDriver: Platform.OS !== 'web',
-                }),
-                Animated.timing(anim, {
-                    toValue: 0,
-                    duration: 750,
-                    easing: Easing.inOut(Easing.quad),
-                    useNativeDriver: Platform.OS !== 'web',
-                }),
-            ])
-        );
-        loop.start();
-        return () => loop.stop();
+        let isMounted = true;
+        let loop: Animated.CompositeAnimation | null = null;
+
+        const startAnim = () => {
+            if (typeof document !== 'undefined' && document.hidden) return;
+            loop = Animated.loop(
+                Animated.sequence([
+                    Animated.timing(anim, {
+                        toValue: 1,
+                        duration: 750,
+                        easing: Easing.inOut(Easing.quad),
+                        useNativeDriver: Platform.OS !== 'web',
+                    }),
+                    Animated.timing(anim, {
+                        toValue: 0,
+                        duration: 750,
+                        easing: Easing.inOut(Easing.quad),
+                        useNativeDriver: Platform.OS !== 'web',
+                    }),
+                ])
+            );
+            loop.start();
+        };
+
+        startAnim();
+
+        const onVisibilityChange = () => {
+            if (typeof document === 'undefined') return;
+            if (document.hidden) {
+                loop?.stop();
+                loop = null;
+            } else if (isMounted) {
+                startAnim();
+            }
+        };
+
+        if (typeof document !== 'undefined') {
+            document.addEventListener('visibilitychange', onVisibilityChange);
+        }
+
+        return () => {
+            isMounted = false;
+            loop?.stop();
+            if (typeof document !== 'undefined') {
+                document.removeEventListener('visibilitychange', onVisibilityChange);
+            }
+        };
     }, [anim]);
 
     // Flame scale pulse

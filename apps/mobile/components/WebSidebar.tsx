@@ -1,6 +1,15 @@
-import { IconHome, IconBook, IconClock, IconBarbell, IconUser, IconChevronRight, IconChevronLeft } from '@tabler/icons-react-native';
 import { Link, usePathname } from 'expo-router';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+
+import {
+    IconHome,
+    IconBook,
+    IconChartBar,
+    IconBarbell,
+    IconUser,
+    IconChevronRight,
+    IconChevronLeft,
+} from '@/src/presentation/components/icons';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { useI18n } from '@/components/useLanguage';
@@ -8,11 +17,11 @@ import { getPalette, theme } from '@/constants/theme';
 
 type SidebarHref = '/' | '/(tabs)/catalog' | '/(tabs)/training' | '/(tabs)/history' | '/(tabs)/profile';
 
-const NAV_ITEMS: ReadonlyArray<{ href: SidebarHref; icon: 'home' | 'book' | 'barbell' | 'time' | 'person'; key: 'tabs.home' | 'tabs.catalog' | 'tabs.training' | 'tabs.history' | 'tabs.profile' }> = [
+const NAV_ITEMS: ReadonlyArray<{ href: SidebarHref; icon: 'home' | 'book' | 'barbell' | 'chart' | 'person'; key: 'tabs.home' | 'tabs.catalog' | 'tabs.training' | 'tabs.dashboard' | 'tabs.profile' }> = [
     { href: '/', icon: 'home', key: 'tabs.home' },
     { href: '/(tabs)/catalog', icon: 'book', key: 'tabs.catalog' },
     { href: '/(tabs)/training', icon: 'barbell', key: 'tabs.training' },
-    { href: '/(tabs)/history', icon: 'time', key: 'tabs.history' },
+    { href: '/(tabs)/history', icon: 'chart', key: 'tabs.dashboard' },
     { href: '/(tabs)/profile', icon: 'person', key: 'tabs.profile' },
 ];
 
@@ -66,10 +75,10 @@ export function WebSidebar({ collapsed, onToggleCollapsed }: WebSidebarProps) {
                 {NAV_ITEMS.map((item) => {
                     const active = isActivePath(pathname, item.href);
                     const navItemStyle = StyleSheet.flatten([styles.navItem, active ? styles.navItemActive : null]);
-                    const iconMap: Record<string, React.ComponentType<{ size: number; color: string; strokeWidth: number }>> = {
+                    const iconMap: Record<string, React.ComponentType<any>> = {
                         home: IconHome,
                         book: IconBook,
-                        time: IconClock,
+                        chart: IconChartBar,
                         barbell: IconBarbell,
                         person: IconUser,
                     };
