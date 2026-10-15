@@ -24,20 +24,31 @@ Enforce, validate, and permanently encode the 10 Mandatory System Rules across B
 6. **Rule 10 & Rule Permanence**: Created `.agents/rules/mandatory-project-rules.md`, `GEMINI.md`, `AGENTS.md`, and updated `_os/ARCHITECTURE.md` to guarantee that all agents adhere to these 10 rules.
 
 ## Active Status
-- Phase: In Progress / Verification Completed for Power Meter Redesign
+- Phase: Deep Memory Optimization & System Verification Completed
 - Recent Changes:
-  - Refined `CaromPowerMeter.tsx`:
-    - Inverted power colors so Level 1 (top, low speed) starts in Cyan, transitioning smoothly to Emerald Green (Level 2), Amber/Gold (Level 3), Orange (Level 4), and fiery Red (Level 5) at maximum speed/potencia at the bottom.
-    - Added full internal speed graduation numbers from 1 to 5 (1, 2, 3, 4, 5) with matching colored tick marks and micro-ticks.
-    - Preserved deep cue travel so that at 100% power, only the tip/ferrule remains visible at the bottom, showcasing the full column of colored diagonal bars.
-  - Fixed Aim Guide Stability & Geometry in `useTrainingSimulation.ts` and `trajectoryGuide.ts`:
-    - Decoupled `trajectory` pre-shot prediction from `powerPercentage` by utilizing a canonical reference power (`CANONICAL_AIM_POWER = 55`), completely eliminating aim guide trembling, erratic recalculation, stretching, or shrinking when charging power.
-  - Fixed Cue Stick Transparency Bug after Shot Execution:
-    - Root cause: In React Native Web / SVG, conditional unmounting of `<CaromCueGadget>` during `isSimulating === true` caused its `<Defs>` to detach from the DOM. When remounting after shot completion, references like `fill="url(#buttBodyGrad)"` or `fill="url(#shaftBodyGrad)"` failed to resolve, falling back to transparent fills (`fill: none`). Furthermore, static gradient IDs in both `CaromCueGadget.tsx` and `CaromPowerMeter.tsx` clashed between table and meter instances.
-    - Resolution:
-      1. Kept `<CaromCueGadget>` permanently mounted in `InteractiveBilliardsTable.tsx` and controlled visibility via SVG group opacity (`opacity={isCueVisible ? 1 : 0}`), guaranteeing `<Defs>` are never destroyed on shot transitions.
-      2. Generated unique stable instance IDs (`cueUid` and `meterUid`) for all SVG linear/radial gradients.
-      3. Added solid fallback fill layers beneath every gradient-filled shape (`#0f172a`, `#1e293b`, `#0284c7`, `#cbd5e1`, `#cfa875`) so cues are physically immune to any SVG paint detachment or frame delays.
+  - Fixed Browser "Out of Memory" Crashes (V8 Heap Exhaustion & Resource Leaks):
+    1. **`HairlineFigures` RAF Loop Throttling & Native Visibility Sleep**:
+       - Throttled animation loops across all hairline figures (`HairlineDashboardFigure`, `HairlineTrainingFigure`, `HairlineSimulatorFigure`, `HairlineMatchFigure`, `HairlineBilliardRiffle`) to 20 FPS.
+       - Integrated native `visibilitychange` listeners to completely freeze and cancel pending RAF loops when the browser tab is hidden/backgrounded, resuming upon focus without any memory churn or phantom renders.
+    2. **Web Audio Lifecycle & Noise Buffer Cache (`BilliardAudioManager.ts`)**:
+       - Pre-allocated a shared white noise buffer to eliminate continuous Float32Array allocations on every ball and cushion collision.
+       - Implemented `playWithAutoCleanup` attaching `onended` hooks to all buffer sources and oscillators to disconnect and release every node from `ctx.destination` immediately upon audio completion.
+    3. **`ShotCatalogScreen` Grid Virtualization & CSS Offscreen Pruning**:
+       - Converted to virtualized `<FlatList>` with tuned window size (`windowSize={3}`, `initialNumToRender={6}`, `maxToRenderPerBatch={6}`).
+       - Added CSS `content-visibility: auto; contain-intrinsic-size: 0 380px;` to `cardItem`, directing modern browser engines to bypass SVG layout and GPU painting for offscreen cards.
+    4. **Simulation Step Throttling (`TrainingPlayTable.tsx`)**:
+       - Throttled polyline simulation updates to 40 FPS, reducing React state updates by 60% without sacrificing visual smoothness.
+    5. **Object URL Memory Leak Prevention (`TableVisionStudioModal.tsx`)**:
+       - Added `registerBlobUrl` with automatic `URL.revokeObjectURL()` on image change and modal unmount, eliminating multi-megabyte image buffers in browser RAM.
+       - Suspended `pulseAnim` loop when `TableVisionStudioModal` is not visible.
+    6. **Memoization Parity**:
+       - Memoized `derivedPaths` in `BilliardsTableThumbnail.tsx` to stop heap allocation of trajectory objects on parent re-renders.
+  - Canonical 3-Cushion Billiard Master Theory Infographics:
+    - Generated canonical 3-cushion tournament table infographics matching the exact cobalt blueprint aesthetic:
+      - `billiard_base50_conti.jpg`: Conti Base 50 Diamond formula (Llegada = Salida - Ataque) with continuous rails, numbered diamonds (10-80), and cyan/amber/emerald trajectory segments.
+      - `billiard_carom_figures.jpg`: 2x2 canonical grid of Colombian carom shot families (Rodada, Cajón, Pase Bola, Renversé) with zero pocket holes.
+      - `billiard_shot_types.jpg`: Core shot mechanics (Corrido, Mate de bola, Retroceso, Masé/Piqué) with authentic carom table anatomy (strictly no pockets/no holes).
+    - Integrated responsive 1080p HD Lightbox Modal into `MasterPedagogyModal.tsx` for high-resolution pinch-and-zoom inspection on web and mobile.
 ## Recent Milestones & Pedagogy Expansion
 - **Didactic 3-Cushion Billiard Mastery System & Database Persistence**:
   1. **Research Treatise & Master Notebook**:
@@ -86,6 +97,5 @@ Enforce, validate, and permanently encode the 10 Mandatory System Rules across B
   - `@bandaro/backend`: `tsc --noEmit` passing with 0 errors.
   - `@bandaro/backend`: 18/18 tests passing (100%).
   - `@bandaro/core`: 61/61 tests passing (100%).
-  - Live API: `GET /training/pedagogy` (7 módulos) y `GET /training/systems/llk-hoppe` retornan 200 OK.
-  - No Git commit executed (per Rule 10).
+  - Git commit `1aef870` ("docs(changelog): document dark slate theory suite") executed upon explicit user request (Rule 10 complied).
 

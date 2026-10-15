@@ -48,3 +48,17 @@
 8. **Apuntado Corto por Defecto**: Modelo de apuntado corto (estilo 8-Ball): línea recta a bola fantasma, círculo de impacto, y desvíos cortos rectos para ambas bolas (~18 cm).
 9. **Modales Responsive**: Todos los modales deben adaptarse al tamaño de pantalla donde se visualizan, con scroll interno y compatibilidad de tema.
 10. **Commits Prohibidos sin Aprobación**: NUNCA hacer commits en Git sin pruebas previas y sin petición explícita del usuario.
+
+## 6. Memory Management & V8 Heap Preservation Architecture
+- **Animation Loop Throttling & Visibility Sleep**:
+  - All idle / ambient loops (`HairlineFigures`, `HairlineBilliardRiffle`) are capped at 20 FPS instead of unthrottled 60-144 FPS.
+  - All continuous animation hooks bind `visibilitychange` listeners to completely cancel pending `requestAnimationFrame` and `Animated.loop` calls when `document.hidden === true`. Loops resume cleanly upon tab reactivation.
+- **Web Audio Node Lifecycle**:
+  - `BilliardAudioManager` pre-allocates a cached white noise buffer to eliminate per-collision Float32Array heap allocations.
+  - All audio sources and intermediate nodes (BiquadFilter, Gain) are automatically disconnected from `ctx.destination` via `source.onended`, enabling immediate V8 garbage collection.
+- **Virtualization & Offscreen DOM Pruning**:
+  - Card grids (`ShotCatalogScreen`) use virtualized `FlatList` with `windowSize={3}`, `initialNumToRender={6}`, and `maxToRenderPerBatch={6}`.
+  - Web card containers apply CSS `content-visibility: auto; contain-intrinsic-size: 0 380px;`, commanding the browser engine to skip SVG layout and shader processing for offscreen items.
+- **Object URL Revocation**:
+  - Image pickers and clipboard paste handlers (`TableVisionStudioModal`) track object URLs and invoke `URL.revokeObjectURL()` upon replacement or unmount, preventing retention of multi-megabyte image buffers in C++ browser memory.
+
