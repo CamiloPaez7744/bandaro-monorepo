@@ -48,6 +48,8 @@
 8. **Apuntado Corto por Defecto**: Modelo de apuntado corto (estilo 8-Ball): línea recta a bola fantasma, círculo de impacto, y desvíos cortos rectos para ambas bolas (~18 cm).
 9. **Modales Responsive**: Todos los modales deben adaptarse al tamaño de pantalla donde se visualizan, con scroll interno y compatibilidad de tema.
 10. **Commits Prohibidos sin Aprobación**: NUNCA hacer commits en Git sin pruebas previas y sin petición explícita del usuario.
+11. **Llegadas Siempre Frente al Caucho y Límite No Negativo (Ataque Mínimo 0)**: En los sistemas de billar a 3 bandas, las Salidas y Ataques se miden sobre los diamantes (marco de madera exterior); TODAS las Llegadas van siempre frente al caucho (en la banda / cushion nose), solo las llegadas. El sistema no permite números negativos: el límite del sistema es cero (0) en ataque (esquina) y cero (0) en llegada ($\text{Ataque} \ge 0, \text{Llegada} \ge 0$).
+
 
 ## 6. Memory Management & V8 Heap Preservation Architecture
 - **Animation Loop Throttling & Visibility Sleep**:

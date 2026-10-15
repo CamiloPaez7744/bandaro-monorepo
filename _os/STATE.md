@@ -12,6 +12,8 @@ Enforce, validate, and permanently encode the 10 Mandatory System Rules across B
 8. Default aiming model: Short aim guide (straight line to ghost ball, contact circle outline, and short straight exit stubs for both cue ball deflection and target ball).
 9. Modals: Fully responsive, adapting size and scrolling to display viewport, matching app theme colors.
 10. Git Commits: Strictly forbidden without passing tests and explicit user approval.
+11. Diamond Systems Arrival Placement & Non-Negative Limit (Regla 11): Departure and Attack are measured on the rail diamonds (outer wood frame); ALL arrivals (3rd & 4th cushion) are ALWAYS positioned strictly in front of the rubber cushion (cushion nose / la banda), only arrivals. The system strictly prohibits negative numbers: lower boundary is 0 in attack (corner) and 0 in arrival.
+
 
 ## Initial Discrepancies & Resolved Deficiencies
 1. **Rule 6 Violation (Edit Mode)**: In `InteractiveBilliardsTable.tsx`, cue stick was only hidden if currently dragging the cue ball (`if (isEditMode && draggingBallId === cueBallId)`), and `filteredAimGuide` did not check `isEditMode`. Resolved: now both cue stick, ghost ball, and trajectory guides are unconditionally hidden when `isEditMode === true`.
@@ -24,8 +26,26 @@ Enforce, validate, and permanently encode the 10 Mandatory System Rules across B
 6. **Rule 10 & Rule Permanence**: Created `.agents/rules/mandatory-project-rules.md`, `GEMINI.md`, `AGENTS.md`, and updated `_os/ARCHITECTURE.md` to guarantee that all agents adhere to these 10 rules.
 
 ## Active Status
-- Phase: Deep Memory Optimization & System Verification Completed
+- Phase: Base 50 Trajectory & 4 Aristas System Completed
 - Recent Changes:
+  - **Canonical Base 50 Trajectory & 4 Aristas (`base50Geometry.ts`, `TrainingPlayTable.tsx`, `TrainingSystemScreen.tsx`)**:
+    - **Base 50 Trajectory Geometry**: Aligned with authentic carom physics and user specification (Image 1):
+      - 1ª Banda (Ataque: Banda larga superior, e.g. diamante 30).
+      - 2ª Banda (Banda corta derecha).
+      - 3ª Banda (Llegada: Banda larga inferior en $S - A$, e.g. diamante 20: $50 - 30 = 20$).
+      - 4ª Banda: Retorno en diagonal hacia la esquina superior izquierda para ejecutar la carambola sobre bola 2 (amarilla) y bola 3 (roja).
+      - Rendered in bold emerald green (`#10b981`, stroke 3.4) with cyan/amber segment accents.
+    - **Escala Canónica de Llegadas y Regla 11**:
+      - Llegadas en 3ª banda (frente al caucho, en la banda): `0` en la esquina ($x = 282$), `10` ($x = 248.5$), `20` ($x = 213$), `30` ($x = 177.5$), `45` ($x = 142$, centro), `60` ($x = 106.5$), `80` ($x = 71$), `100` ($x = 35.5$).
+      - Ataque invertido en 1ª banda (por diamante): `10, 20, 30, 40, 50, 70, 90` contando desde la 2ª banda hacia la esquina de salida.
+      - Puntos de rebote de todas las trayectorias alineados matemáticamente con la fórmula $S - A = LL$.
+    - **Soporte de 4 Aristas Dinámicas**:
+      - `base50Geometry.ts`: Soporta las 4 aristas/esquinas de la mesa (`bottom_left`, `bottom_right`, `top_right`, `top_left`).
+      - Detección automática según la posición de la bola tacadora (blanca), con selector manual de 4 esquinas (`◱ Inf-Izq (Canónica)`, `◲ Inf-Der`, `◳ Sup-Der`, `◰ Sup-Izq`).
+      - Transformación matemática exacta de las bandas de Salida (🟨), Ataque (🟥) y Llegada (🟩).
+    - **Visibilidad Completa de Numeración de Diamantes**:
+      - Corregido el recorte de pines: `TrainingPlayTable` ahora incorpora un margen perimetral `PIN_PAD = 18` en el SVG viewBox (`-18 -18 352 210`) y `tableWrap` con `overflow: 'visible'`.
+      - Los pines (`DiamondPinMarker`) ahora se ubican perfectamente con sus puntas tocando el borde exterior de la madera y las insignias circulares con números en negrita (`fontWeight: '900'`, blanco sobre fondo oscuro) completamente visibles y legibles.
   - Fixed Browser "Out of Memory" Crashes (V8 Heap Exhaustion & Resource Leaks):
     1. **`HairlineFigures` RAF Loop Throttling & Native Visibility Sleep**:
        - Throttled animation loops across all hairline figures (`HairlineDashboardFigure`, `HairlineTrainingFigure`, `HairlineSimulatorFigure`, `HairlineMatchFigure`, `HairlineBilliardRiffle`) to 20 FPS.

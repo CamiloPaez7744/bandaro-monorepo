@@ -109,7 +109,10 @@ export async function runSchemaUpdates() {
             ADD COLUMN IF NOT EXISTS diagram_url text,
             ADD COLUMN IF NOT EXISTS diamond_numbers jsonb,
             ADD COLUMN IF NOT EXISTS segmented_trajectories jsonb,
-            ADD COLUMN IF NOT EXISTS cheat_sheets jsonb;
+            ADD COLUMN IF NOT EXISTS cheat_sheets jsonb,
+            ADD COLUMN IF NOT EXISTS effect_type varchar(30) DEFAULT 'reloj',
+            ADD COLUMN IF NOT EXISTS canonical_shots jsonb,
+            ADD COLUMN IF NOT EXISTS diamond_pin_map jsonb;
     `);
 
     // 7. Master Pedagogy Modules (Biomechanics, Bridges, Ball Thickness, etc.)

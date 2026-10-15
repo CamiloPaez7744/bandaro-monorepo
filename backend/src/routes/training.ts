@@ -14,6 +14,7 @@ import {
     userPositionMastery,
     trainingSessionHistory,
 } from '../db/schema.js';
+import { BASE_50_SYSTEM_RECORD } from '../db/base50Data.js';
 import { verifyAccessToken } from './auth.js';
 
 export const trainingRouter: Router = Router();
@@ -779,3 +780,50 @@ trainingRouter.get('/stats', async (_req: Request, res: Response) => {
         res.status(500).json({ error: 'Error al calcular estadísticas' });
     }
 });
+
+// ---------------------------------------------------------------------------
+// 7. GET /training/systems — List all classical billiard systems
+// ---------------------------------------------------------------------------
+trainingRouter.get('/systems', async (_req: Request, res: Response) => {
+    try {
+        const rows = await db.select().from(billiardSystems);
+        if (rows.length === 0) {
+            return res.json([BASE_50_SYSTEM_RECORD]);
+        }
+        res.json(rows);
+    } catch (error) {
+        console.error('Error fetching systems:', error);
+        res.json([BASE_50_SYSTEM_RECORD]);
+    }
+});
+
+// ---------------------------------------------------------------------------
+// 8. GET /training/systems/:id — Fetch specific system (e.g. base-50)
+// ---------------------------------------------------------------------------
+trainingRouter.get('/systems/:id', async (req: Request, res: Response) => {
+    try {
+        const id = String(req.params.id);
+        const [row] = await db
+            .select()
+            .from(billiardSystems)
+            .where(eq(billiardSystems.id, id))
+            .limit(1);
+
+        if (row) {
+            return res.json(row);
+        }
+
+        if (id === 'base-50') {
+            return res.json(BASE_50_SYSTEM_RECORD);
+        }
+
+        return res.status(404).json({ error: 'Sistema no encontrado' });
+    } catch (error) {
+        console.error(`Error fetching system ${req.params.id}:`, error);
+        if (req.params.id === 'base-50') {
+            return res.json(BASE_50_SYSTEM_RECORD);
+        }
+        res.status(500).json({ error: 'Error al obtener el sistema de billar' });
+    }
+});
+

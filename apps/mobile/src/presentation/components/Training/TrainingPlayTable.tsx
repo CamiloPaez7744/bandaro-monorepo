@@ -4,6 +4,7 @@ import Svg, { Circle, Defs, G, Line, LinearGradient, Path, Polygon, RadialGradie
 
 import { resolveBilliardPhysics } from './billiardPhysics';
 import { getTableDecalSource } from './tableDecals';
+import { DiamondPinMarker } from './DiamondPinMarker';
 import {
   type TablePreferences,
   type DiamondShape,
@@ -19,6 +20,25 @@ export interface TablePoint {
   y: number; // 0..142
 }
 
+export type TableTrajectoryPath = {
+  id: string;
+  points: TablePoint[];
+  color?: string;
+  width?: number;
+  dash?: number[];
+  opacity?: number;
+};
+
+export type DiamondPinItem = {
+  x: number;
+  y: number;
+  label: string;
+  pinColor: string;
+  pinDirection: 'down' | 'up' | 'left' | 'right';
+  role?: 'departure' | 'attack' | 'arrival_3rd' | 'arrival_4th';
+  isSelected?: boolean;
+};
+
 export interface TrainingPlayTableProps {
   style?: StyleProp<ViewStyle>;
   whiteBall: TablePoint;
@@ -27,6 +47,8 @@ export interface TrainingPlayTableProps {
   redBallColor?: 'red' | 'orange' | 'blue';
   trajectory?: TablePoint[]; // Optional solution path
   trajectoryColor?: string; // Optional trajectory stroke color (e.g. category color)
+  paths?: TableTrajectoryPath[]; // Multi-segment or multi-shot trajectories
+  diamondPins?: DiamondPinItem[]; // Teardrop pins matching numeración.png
   isSimulating?: boolean;
   onSimulationEnd?: () => void;
   showGrid?: boolean;
@@ -59,6 +81,8 @@ function TrainingPlayTableBase({
   redBallColor = 'red',
   trajectory = [],
   trajectoryColor = '#4edea3',
+  paths = [],
+  diamondPins = [],
   isSimulating = false,
   onSimulationEnd,
   showGrid = true,
@@ -194,12 +218,17 @@ function TrainingPlayTableBase({
     ? Array.from({ length: 5 }, (_, i) => i / 4)
     : Array.from({ length: 3 }, (_, i) => (i + 1) / 4);
 
+  const hasPins = Boolean(diamondPins && diamondPins.length > 0);
+  const PIN_PAD = hasPins ? 18 : 0;
+  const vbW = TOTAL_W + PIN_PAD * 2;
+  const vbH = TOTAL_H + PIN_PAD * 2;
+
   return (
-    <View style={[styles.container, style]}>
+    <View style={[styles.container, hasPins && { aspectRatio: vbW / vbH, overflow: 'visible' }, style]}>
       <Svg
         width="100%"
         height="100%"
-        viewBox={`0 0 ${TOTAL_W} ${TOTAL_H}`}
+        viewBox={`${-PIN_PAD} ${-PIN_PAD} ${vbW} ${vbH}`}
         style={styles.svg}
       >
         <Defs>
@@ -666,6 +695,59 @@ function TrainingPlayTableBase({
           </G>
         ) : null}
 
+        {/* Multi-segment / Multi-shot Trajectories */}
+        {paths && paths.length > 0 && (
+          <G>
+            {paths.map((p) => {
+              if (!p.points || p.points.length < 2) return null;
+              const pthD = p.points
+                .map((pt, idx) => `${idx === 0 ? 'M' : 'L'} ${pt.x + PLAY_OFFSET_X} ${pt.y + PLAY_OFFSET_Y}`)
+                .join(' ');
+              const strokeColor = p.color ?? '#4edea3';
+              const strokeOpacity = p.opacity ?? 0.9;
+              const strokeWidth = p.width ?? 1.9;
+              return (
+                <G key={p.id}>
+                  {p.dash && p.dash.length > 0 ? (
+                    <Path
+                      d={pthD}
+                      fill="none"
+                      stroke={strokeColor}
+                      strokeOpacity={strokeOpacity}
+                      strokeWidth={strokeWidth}
+                      strokeDasharray={p.dash.join(',')}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  ) : (
+                    <>
+                      <Path
+                        d={pthD}
+                        fill="none"
+                        stroke={strokeColor}
+                        strokeOpacity={strokeOpacity * 0.35}
+                        strokeWidth={strokeWidth * 2.2}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <Path
+                        d={pthD}
+                        fill="none"
+                        stroke={strokeColor}
+                        strokeOpacity={strokeOpacity}
+                        strokeWidth={strokeWidth}
+                        strokeDasharray={p.dash ? p.dash.join(',') : undefined}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </>
+                  )}
+                </G>
+              );
+            })}
+          </G>
+        )}
+
         {/* 6. Object Ball 2 (Red Ball) */}
         <G>
           <Circle
@@ -781,6 +863,44 @@ function TrainingPlayTableBase({
             fill="#dc2626"
           />
         </G>
+
+        {/* 9. Canonical Diamond Pin Markers (Matching numeración.png) */}
+        {diamondPins && diamondPins.length > 0 && (
+          <G opacity={0.98}>
+            {diamondPins.map((pin, idx) => {
+              let px = PLAY_OFFSET_X + pin.x;
+              let py = PLAY_OFFSET_Y + pin.y;
+              const isArrival = pin.role === 'arrival_3rd' || pin.role === 'arrival_4th';
+              if (isArrival) {
+                // REGLA 11: Todas las llegadas siempre van frente al caucho (en la banda / cushion nose)
+                // px and py already touch the cushion nose
+              } else {
+                // Salidas y Ataques se miden por diamante (marco exterior de madera)
+                if (pin.pinDirection === 'down') {
+                  py = 0.5;
+                } else if (pin.pinDirection === 'up') {
+                  py = TOTAL_H - 0.5;
+                } else if (pin.pinDirection === 'right') {
+                  px = 0.5;
+                } else if (pin.pinDirection === 'left') {
+                  px = TOTAL_W - 0.5;
+                }
+              }
+              return (
+                <DiamondPinMarker
+                  key={`tpt-pin-${idx}-${pin.role}-${pin.label}-${pin.x}-${pin.y}`}
+                  x={px}
+                  y={py}
+                  label={pin.label}
+                  pinColor={pin.pinColor}
+                  pinDirection={pin.pinDirection}
+                  isSelected={pin.isSelected}
+                  role={pin.role}
+                />
+              );
+            })}
+          </G>
+        )}
       </Svg>
     </View>
   );

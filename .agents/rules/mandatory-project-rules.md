@@ -73,3 +73,17 @@ Estas reglas son mandatorias, inviolables y deben cumplirse en **cualquier cambi
 - **NUNCA** hacer commit en Git de alguna funcionalidad o cambio sin:
   1. Haber sido verificado y probado exhaustivamente (tests automáticos y validaciones de tipos).
   2. Haber sido **explícitamente solicitado y autorizado el commit por el usuario**.
+
+---
+
+### Regla 11: Ubicación Canónica de Llegadas y Límite No Negativo en Sistemas de Billar
+- En todos los sistemas de billar a 3 bandas (Base 50, Sistema Conti, etc.):
+  1. Las **Salidas** y los **Ataques** se miden, proyectan y ubican sobre los **diamantes** (marco exterior de madera de la mesa).
+  2. **TODAS las Llegadas** (3ª banda y 4ª banda) siempre van **frente al caucho, es decir en la banda** (en el filo de goma / cushion nose interior). **Solo las llegadas**.
+  3. Queda terminantemente prohibido posicionar las llegadas sobre los diamantes de madera del marco exterior o hacer que se superpongan en la misma línea exterior que las salidas o los ataques.
+  4. **Prohibición Estricta de Números Negativos**: El sistema **no permite números negativos**. El límite inferior del sistema es **cero (0) en ataque** (en la esquina de 1ª a 2ª banda) y **cero (0) en llegada** (en la esquina de 2ª a 3ª banda). Ninguna fórmula, pin o selector puede arrojar o mostrar números negativos ($\text{Ataque} \ge 0, \text{Llegada} \ge 0$).
+  5. **Escalas Canónicas Base 50 (Arista Abajo-Izquierda)**:
+     - **Ataque (1ª Banda - Superior de der a izq)**: `0` (límite en esquina), `10`, `20`, `30`, `40`, `50`, `70`, `90`.
+     - **Llegada (3ª Banda - Inferior frente al caucho)**: `0` (en la esquina), `10`, `20`, `30`, `45`, `60`, `80`, `100`.
+
+

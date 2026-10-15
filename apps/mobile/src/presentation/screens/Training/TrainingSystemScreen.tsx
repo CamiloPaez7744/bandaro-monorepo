@@ -7,7 +7,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/components/useColorScheme';
 import { useI18n } from '@/components/useLanguage';
 import { getPalette, theme } from '@/constants/theme';
-import { BilliardsTableThumbnail } from '@/src/presentation/components/Training/BilliardsTableThumbnail';
+import { TrainingPlayTable, type DiamondPinItem, type TableTrajectoryPath } from '@/src/presentation/components/Training/TrainingPlayTable';
+import { type AristaCorner, getAristaConfig, detectAristaFromBall } from '@/src/presentation/components/Training/base50Geometry';
 import { EffectBallSelector } from '@/src/presentation/components/Training/EffectBallSelector';
 import { MasterPedagogyModal } from '@/src/presentation/components/Training/MasterPedagogyModal';
 import {
@@ -21,6 +22,8 @@ import {
     IconSparkles,
     IconTarget,
 } from '@/src/presentation/components/icons';
+import { SystemFormulaBar, type FormulaRole } from '@/src/presentation/components/Training/SystemFormulaBar';
+import { ClockEffectDial, type EffectSystemType } from '@/src/presentation/components/Training/ClockEffectDial';
 import {
     CONTACT_PRESETS,
     EFFECT_PRESETS,
@@ -207,9 +210,14 @@ function TrainingSystemWorkspace() {
         yellow: true,
         red: true,
     });
-    const [viewMode, setViewMode] = useState<'practice' | 'cheatsheet'>('practice');
+    const [viewMode, setViewMode] = useState<'practice' | 'cheatsheet'>('cheatsheet');
     const [selectedOrigin, setSelectedOrigin] = useState<number>(50);
-    const [selectedShotIndex, setSelectedShotIndex] = useState<number | 'all'>('all');
+    const [selectedShotIndex, setSelectedShotIndex] = useState<number | 'all'>(0);
+    const [selectedArista, setSelectedArista] = useState<AristaCorner>('bottom_left');
+    const [formulaFilter, setFormulaFilter] = useState<FormulaRole>('all');
+    const [clockPoint, setClockPoint] = useState<number>(3);
+    const [clockDirection, setClockDirection] = useState<'right' | 'left'>('right');
+    const [effectSystemType, setEffectSystemType] = useState<EffectSystemType>('reloj');
     const [showMasterTheoryModal, setShowMasterTheoryModal] = useState(false);
     const [tableOrientation, setTableOrientation] = useState<Orientation>(defaultOrientation);
     const stageLayoutRef = useRef({ width: 0, height: 0 });
@@ -341,126 +349,143 @@ function TrainingSystemWorkspace() {
           }
         : undefined;
 
-    const activeOriginCheat = useMemo(() => {
-        if (!system?.cheatSheets || system.cheatSheets.length === 0) return null;
-        return system.cheatSheets.find((c) => c.origin === selectedOrigin) ?? system.cheatSheets[0];
-    }, [system, selectedOrigin]);
+    const activeArista: AristaCorner = useMemo(() => {
+        if (viewMode === 'practice') {
+            return detectAristaFromBall(ballPositions.white);
+        }
+        return selectedArista;
+    }, [viewMode, ballPositions.white, selectedArista]);
+
+    const aristaConfig = useMemo(() => {
+        return getAristaConfig(activeArista);
+    }, [activeArista]);
 
     const cheatPaths = useMemo(() => {
-        if (!activeOriginCheat) return [];
         const shotsToRender = typeof selectedShotIndex === 'number'
-            ? [activeOriginCheat.shots[selectedShotIndex]].filter(Boolean)
-            : activeOriginCheat.shots;
+            ? [aristaConfig.shots[selectedShotIndex]].filter(Boolean)
+            : aristaConfig.shots;
 
-        const paths: Array<{ id: string; points: Point2D[]; color: string; width: number; dash?: number[]; opacity?: number }> = [];
+        const paths: TableTrajectoryPath[] = [];
 
         shotsToRender.forEach((shot, sIdx) => {
             const isSingle = typeof selectedShotIndex === 'number';
-            const strokeWidth = isSingle ? 2.8 : 2.0;
-            const opacity = isSingle ? 1 : 0.92;
 
-            // Tramo 1: 1ª a 3ª Banda (Cian eléctrico #06b6d4)
-            paths.push({
-                id: `cheat-${activeOriginCheat.origin}-${sIdx}-tramo1`,
-                points: shot.points1to3,
-                color: '#06b6d4',
-                width: strokeWidth,
-                opacity,
-            });
-
-            // Tramo 2: 3ª a 4ª Banda (Ámbar dorado #f59e0b)
-            paths.push({
-                id: `cheat-${activeOriginCheat.origin}-${sIdx}-tramo2`,
-                points: shot.points3to4,
-                color: '#f59e0b',
-                width: strokeWidth,
-                opacity,
-            });
-
-            // Tramo 3: 4ª a 5ª Banda (Verde esmeralda #10b981)
-            paths.push({
-                id: `cheat-${activeOriginCheat.origin}-${sIdx}-tramo3`,
-                points: shot.points4to5,
-                color: '#10b981',
-                width: strokeWidth,
-                opacity,
-            });
+            if (isSingle) {
+                // Continuous vibrant emerald trajectory (#10b981) - directly matching Image 1
+                paths.push({
+                    id: `shot-${activeArista}-${sIdx}-full`,
+                    points: [...shot.points1to3, ...shot.points3to4.slice(1)],
+                    color: '#10b981',
+                    width: 3.4,
+                    opacity: 1,
+                });
+                // Tramo 1 (1ª a 3ª banda) in cyan accent
+                paths.push({
+                    id: `shot-${activeArista}-${sIdx}-tramo1`,
+                    points: shot.points1to3,
+                    color: '#06b6d4',
+                    width: 2.2,
+                    opacity: 0.85,
+                });
+                // Tramo 2 (3ª a 4ª banda) in amber accent
+                paths.push({
+                    id: `shot-${activeArista}-${sIdx}-tramo2`,
+                    points: shot.points3to4,
+                    color: '#f59e0b',
+                    width: 2.2,
+                    opacity: 0.85,
+                });
+                // Línea punteada de proyección al diamante (entre el caucho y el diamante)
+                if (shot.projectionLine && shot.projectionLine.length >= 2) {
+                    paths.push({
+                        id: `shot-${activeArista}-${sIdx}-projection`,
+                        points: shot.projectionLine,
+                        color: '#ffffff',
+                        width: 2.2,
+                        opacity: 0.95,
+                        dash: [3.5, 3],
+                    });
+                }
+            } else {
+                // Abanico Completo: clean emerald/cyan fan across cushions
+                paths.push({
+                    id: `abanico-${activeArista}-${sIdx}`,
+                    points: [...shot.points1to3, ...shot.points3to4.slice(1)],
+                    color: sIdx === 0 ? '#10b981' : '#06b6d4',
+                    width: sIdx === 0 ? 2.8 : 1.8,
+                    opacity: sIdx === 0 ? 1 : 0.75,
+                });
+                // En abanico completo también mostramos la proyección punteada de la canónica
+                if (sIdx === 0 && shot.projectionLine && shot.projectionLine.length >= 2) {
+                    paths.push({
+                        id: `abanico-${activeArista}-${sIdx}-projection`,
+                        points: shot.projectionLine,
+                        color: '#ffffff',
+                        width: 2.2,
+                        opacity: 0.95,
+                        dash: [3.5, 3],
+                    });
+                }
+            }
         });
 
         return paths;
-    }, [activeOriginCheat, selectedShotIndex]);
+    }, [aristaConfig.shots, selectedShotIndex, activeArista]);
 
-    const cheatDiamondLabels = useMemo(() => {
-        if (!system?.diamondNumbers) return [];
-        const labels: Array<{ x: number; y: number; text: string; color: string; bgColor: string }> = [];
+    const canonicalPins = useMemo<DiamondPinItem[]>(() => {
+        return aristaConfig.pins
+            .filter((pin) => {
+                if (formulaFilter === 'all') return true;
+                if (formulaFilter === 'departure') return pin.role === 'departure';
+                if (formulaFilter === 'attack') return pin.role === 'attack';
+                if (formulaFilter === 'arrival') return pin.role === 'arrival_3rd' || pin.role === 'arrival_4th';
+                return true;
+            })
+            .map((pin) => ({
+                ...pin,
+                isSelected:
+                    (formulaFilter === 'departure' && pin.role === 'departure') ||
+                    (formulaFilter === 'attack' && pin.role === 'attack') ||
+                    (formulaFilter === 'arrival' && (pin.role === 'arrival_3rd' || pin.role === 'arrival_4th')),
+            }));
+    }, [aristaConfig.pins, formulaFilter]);
 
-        // Banda de ataque (superior)
-        system.diamondNumbers.attack.forEach((d) => {
-            labels.push({
-                x: d.x,
-                y: 10,
-                text: d.value,
-                color: '#38bdf8',
-                bgColor: 'rgba(8, 47, 73, 0.95)',
-            });
-        });
-
-        // Banda de salida (inferior)
-        system.diamondNumbers.departure.forEach((d) => {
-            labels.push({
-                x: d.x,
-                y: 132,
-                text: d.value,
-                color: '#34d399',
-                bgColor: 'rgba(6, 78, 59, 0.95)',
-            });
-        });
-
-        // Banda de llegada 3ª (corta izquierda)
-        system.diamondNumbers.arrival3rd.forEach((d) => {
-            labels.push({
-                x: 12,
-                y: d.y,
-                text: d.value,
-                color: '#fbbf24',
-                bgColor: 'rgba(120, 53, 15, 0.95)',
-            });
-        });
-
-        // Banda de llegada 4ª (larga retorno)
-        system.diamondNumbers.arrival4th.forEach((d) => {
-            labels.push({
-                x: d.x,
-                y: 132,
-                text: d.value,
-                color: '#ec4899',
-                bgColor: 'rgba(131, 24, 67, 0.95)',
-            });
-        });
-
-        return labels;
-    }, [system]);
+    const currentFormulaValues = useMemo(() => {
+        const shotIdx = typeof selectedShotIndex === 'number' ? selectedShotIndex : 0;
+        const shot = aristaConfig.shots[shotIdx] ?? aristaConfig.shots[0];
+        return {
+            departure: Math.max(0, shot.departure),
+            attack: Math.max(0, shot.attack),
+            arrival: Math.max(0, shot.arrival3rd ?? shot.arrival),
+            arrival4th: Math.max(0, shot.arrival4th ?? 20),
+        };
+    }, [aristaConfig.shots, selectedShotIndex]);
 
     const effectiveBalls = useMemo(() => {
         if (viewMode === 'practice') {
             return stageBalls;
         }
-        if (activeOriginCheat && typeof selectedShotIndex === 'number') {
-            const shot = activeOriginCheat.shots[selectedShotIndex];
-            if (shot) {
-                return [
-                    { id: 'white' as const, x: shot.points1to3[0].x, y: shot.points1to3[0].y, color: '#f8fafc', border: '#cbd5e1' },
-                    { id: 'yellow' as const, x: shot.points1to3[1].x, y: shot.points1to3[1].y, color: '#facc15', border: '#ca8a04' },
-                    { id: 'red' as const, x: shot.points1to3.at(-1)?.x ?? 40, y: shot.points1to3.at(-1)?.y ?? 40, color: '#dc2626', border: '#991b1b' },
-                ];
-            }
-        }
         return [
-            { id: 'white' as const, x: 20, y: 130, color: '#f8fafc', border: '#cbd5e1' },
-            { id: 'yellow' as const, x: 142, y: 71, color: '#facc15', border: '#ca8a04' },
-            { id: 'red' as const, x: 260, y: 20, color: '#dc2626', border: '#991b1b' },
+            { id: 'white' as const, x: aristaConfig.whiteBall.x, y: aristaConfig.whiteBall.y, color: '#f8fafc', border: '#cbd5e1' },
+            { id: 'yellow' as const, x: aristaConfig.yellowBall.x, y: aristaConfig.yellowBall.y, color: '#facc15', border: '#ca8a04' },
+            { id: 'red' as const, x: aristaConfig.redBall.x, y: aristaConfig.redBall.y, color: '#dc2626', border: '#991b1b' },
         ];
-    }, [viewMode, stageBalls, activeOriginCheat, selectedShotIndex]);
+    }, [viewMode, stageBalls, aristaConfig]);
+
+    const whiteBallPos = useMemo(() => {
+        const found = effectiveBalls.find((b) => b.id === 'white');
+        return found ? { x: found.x, y: found.y } : { x: 20, y: 130 };
+    }, [effectiveBalls]);
+
+    const yellowBallPos = useMemo(() => {
+        const found = effectiveBalls.find((b) => b.id === 'yellow');
+        return found ? { x: found.x, y: found.y } : { x: 142, y: 71 };
+    }, [effectiveBalls]);
+
+    const redBallPos = useMemo(() => {
+        const found = effectiveBalls.find((b) => b.id === 'red');
+        return found ? { x: found.x, y: found.y } : { x: 260, y: 20 };
+    }, [effectiveBalls]);
 
     const storageKey = `${GUIDE_STORAGE_PREFIX}/${system.id}/${currentPosition.id}`;
 
@@ -570,8 +595,8 @@ function TrainingSystemWorkspace() {
     };
 
     const responderProps = useMemo(() => {
-        if (viewMode !== 'practice') return {};
         if (Platform.OS === 'web') {
+            if (viewMode !== 'practice') return {};
             return {
                 onPointerDown: (e: any) => {
                     const rect = e.currentTarget?.getBoundingClientRect?.();
@@ -594,6 +619,7 @@ function TrainingSystemWorkspace() {
                 },
             };
         }
+        if (viewMode !== 'practice') return {};
         return {
             onStartShouldSetResponder: () => true,
             onMoveShouldSetResponder: () => true,
@@ -679,6 +705,18 @@ function TrainingSystemWorkspace() {
 
             <View style={[styles.simulationFrame, isSimulationWide && styles.simulationFrameWide]}>
                 <View style={styles.simulationMainPane}>
+                    {/* Componente FÓRMULA CANÓNICA BASE 50 (Directamente arriba de la mesa canónica) */}
+                    {viewMode === 'cheatsheet' && (
+                        <SystemFormulaBar
+                            departure={currentFormulaValues.departure}
+                            attack={currentFormulaValues.attack}
+                            arrival={currentFormulaValues.arrival}
+                            arrival4th={currentFormulaValues.arrival4th}
+                            activeFilter={formulaFilter}
+                            onSelectFilter={setFormulaFilter}
+                        />
+                    )}
+
                     <View style={styles.tableCard}>
                         <View style={styles.tableHeaderRow}>
                             <View style={styles.tableTitleWrap}>
@@ -708,39 +746,37 @@ function TrainingSystemWorkspace() {
                                 };
                             }}
                             {...responderProps}>
-                            <BilliardsTableThumbnail
-                                orientation={tableOrientation}
+                            <TrainingPlayTable
                                 style={styles.tableStage}
-                                balls={effectiveBalls as unknown as Array<{ id: 'white' | 'yellow' | 'red'; x: number; y: number; color: string; border: string }>}
-                                aim={viewMode === 'practice' ? aimGuide : undefined}
+                                whiteBall={whiteBallPos}
+                                yellowBall={yellowBallPos}
+                                redBall={redBallPos}
                                 paths={viewMode === 'practice' ? guidePaths : cheatPaths}
-                                diamondLabels={viewMode === 'cheatsheet' ? cheatDiamondLabels : undefined}
-                                showZones
+                                diamondPins={viewMode === 'cheatsheet' ? canonicalPins : undefined}
+                                showGrid
                             />
                             {viewMode === 'practice' && <View style={styles.tableGestureLayer} />}
                         </View>
 
                         {/* Controles para MODO CHEAT SHEET */}
-                        {viewMode === 'cheatsheet' && activeOriginCheat && (
+                        {viewMode === 'cheatsheet' && (
                             <View style={styles.cheatControlsContainer}>
-                                {/* 1. Selector de Salida */}
+                                {/* 1. Selector de Aristas / Esquinas de Salida (4 Aristas) */}
                                 <View style={styles.cheatSection}>
                                     <Text style={styles.cheatSectionTitle}>
-                                        {language === 'en' ? '1. Departure Rail (Origin Point)' : '1. Salida Canónica (Punto de Partida)'}
+                                        {language === 'en' ? '1. Attack Corner / Arista (4 Positions)' : '1. Arista / Esquina de Salida (4 Cuadrantes)'}
                                     </Text>
                                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cheatOriginScroll}>
-                                        {system.cheatSheets?.map((cheat) => {
-                                            const isSelected = cheat.origin === selectedOrigin;
+                                        {(['bottom_left', 'bottom_right', 'top_right', 'top_left'] as AristaCorner[]).map((cId) => {
+                                            const cfg = getAristaConfig(cId);
+                                            const isSelected = activeArista === cId;
                                             return (
                                                 <TouchableOpacity
-                                                    key={`origin-${cheat.origin}`}
+                                                    key={`arista-${cId}`}
                                                     style={[styles.cheatOriginPill, isSelected && styles.cheatOriginPillActive]}
-                                                    onPress={() => {
-                                                        setSelectedOrigin(cheat.origin);
-                                                        setSelectedShotIndex('all');
-                                                    }}>
+                                                    onPress={() => setSelectedArista(cId)}>
                                                     <Text style={[styles.cheatOriginPillText, isSelected && styles.cheatOriginPillTextActive]}>
-                                                        Salida {cheat.origin} {cheat.origin === 50 ? '★ (Esquina)' : ''}
+                                                        {cfg.shortLabel}
                                                     </Text>
                                                 </TouchableOpacity>
                                             );
@@ -751,7 +787,7 @@ function TrainingSystemWorkspace() {
                                 {/* 2. Selector de Trayectorias */}
                                 <View style={styles.cheatSection}>
                                     <Text style={styles.cheatSectionTitle}>
-                                        {language === 'en' ? '2. Trajectory / Arrival' : '2. Trayectoria / Ataque y Llegada'}
+                                        {language === 'en' ? '2. Trajectory / Arrival' : '2. Trayectoria Canónica (Salida - Ataque = Llegada)'}
                                     </Text>
                                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cheatOriginScroll}>
                                         <TouchableOpacity
@@ -763,17 +799,18 @@ function TrainingSystemWorkspace() {
                                             </Text>
                                         </TouchableOpacity>
 
-                                        {activeOriginCheat.shots.map((shot, idx) => {
+                                        {aristaConfig.shots.map((shot, idx) => {
                                             const isSelected = selectedShotIndex === idx;
-                                            const dep = shot.departure ?? activeOriginCheat.origin;
-                                            const arr3 = shot.arrival3rd ?? shot.arrival;
+                                            const safeDep = Math.max(0, shot.departure);
+                                            const safeAtt = Math.max(0, shot.attack);
+                                            const safeArr = Math.max(0, shot.arrival);
                                             return (
                                                 <TouchableOpacity
                                                     key={`shot-${idx}`}
                                                     style={[styles.cheatShotPill, isSelected && styles.cheatShotPillActive]}
                                                     onPress={() => setSelectedShotIndex(idx)}>
                                                     <Text style={[styles.cheatShotPillText, isSelected && styles.cheatShotPillTextActive]}>
-                                                        {dep} - {arr3} = {shot.attack}
+                                                        {safeDep} - {safeAtt} = {safeArr} {idx === 0 ? '★ (Canónica)' : ''}
                                                     </Text>
                                                 </TouchableOpacity>
                                             );
@@ -784,6 +821,10 @@ function TrainingSystemWorkspace() {
                                 {/* 3. Leyenda de Colores Multibanda */}
                                 <View style={styles.multiCushionLegend}>
                                     <View style={styles.legendColorItem}>
+                                        <View style={[styles.legendColorDot, { backgroundColor: '#10b981' }]} />
+                                        <Text style={styles.legendColorText}>{language === 'en' ? 'Carom Trajectory' : 'Trayectoria Base 50'}</Text>
+                                    </View>
+                                    <View style={styles.legendColorItem}>
                                         <View style={[styles.legendColorDot, { backgroundColor: '#06b6d4' }]} />
                                         <Text style={styles.legendColorText}>1ª a 3ª Banda</Text>
                                     </View>
@@ -792,8 +833,8 @@ function TrainingSystemWorkspace() {
                                         <Text style={styles.legendColorText}>3ª a 4ª Banda</Text>
                                     </View>
                                     <View style={styles.legendColorItem}>
-                                        <View style={[styles.legendColorDot, { backgroundColor: '#10b981' }]} />
-                                        <Text style={styles.legendColorText}>4ª a 5ª Banda</Text>
+                                        <View style={[styles.legendColorDot, { backgroundColor: 'transparent', borderWidth: 1.2, borderColor: '#ffffff', borderStyle: 'dashed' }]} />
+                                        <Text style={styles.legendColorText}>{language === 'en' ? 'Aim to Diamond' : 'Proyección al Diamante'}</Text>
                                     </View>
                                 </View>
 
@@ -801,26 +842,36 @@ function TrainingSystemWorkspace() {
                                 <View style={styles.cheatFormulaCard}>
                                     <View style={styles.formulaHeaderRow}>
                                         <Text style={styles.formulaBadge}>FÓRMULA CANÓNICA</Text>
-                                        <Text style={styles.formulaMath}>Salida - Llegada (3ª) = Ataque (1ª)</Text>
+                                        <Text style={styles.formulaMath}>Salida - Ataque (1ª) = Llegada (3ª)</Text>
                                     </View>
-                                    {typeof selectedShotIndex === 'number' && activeOriginCheat.shots[selectedShotIndex] ? (
+                                    {typeof selectedShotIndex === 'number' && aristaConfig.shots[selectedShotIndex] ? (
                                         <View style={styles.shotDetailBox}>
                                             <Text style={styles.shotDetailMath}>
-                                                {activeOriginCheat.shots[selectedShotIndex].departure ?? activeOriginCheat.origin} (Salida) - {activeOriginCheat.shots[selectedShotIndex].arrival3rd ?? activeOriginCheat.shots[selectedShotIndex].arrival} (3ª Banda) = {activeOriginCheat.shots[selectedShotIndex].attack} (Ataque)
+                                                {Math.max(0, aristaConfig.shots[selectedShotIndex].departure)} (Salida) - {Math.max(0, aristaConfig.shots[selectedShotIndex].attack)} (Ataque 1ª) = {Math.max(0, aristaConfig.shots[selectedShotIndex].arrival)} (Llegada 3ª)
                                             </Text>
                                             <Text style={styles.shotDetailArrival4th}>
-                                                🎯 Retorno a 4ª Banda: Diamante {activeOriginCheat.shots[selectedShotIndex].arrival4th ?? activeOriginCheat.shots[selectedShotIndex].arrival}
+                                                🎯 Retorno a 4ª Banda: Esquina contraria para carambola en bola amarilla y roja
                                             </Text>
                                         </View>
                                     ) : (
                                         <Text style={styles.formulaNote}>
-                                            Mostrando el abanico completo desde la salida {activeOriginCheat.origin}. Selecciona una trayectoria individual arriba para aislar el recorrido.
+                                            Mostrando el abanico completo desde la {aristaConfig.title}. Selecciona una trayectoria individual arriba para aislar el recorrido.
                                         </Text>
                                     )}
                                     <Text style={styles.formulaExecution}>
-                                        ⚡ Ejecución: Efecto 3 a favor (hora 3 / hora 9), golpe penetrado sin brusquedad, velocidad media-viva (2.5 a 3 bandas de recorrido residual).
+                                        ⚡ Ejecución: Efecto 3 canónico a favor (hora 3:00 / 9:00). La visual se proyecta al diamante (línea punteada blanca); el impacto en el caucho ocurre ligeramente antes.
                                     </Text>
                                 </View>
+
+                                {/* 5. Selector de Efectos de Rotación (Reloj Canónico 0..4) */}
+                                <ClockEffectDial
+                                    selectedPoint={clockPoint}
+                                    onSelectPoint={setClockPoint}
+                                    systemType={effectSystemType}
+                                    onSelectSystemType={setEffectSystemType}
+                                    cueDirection={clockDirection}
+                                    onToggleDirection={() => setClockDirection((prev) => (prev === 'right' ? 'left' : 'right'))}
+                                />
                             </View>
                         )}
 
@@ -1204,7 +1255,7 @@ const getStyles = (palette: ReturnType<typeof getPalette>) =>
     tableWrap: {
         borderRadius: 18,
         position: 'relative',
-        overflow: 'hidden',
+        overflow: 'visible',
     },
     tableStage: {
         width: '100%',

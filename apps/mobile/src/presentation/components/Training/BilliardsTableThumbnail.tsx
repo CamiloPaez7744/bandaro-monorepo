@@ -3,6 +3,7 @@ import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Circle, Defs, G, Line, LinearGradient, Polyline, RadialGradient, Rect, Stop, Text as SvgText } from 'react-native-svg';
 
 import type { Point2D } from '@/src/presentation/screens/Training/trainingData';
+import { DiamondPinMarker } from './DiamondPinMarker';
 
 type Orientation = 'horizontal' | 'vertical';
 
@@ -37,6 +38,16 @@ export type DiamondLabel = {
     bgColor?: string;
 };
 
+export type DiamondPinItem = {
+    x: number;
+    y: number;
+    label: string;
+    pinColor: string;
+    pinDirection: 'down' | 'up' | 'left' | 'right';
+    role?: 'departure' | 'attack' | 'arrival_3rd' | 'arrival_4th';
+    isSelected?: boolean;
+};
+
 interface BilliardsTableThumbnailProps {
     orientation?: Orientation;
     style?: StyleProp<ViewStyle>;
@@ -47,6 +58,7 @@ interface BilliardsTableThumbnailProps {
     showPath?: boolean;
     showZones?: boolean;
     diamondLabels?: DiamondLabel[];
+    diamondPins?: DiamondPinItem[];
 }
 
 const TABLE_W = 284;
@@ -179,7 +191,18 @@ function linePoints(points: Point2D[], orientation: Orientation, layout: ReturnT
 }
 
 function BilliardsTableThumbnailBase(props: Readonly<BilliardsTableThumbnailProps>) {
-    const { orientation = 'horizontal', style, balls = [], path = [], paths = [], aim, showPath = true, showZones = true, diamondLabels = [] } = props;
+    const {
+        orientation = 'horizontal',
+        style,
+        balls = [],
+        path = [],
+        paths = [],
+        aim,
+        showPath = true,
+        showZones = true,
+        diamondLabels = [],
+        diamondPins = [],
+    } = props;
     const layout = getLayout(orientation);
     const uid = useId();
     const derivedPaths = useMemo<TrajectoryPath[]>(() => {
@@ -382,6 +405,27 @@ function BilliardsTableThumbnailBase(props: Readonly<BilliardsTableThumbnailProp
                                         {lbl.text}
                                     </SvgText>
                                 </G>
+                            );
+                        })}
+                    </G>
+                )}
+
+                {/* Canonical Diamond Pins (Teardrop Pins matching numeración.png) */}
+                {diamondPins && diamondPins.length > 0 && (
+                    <G opacity={0.98}>
+                        {diamondPins.map((pin, idx) => {
+                            const mapped = mapPoint({ x: pin.x, y: pin.y }, orientation, layout);
+                            return (
+                                <DiamondPinMarker
+                                    key={`pin-${idx}-${pin.role}-${pin.label}-${pin.x}-${pin.y}`}
+                                    x={mapped.x}
+                                    y={mapped.y}
+                                    label={pin.label}
+                                    pinColor={pin.pinColor}
+                                    pinDirection={pin.pinDirection}
+                                    isSelected={pin.isSelected}
+                                    role={pin.role}
+                                />
                             );
                         })}
                     </G>

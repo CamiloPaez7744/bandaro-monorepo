@@ -11,6 +11,7 @@ import {
     billiardSystems,
     pedagogyModules,
 } from './schema.js';
+import { BASE_50_SYSTEM_RECORD } from './base50Data.js';
 
 function hashPassword(password: string): string {
     const salt = randomBytes(16).toString('hex');
@@ -1588,6 +1589,53 @@ export async function seedDatabase() {
         }
     }
     console.log(`[seed] Seeded 4 Quetglas levels and 20 daily practice stations.`);
+
+    // 2b. Seed Classical Billiard Systems (Sistema Base 50)
+    await db
+        .insert(billiardSystems)
+        .values({
+            id: BASE_50_SYSTEM_RECORD.id,
+            name: BASE_50_SYSTEM_RECORD.name,
+            category: BASE_50_SYSTEM_RECORD.category,
+            formula: BASE_50_SYSTEM_RECORD.formula,
+            description: BASE_50_SYSTEM_RECORD.description,
+            difficulty: BASE_50_SYSTEM_RECORD.difficulty,
+            defaultBalls: BASE_50_SYSTEM_RECORD.defaultBalls,
+            defaultTrajectory: BASE_50_SYSTEM_RECORD.defaultTrajectory,
+            author: BASE_50_SYSTEM_RECORD.author,
+            youtubeUrl: BASE_50_SYSTEM_RECORD.youtubeUrl,
+            diagramUrl: BASE_50_SYSTEM_RECORD.diagramUrl,
+            diamondNumbers: BASE_50_SYSTEM_RECORD.diamondNumbers,
+            segmentedTrajectories: BASE_50_SYSTEM_RECORD.segmentedTrajectories,
+            cheatSheets: BASE_50_SYSTEM_RECORD.cheatSheets,
+            effectType: BASE_50_SYSTEM_RECORD.effectType,
+            canonicalShots: BASE_50_SYSTEM_RECORD.canonicalShots,
+            diamondPinMap: BASE_50_SYSTEM_RECORD.diamondPinMap,
+            isPremium: BASE_50_SYSTEM_RECORD.isPremium,
+        })
+        .onConflictDoUpdate({
+            target: billiardSystems.id,
+            set: {
+                name: BASE_50_SYSTEM_RECORD.name,
+                category: BASE_50_SYSTEM_RECORD.category,
+                formula: BASE_50_SYSTEM_RECORD.formula,
+                description: BASE_50_SYSTEM_RECORD.description,
+                difficulty: BASE_50_SYSTEM_RECORD.difficulty,
+                defaultBalls: BASE_50_SYSTEM_RECORD.defaultBalls,
+                defaultTrajectory: BASE_50_SYSTEM_RECORD.defaultTrajectory,
+                author: BASE_50_SYSTEM_RECORD.author,
+                youtubeUrl: BASE_50_SYSTEM_RECORD.youtubeUrl,
+                diagramUrl: BASE_50_SYSTEM_RECORD.diagramUrl,
+                diamondNumbers: BASE_50_SYSTEM_RECORD.diamondNumbers,
+                segmentedTrajectories: BASE_50_SYSTEM_RECORD.segmentedTrajectories,
+                cheatSheets: BASE_50_SYSTEM_RECORD.cheatSheets,
+                effectType: BASE_50_SYSTEM_RECORD.effectType,
+                canonicalShots: BASE_50_SYSTEM_RECORD.canonicalShots,
+                diamondPinMap: BASE_50_SYSTEM_RECORD.diamondPinMap,
+                isPremium: BASE_50_SYSTEM_RECORD.isPremium,
+            },
+        });
+    console.log(`[seed] Seeded Sistema Base 50 with Universal Diamond Slot Map and 10 canonical shots.`);
 
     // 3. Seed Default Demo User
     const demoEmail = 'demo@bandaro.app';
