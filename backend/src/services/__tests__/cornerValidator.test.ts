@@ -34,12 +34,14 @@ describe('validateCorners', () => {
 
     it('rejects corners with non-numeric values', () => {
         const corners = [
-            { x: NaN, y: 0.1 },
+            { x: 'invalid' as unknown as number, y: 0.1 },
             { x: 0.9, y: 0.1 },
             { x: 0.9, y: 0.9 },
             { x: 0.1, y: 0.9 },
-        ] as unknown as Point[];
-        expect(validateCorners(corners).valid).toBe(false);
+        ] as Point[];
+        const res = validateCorners(corners);
+        expect(res.valid).toBe(false);
+        expect(res.error).toBe('Each corner must have numeric x and y');
     });
 
     it('rejects corners outside expanded canvas range', () => {

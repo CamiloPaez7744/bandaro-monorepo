@@ -1,7 +1,7 @@
 const ONE_SECOND_MS = 1000;
 
 function base64UrlEncode(value: string): string {
-    return encodeURIComponent(value).replaceAll('%', '_');
+    return encodeURIComponent(value).replaceAll('.', '%2E').replaceAll('%', '_');
 }
 
 function base64UrlDecode(value: string): string {

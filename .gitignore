@@ -64,6 +64,6 @@ scraper/
 scratch/
 *.log
 docs/training-images/
-
-
-
+# Test coverage
+coverage/
+*.lcov

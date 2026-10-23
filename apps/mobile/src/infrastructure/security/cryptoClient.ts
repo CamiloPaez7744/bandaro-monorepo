@@ -26,6 +26,11 @@ export interface EncryptedPayload {
 let cachedHandshake: HandshakeInfo | null = null;
 let handshakePromise: Promise<HandshakeInfo | null> | null = null;
 
+export function resetHandshakeCache(): void {
+    cachedHandshake = null;
+    handshakePromise = null;
+}
+
 /**
  * Convert PEM public key to ArrayBuffer (SPKI DER)
  */

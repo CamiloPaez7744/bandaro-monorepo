@@ -32,6 +32,31 @@ describe('normalizeBalls', () => {
     it('returns empty array for empty input', () => {
         expect(normalizeBalls([])).toEqual([]);
     });
+
+    it('reassigns duplicate ball labels when duplicates exist and length >= 3', () => {
+        const balls = [
+            { label: 'white', x: 0.1, y: 0.1 },
+            { label: 'white', x: 0.5, y: 0.5 },
+            { label: 'red', x: 0.8, y: 0.8 },
+        ];
+        const res = normalizeBalls(balls);
+        const labels = res.map((b) => b.label);
+        expect(new Set(labels).size).toBe(3);
+        expect(labels).toContain('white');
+        expect(labels).toContain('yellow');
+        expect(labels).toContain('red');
+    });
+
+    it('handles extra duplicate balls when standard colors run out', () => {
+        const balls = [
+            { label: 'white', x: 0.1, y: 0.1 },
+            { label: 'white', x: 0.2, y: 0.2 },
+            { label: 'yellow', x: 0.3, y: 0.3 },
+            { label: 'red', x: 0.4, y: 0.4 },
+        ];
+        const res = normalizeBalls(balls);
+        expect(res).toHaveLength(4);
+    });
 });
 
 describe('validateBallCount', () => {
