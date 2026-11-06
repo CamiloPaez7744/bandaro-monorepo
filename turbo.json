@@ -19,6 +19,7 @@
                 "^build"
             ],
             "outputs": [
+                "dist/**",
                 "web-build/**"
             ]
         },

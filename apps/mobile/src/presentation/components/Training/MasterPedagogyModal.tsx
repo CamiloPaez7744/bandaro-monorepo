@@ -301,6 +301,22 @@ const LOCAL_ASSET_IMAGES: Record<string, any> = {
     '/assets/images/theory/billiard_stance_multiview.jpg': require('@/assets/images/theory/billiard_stance_multiview.jpg'),
     '/assets/images/theory/billiard_vision_aiming.jpg': require('@/assets/images/theory/billiard_vision_aiming.jpg'),
     '/assets/images/theory/billiard_clock_systems_masters.jpg': require('@/assets/images/theory/billiard_clock_systems_masters.jpg'),
+    // Responsive Stance Images (ES/EN)
+    '/assets/images/theory/billiard_stance_mobile_es.jpg': require('@/assets/images/theory/billiard_stance_mobile_es.jpg'),
+    '/assets/images/theory/billiard_stance_mobile_en.jpg': require('@/assets/images/theory/billiard_stance_mobile_en.jpg'),
+    '/assets/images/theory/billiard_stance_tablet_es.jpg': require('@/assets/images/theory/billiard_stance_tablet_es.jpg'),
+    '/assets/images/theory/billiard_stance_tablet_en.jpg': require('@/assets/images/theory/billiard_stance_tablet_en.jpg'),
+    '/assets/images/theory/billiard_stance_desktop_es.jpg': require('@/assets/images/theory/billiard_stance_desktop_es.jpg'),
+    '/assets/images/theory/billiard_stance_desktop_en.jpg': require('@/assets/images/theory/billiard_stance_desktop_en.jpg'),
+    // Independent Bridges (ES/EN)
+    '/assets/images/theory/billiard_bridge_open_es.jpg': require('@/assets/images/theory/billiard_bridge_open_es.jpg'),
+    '/assets/images/theory/billiard_bridge_open_en.jpg': require('@/assets/images/theory/billiard_bridge_open_en.jpg'),
+    '/assets/images/theory/billiard_bridge_closed_es.jpg': require('@/assets/images/theory/billiard_bridge_closed_es.jpg'),
+    '/assets/images/theory/billiard_bridge_closed_en.jpg': require('@/assets/images/theory/billiard_bridge_closed_en.jpg'),
+    '/assets/images/theory/billiard_bridge_rail_es.jpg': require('@/assets/images/theory/billiard_bridge_rail_es.jpg'),
+    '/assets/images/theory/billiard_bridge_rail_en.jpg': require('@/assets/images/theory/billiard_bridge_rail_en.jpg'),
+    '/assets/images/theory/billiard_bridge_elevated_es.jpg': require('@/assets/images/theory/billiard_bridge_elevated_es.jpg'),
+    '/assets/images/theory/billiard_bridge_elevated_en.jpg': require('@/assets/images/theory/billiard_bridge_elevated_en.jpg'),
 };
 
 interface MasterPedagogyModalProps {
@@ -321,6 +337,8 @@ export function MasterPedagogyModal({ visible, onClose, initialModuleId }: Maste
     const [lessons, setLessons] = useState<PedagogyLesson[]>(LOCAL_FALLBACK_LESSONS);
     const [selectedLessonId, setSelectedLessonId] = useState<string>(initialModuleId ?? 'posture-biomechanics');
     const [lightboxVisible, setLightboxVisible] = useState(false);
+    const [postureDeviceOverride, setPostureDeviceOverride] = useState<'auto' | 'mobile' | 'tablet' | 'desktop'>('auto');
+    const [selectedBridgeKey, setSelectedBridgeKey] = useState<'open' | 'closed' | 'rail' | 'elevated' | 'guide'>('open');
 
     useEffect(() => {
         if (initialModuleId) {
@@ -358,8 +376,38 @@ export function MasterPedagogyModal({ visible, onClose, initialModuleId }: Maste
         Linking.openURL(url).catch((err) => console.warn('Could not open YouTube link:', err));
     };
 
-    const imageSource = activeLesson.imageUrl
-        ? LOCAL_ASSET_IMAGES[activeLesson.imageUrl] ?? { uri: activeLesson.imageUrl }
+    // Dynamically resolve image by device form-factor (mobile/tablet/desktop) and language (ES/EN)
+    let resolvedImageUrl = activeLesson.imageUrl;
+    const langSuffix = isEn ? 'en' : 'es';
+
+    if (activeLesson.id === 'posture-biomechanics') {
+        const targetDevice = postureDeviceOverride === 'auto'
+            ? (width < 600 ? 'mobile' : width < 1024 ? 'tablet' : 'desktop')
+            : postureDeviceOverride;
+
+        if (targetDevice === 'mobile') {
+            resolvedImageUrl = `/assets/images/theory/billiard_stance_mobile_${langSuffix}.jpg`;
+        } else if (targetDevice === 'tablet') {
+            resolvedImageUrl = `/assets/images/theory/billiard_stance_tablet_${langSuffix}.jpg`;
+        } else {
+            resolvedImageUrl = `/assets/images/theory/billiard_stance_desktop_${langSuffix}.jpg`;
+        }
+    } else if (activeLesson.id === 'cue-bridges') {
+        if (selectedBridgeKey === 'open') {
+            resolvedImageUrl = `/assets/images/theory/billiard_bridge_open_${langSuffix}.jpg`;
+        } else if (selectedBridgeKey === 'closed') {
+            resolvedImageUrl = `/assets/images/theory/billiard_bridge_closed_${langSuffix}.jpg`;
+        } else if (selectedBridgeKey === 'rail') {
+            resolvedImageUrl = `/assets/images/theory/billiard_bridge_rail_${langSuffix}.jpg`;
+        } else if (selectedBridgeKey === 'elevated') {
+            resolvedImageUrl = `/assets/images/theory/billiard_bridge_elevated_${langSuffix}.jpg`;
+        } else {
+            resolvedImageUrl = '/assets/images/theory/billiard_bridges_guide.jpg';
+        }
+    }
+
+    const imageSource = resolvedImageUrl
+        ? LOCAL_ASSET_IMAGES[resolvedImageUrl] ?? { uri: resolvedImageUrl }
         : null;
 
     return (
@@ -426,6 +474,81 @@ export function MasterPedagogyModal({ visible, onClose, initialModuleId }: Maste
                     <View style={[styles.containerRow, isWide && styles.containerRowWide]}>
                         {/* LEFT COLUMN: Visual Media (Infographic & YouTube Link) */}
                         <View style={[styles.mediaCol, isWide && styles.mediaColWide]}>
+                            {/* Device Format Selector for Posture & Stance */}
+                            {activeLesson.id === 'posture-biomechanics' && (
+                                <View style={[styles.subSelectorRow, { backgroundColor: palette.card, borderColor: palette.border }]}>
+                                    <Text style={[styles.subSelectorLabel, { color: palette.muted }]}>
+                                        {isEn ? 'Format:' : 'Formato:'}
+                                    </Text>
+                                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.subSelectorPills}>
+                                        {(['auto', 'mobile', 'tablet', 'desktop'] as const).map((d) => {
+                                            const isSel = postureDeviceOverride === d;
+                                            const labels = {
+                                                auto: isEn ? 'Auto' : 'Auto',
+                                                mobile: isEn ? '📱 Mobile (9:16)' : '📱 Móvil (9:16)',
+                                                tablet: isEn ? '📟 Tablet (4:3)' : '📟 Tablet (4:3)',
+                                                desktop: isEn ? '💻 Desktop (16:9)' : '💻 PC (16:9)',
+                                            };
+                                            return (
+                                                <TouchableOpacity
+                                                    key={d}
+                                                    style={[
+                                                        styles.subSelectorPill,
+                                                        {
+                                                            backgroundColor: isSel ? `${palette.primary}25` : 'transparent',
+                                                            borderColor: isSel ? palette.primary : palette.border,
+                                                        },
+                                                    ]}
+                                                    onPress={() => setPostureDeviceOverride(d)}
+                                                >
+                                                    <Text style={[styles.subSelectorPillText, { color: isSel ? palette.primary : palette.text }]}>
+                                                        {labels[d]}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            );
+                                        })}
+                                    </ScrollView>
+                                </View>
+                            )}
+
+                            {/* Independent Bridge Selector */}
+                            {activeLesson.id === 'cue-bridges' && (
+                                <View style={[styles.subSelectorRow, { backgroundColor: palette.card, borderColor: palette.border }]}>
+                                    <Text style={[styles.subSelectorLabel, { color: palette.muted }]}>
+                                        {isEn ? 'Bridge:' : 'Puente:'}
+                                    </Text>
+                                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.subSelectorPills}>
+                                        {(['open', 'closed', 'rail', 'elevated', 'guide'] as const).map((b) => {
+                                            const isSel = selectedBridgeKey === b;
+                                            const labels = {
+                                                open: isEn ? 'Open V' : 'Abierto en V',
+                                                closed: isEn ? 'Closed Loop' : 'Con Anilla',
+                                                rail: isEn ? 'Rail Bridge' : 'Sobre Banda',
+                                                elevated: isEn ? 'Elevated (Piqué)' : 'Elevado (Piqué)',
+                                                guide: isEn ? '4-in-1 Guide' : 'Guía 4 en 1',
+                                            };
+                                            return (
+                                                <TouchableOpacity
+                                                    key={b}
+                                                    style={[
+                                                        styles.subSelectorPill,
+                                                        {
+                                                            backgroundColor: isSel ? `${palette.primary}25` : 'transparent',
+                                                            borderColor: isSel ? palette.primary : palette.border,
+                                                        },
+                                                    ]}
+                                                    onPress={() => setSelectedBridgeKey(b)}
+                                                >
+                                                    <Text style={[styles.subSelectorPillText, { color: isSel ? palette.primary : palette.text }]}>
+                                                        {labels[b]}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            );
+                                        })}
+                                    </ScrollView>
+                                </View>
+                            )}
+
                             {imageSource && (
                                 <TouchableOpacity
                                     style={[
@@ -965,5 +1088,34 @@ const styles = StyleSheet.create({
     drillHint: {
         fontSize: 13,
         lineHeight: 18,
+    },
+    subSelectorRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 12,
+        borderWidth: 1,
+        marginBottom: 10,
+        gap: 8,
+    },
+    subSelectorLabel: {
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    subSelectorPills: {
+        flexDirection: 'row',
+        gap: 6,
+        alignItems: 'center',
+    },
+    subSelectorPill: {
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 8,
+        borderWidth: 1,
+    },
+    subSelectorPillText: {
+        fontSize: 11,
+        fontWeight: '700',
     },
 });
