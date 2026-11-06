@@ -26,8 +26,14 @@ Enforce, validate, and permanently encode the 10 Mandatory System Rules across B
 6. **Rule 10 & Rule Permanence**: Created `.agents/rules/mandatory-project-rules.md`, `GEMINI.md`, `AGENTS.md`, and updated `_os/ARCHITECTURE.md` to guarantee that all agents adhere to these 10 rules.
 
 ## Active Status
-- Phase: Base 50 Trajectory & 4 Aristas System Completed
+- Phase: Production Deployment Ready (Render + Vercel + Cloud DB)
 - Recent Changes:
+  - **Deploy Infrastructure & Cloud Database Ready**:
+    - Created `render.yaml` for 1-click backend deployment on Render Free Tier.
+    - Created root `vercel.json` and `apps/mobile/vercel.json` with SPA route support and clean URLs.
+    - Updated `backend/src/db/index.ts` to automatically negotiate SSL for remote databases (Neon, Supabase, Render, Aiven).
+    - Resolved web bundling missing assets in `apps/mobile/assets/images/theory/` (`billiard_base50_conti.jpg`, `billiard_carom_figures.jpg`), verified 24 static routes in `expo export --platform web`.
+    - Executed commit `5aeac68` and pushed to `origin/main` upon explicit user request.
   - **Canonical Base 50 Trajectory & 4 Aristas (`base50Geometry.ts`, `TrainingPlayTable.tsx`, `TrainingSystemScreen.tsx`)**:
     - **Base 50 Trajectory Geometry**: Aligned with authentic carom physics and user specification (Image 1):
       - 1ª Banda (Ataque: Banda larga superior, e.g. diamante 30).
