@@ -11,6 +11,7 @@
         "db:migrate": "drizzle-kit migrate",
         "db:push": "drizzle-kit push",
         "db:seed": "tsx src/db/seed.ts",
+        "db:seed:catalog": "tsx src/db/seed_catalog.ts",
         "db:studio": "drizzle-kit studio",
         "lint": "echo \"Backend lint pending\"",
         "type-check": "tsc --noEmit",

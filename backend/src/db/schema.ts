@@ -7,6 +7,7 @@ import {
     jsonb,
     numeric,
     pgTable,
+    serial,
     text,
     timestamp,
     uniqueIndex,
@@ -335,7 +336,7 @@ export const ballPosition = pgTable('ball_positions', {
 export const shotCatalog = pgTable(
     'shot_catalog',
     {
-        id: integer('id').primaryKey(),
+        id: serial('id').primaryKey(),
         externalId: integer('external_id').notNull().unique(),
         sourceType: text('source_type').notNull().default('analysis'),
         nameEs: text('name_es').notNull(),
