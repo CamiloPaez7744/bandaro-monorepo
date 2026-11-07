@@ -163,6 +163,9 @@ export async function runSchemaUpdates() {
         ALTER TABLE shot_catalog 
             ADD COLUMN IF NOT EXISTS is_premium boolean NOT NULL DEFAULT false;
         CREATE INDEX IF NOT EXISTS idx_shot_catalog_premium ON shot_catalog(is_premium);
+
+        CREATE SEQUENCE IF NOT EXISTS shot_catalog_id_seq;
+        ALTER TABLE shot_catalog ALTER COLUMN id SET DEFAULT nextval('shot_catalog_id_seq');
     `);
 
     // 10. Propuesta 1: Granular Training Sessions

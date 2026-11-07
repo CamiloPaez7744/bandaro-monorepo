@@ -2,6 +2,7 @@ import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { sql } from 'drizzle-orm';
 import { db } from './index.js';
 import { shotCatalog } from './schema.js';
 
@@ -10,6 +11,18 @@ const __dirname = path.dirname(__filename);
 
 export async function seedCatalog(limitFiles?: number) {
     console.log('[catalog-seed] Starting shot catalog seed...');
+
+    // 0. Ensure id column has an auto-increment sequence attached in PostgreSQL
+    try {
+        await db.execute(sql`
+            CREATE SEQUENCE IF NOT EXISTS shot_catalog_id_seq;
+            ALTER TABLE shot_catalog ALTER COLUMN id SET DEFAULT nextval('shot_catalog_id_seq');
+            SELECT setval('shot_catalog_id_seq', COALESCE((SELECT MAX(id) FROM shot_catalog), 0) + 1, false);
+        `);
+        console.log('[catalog-seed] Auto-increment sequence verified for shot_catalog.id');
+    } catch (seqErr) {
+        console.warn('[catalog-seed] Sequence check note:', seqErr);
+    }
 
     const dataDir = path.resolve(__dirname, '../../tmp/scraper/translated_data');
     if (!fs.existsSync(dataDir)) {
